@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="شهد با موم طبیعی">
+  <defs>
+    <linearGradient id="bg-p018" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="50%" stop-color="#F59E0B22"/>
+      <stop offset="100%" stop-color="#B4530944"/>
+    </linearGradient>
+    <radialGradient id="glow-p018" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="jar-p018" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg-p018)"/>
+  <circle cx="400" cy="320" r="280" fill="url(#glow-p018)"/>
+  <g transform="translate(400,380)">
+    <path d="M-120,-80 L120,-80 L140,180 Q140,220 100,220 L-100,220 Q-140,220 -140,180 Z" fill="url(#jar-p018)" opacity="0.9"/>
+    <ellipse cx="0" cy="-80" rx="120" ry="28" fill="#B45309"/>
+    <ellipse cx="0" cy="40" rx="90" ry="70" fill="#FDE68A" opacity="0.5"/>
+    <path d="M-60,120 Q0,160 60,120" stroke="#B45309" stroke-width="4" fill="none" opacity="0.6"/>
+  </g>
+  <g opacity="0.15" fill="#B45309">
+    <polygon points="120,120 140,150 110,150"/>
+    <polygon points="680,200 700,230 670,230"/>
+    <polygon points="200,650 220,680 190,680"/>
+    <polygon points="600,580 620,610 590,610"/>
+  </g>
+</svg>

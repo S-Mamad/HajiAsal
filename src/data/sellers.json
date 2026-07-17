@@ -1,0 +1,26 @@
+[
+  {
+    "id": "s1",
+    "shopName": "زنبورداری البرز",
+    "ownerName": "حسین محمدی",
+    "phone": "09121111111",
+    "passwordHash": "scrypt$NDQMuyBRdq7P76kLdlhMuQ$SfXCRHqm8tbFSl0GoWWoO1LeXqJsSf518UvPya-D4x1st9fOvfnFBmvVH9NCYK8zcnHgoCyhmHvRszpLP7_Ihg",
+    "city": "کرج",
+    "status": "active",
+    "isDemo": true,
+    "commissionPercent": 10,
+    "joinedAt": "2025-01-10"
+  },
+  {
+    "id": "s2",
+    "shopName": "شهد زاگرس",
+    "ownerName": "مریم کریمی",
+    "phone": "09122222222",
+    "passwordHash": "scrypt$aQh7j2hX3V92VATGRohYsA$Mr6ghcsjPhhvfmfetT8BlS1HPRxqPKEOMxfgxZKs5taXT_5ydbIHAUOSLtGvEUZK9nBPPGB70BB1FEOwENC4cA",
+    "city": "شیراز",
+    "status": "active",
+    "isDemo": true,
+    "commissionPercent": 10,
+    "joinedAt": "2025-03-22"
+  }
+]

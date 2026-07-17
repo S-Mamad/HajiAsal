@@ -1,0 +1,1472 @@
+[
+  {
+    "id": "p001",
+    "slug": "asal-koohestan-alborz",
+    "title": "عسل کوهستان البرز",
+    "shortDescription": "عسل طبیعی از ارتفاعات البرز با طعم ملایم و عطر گل‌های کوهی",
+    "longDescription": "این عسل از کندوهای سنتی در ارتفاعات البرز برداشت می‌شود. رنگ کهربایی روشن و بافت نرم آن نشان‌دهنده خلوص و کیفیت بالاست. مناسب مصرف روزانه و تقویت سیستم ایمنی.",
+    "category": "mountain",
+    "categoryLabel": "عسل کوهستان",
+    "images": [
+      "/images/products/p001.jpg",
+      "/images/products/p001-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 285000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 520000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 128,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ عسل طبیعی کوهستان",
+    "shippingInfo": "ارسال در بسته‌بندی ضدضربه ظرف ۲ تا ۴ روز کاری"
+  },
+  {
+    "id": "p002",
+    "slug": "asal-koohestan-lorestan",
+    "title": "عسل کوهی لرستان",
+    "shortDescription": "عسل وحشی از دامنه‌های زاگرس با طعم قوی و طبیعی",
+    "longDescription": "عسل کوهی لرستان از گیاهان بومی منطقه تغذیه می‌شود و طعمی متمایز و عمیق دارد. برای علاقه‌مندان به عسل‌های پرطعم و اصیل ایرانی ایده‌آل است.",
+    "category": "mountain",
+    "categoryLabel": "عسل کوهستان",
+    "images": [
+      "/images/products/p002.jpg",
+      "/images/products/p002-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 310000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 580000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 94,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ عسل طبیعی کوهی",
+    "shippingInfo": "ارسال سردخانه‌ای در فصل گرم سال"
+  },
+  {
+    "id": "p003",
+    "slug": "asal-koohestan-mazandaran",
+    "title": "عسل کوهستان مازندران",
+    "shortDescription": "عسل معطر از جنگل‌های هیرکانی شمال ایران",
+    "longDescription": "برداشت از مناطق جنگلی مازندران با تنوع گل‌های وحشی. این عسل عطر ملایم و طعم شیرین متعادل دارد و برای صبحانه و دمنوش عالی است.",
+    "category": "mountain",
+    "categoryLabel": "عسل کوهستان",
+    "images": [
+      "/images/products/p003.jpg",
+      "/images/products/p003-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۰۰ گرم",
+        "grams": 300,
+        "price": 195000
+      },
+      {
+        "label": "۷۰۰ گرم",
+        "grams": 700,
+        "price": 395000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 67,
+    "ingredients": "۱۰۰٪ عسل طبیعی",
+    "shippingInfo": "ارسال سراسری با بسته‌بندی ایمن"
+  },
+  {
+    "id": "p004",
+    "slug": "asal-koohestan-kerman",
+    "title": "عسل کوهستان کرمان",
+    "shortDescription": "عسل خشک و غلیظ از ارتفاعات جنوب شرق",
+    "longDescription": "عسل کوهستان کرمان به دلیل آب‌وهوای خشک، غلظت بالایی دارد و طعمی متفاوت از عسل‌های شمالی ارائه می‌دهد. مناسب مصرف مستقیم و طب سنتی.",
+    "category": "mountain",
+    "categoryLabel": "عسل کوهستان",
+    "images": [
+      "/images/products/p004.jpg",
+      "/images/products/p004-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 275000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 495000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 45,
+    "ingredients": "۱۰۰٪ عسل طبیعی کوهستان",
+    "shippingInfo": "ارسال در سراسر کشور"
+  },
+  {
+    "id": "p005",
+    "slug": "asal-koohestan-ardabil",
+    "title": "عسل کوهستان اردبیل",
+    "shortDescription": "عسل سبلان با کیفیت ممتاز و رنگ طلایی",
+    "longDescription": "از دامنه‌های سبلان برداشت شده و یکی از معروف‌ترین عسل‌های کوهستانی شمال غرب است. بافت کرمی و طعم متعادل برای تمام سنین مناسب است.",
+    "category": "mountain",
+    "categoryLabel": "عسل کوهستان",
+    "images": [
+      "/images/products/p005.jpg",
+      "/images/products/p005-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 295000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 545000
+      }
+    ],
+    "inStock": false,
+    "rating": 4.9,
+    "reviewCount": 112,
+    "ingredients": "۱۰۰٪ عسل طبیعی",
+    "shippingInfo": "موجودی محدود، پیش‌سفارش فعال"
+  },
+  {
+    "id": "p006",
+    "slug": "asal-avishan-sabalan",
+    "title": "عسل آویشن سبلان",
+    "shortDescription": "عسل آویشن خالص با عطر قوی و خواص درمانی",
+    "longDescription": "عسل آویشن یکی از گران‌ترین و باکیفیت‌ترین عسل‌های ایران است. از گل آویشن کوهستانی تغذیه می‌شود و برای سرفه، سرماخوردگی و تقویت عمومی بدن توصیه می‌شود.",
+    "category": "thyme",
+    "categoryLabel": "عسل آویشن",
+    "images": [
+      "/images/products/p006.jpg",
+      "/images/products/p006-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۲۵۰ گرم",
+        "grams": 250,
+        "price": 385000
+      },
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 720000
+      }
+    ],
+    "inStock": true,
+    "rating": 5,
+    "reviewCount": 203,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ عسل آویشن طبیعی",
+    "shippingInfo": "بسته‌بندی ویژه با جعبه چوبی"
+  },
+  {
+    "id": "p007",
+    "slug": "asal-avishan-organic",
+    "title": "عسل آویشن ارگانیک",
+    "shortDescription": "گواهی ارگانیک، بدون آفت‌کش و افزودنی",
+    "longDescription": "این عسل از کندوهای ارگانیک در ارتفاعات آذربایجان برداشت می‌شود. تمام مراحل تولید تحت نظارت و با گواهی معتبر ارگانیک انجام می‌گیرد.",
+    "category": "thyme",
+    "categoryLabel": "عسل آویشن",
+    "images": [
+      "/images/products/p007.jpg",
+      "/images/products/p007-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۰۰ گرم",
+        "grams": 300,
+        "price": 450000
+      },
+      {
+        "label": "۶۰۰ گرم",
+        "grams": 600,
+        "price": 850000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 87,
+    "isNew": true,
+    "ingredients": "۱۰۰٪ عسل آویشن ارگانیک",
+    "shippingInfo": "ارسال با بیمه کامل"
+  },
+  {
+    "id": "p008",
+    "slug": "asal-avishan-kurdistan",
+    "title": "عسل آویشن کردستان",
+    "shortDescription": "عسل آویشن از مراتع کردستان با طعم اصیل",
+    "longDescription": "برداشت سنتی از زنبورداران بومی کردستان. عطر آویشن کوهستانی و طعم ملایم-تلخ این عسل آن را برای مصرف‌کنندگان حرفه‌ای جذاب کرده است.",
+    "category": "thyme",
+    "categoryLabel": "عسل آویشن",
+    "images": [
+      "/images/products/p008.jpg",
+      "/images/products/p008-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 680000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 1250000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 56,
+    "ingredients": "۱۰۰٪ عسل آویشن",
+    "shippingInfo": "ارسال ۲ تا ۵ روز کاری"
+  },
+  {
+    "id": "p009",
+    "slug": "asal-avishan-premium",
+    "title": "عسل آویشن ممتاز",
+    "shortDescription": "درجه یک صادراتی با آزمایشگاه تأیید شده",
+    "longDescription": "بالاترین درجه کیفیت عسل آویشن با گزارش آزمایشگاه معتبر. مناسب هدیه و مصرف لوکس. بسته‌بندی شیشه‌ای درب‌دار با جعبه هدیه.",
+    "category": "thyme",
+    "categoryLabel": "عسل آویشن",
+    "images": [
+      "/images/products/p009.jpg",
+      "/images/products/p009-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۲۵۰ گرم",
+        "grams": 250,
+        "price": 420000
+      }
+    ],
+    "discountPrice": 380000,
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 34,
+    "ingredients": "۱۰۰٪ عسل آویشن ممتاز",
+    "shippingInfo": "ارسال اکسپرس در تهران"
+  },
+  {
+    "id": "p010",
+    "slug": "asal-chehel-giah",
+    "title": "عسل چهل‌گیاه",
+    "shortDescription": "ترکیب گل‌های وحشی با طعم متعادل و عطر دلنشین",
+    "longDescription": "عسل چهل‌گیاه از تغذیه زنبور بر روی انواع گل‌های وحشی به دست می‌آید. طعم متعادل و رنگ کهربایی آن محبوب‌ترین انتخاب مشتریان است.",
+    "category": "multifloral",
+    "categoryLabel": "عسل چهل‌گیاه",
+    "images": [
+      "/images/products/p010.jpg",
+      "/images/products/p010-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 245000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 450000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 156,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ عسل چهل‌گیاه",
+    "shippingInfo": "ارسال استاندارد"
+  },
+  {
+    "id": "p011",
+    "slug": "asal-bahar",
+    "title": "عسل بهار",
+    "shortDescription": "عسل بهاره با رنگ روشن و طعم شیرین ملایم",
+    "longDescription": "برداشت بهاری از کندوها با شکوفه‌های تازه. این عسل برای کودکان و افرادی که طعم ملایم را ترجیح می‌دهند ایده‌آل است.",
+    "category": "multifloral",
+    "categoryLabel": "عسل چهل‌گیاه",
+    "images": [
+      "/images/products/p011.jpg",
+      "/images/products/p011-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۴۰۰ گرم",
+        "grams": 400,
+        "price": 210000
+      },
+      {
+        "label": "۸۰۰ گرم",
+        "grams": 800,
+        "price": 385000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 78,
+    "ingredients": "۱۰۰٪ عسل بهار",
+    "shippingInfo": "ارسال در سراسر کشور"
+  },
+  {
+    "id": "p012",
+    "slug": "asal-taame",
+    "title": "عسل تابستانه",
+    "shortDescription": "عسل تابستان با غلظت بالا و طعم غنی",
+    "longDescription": "برداشت تابستانی با تنوع گل‌های فصلی. غلظت بالاتر و طعم قوی‌تر نسبت به عسل بهاری دارد.",
+    "category": "multifloral",
+    "categoryLabel": "عسل چهل‌گیاه",
+    "images": [
+      "/images/products/p012.jpg",
+      "/images/products/p012-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 235000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 430000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 42,
+    "ingredients": "۱۰۰٪ عسل طبیعی",
+    "shippingInfo": "ارسال ۳ روز کاری"
+  },
+  {
+    "id": "p013",
+    "slug": "asal-paeizi",
+    "title": "عسل پاییزه",
+    "shortDescription": "عسل پاییزی تیره با طعم عمیق و ماندگار",
+    "longDescription": "آخرین برداشت فصل با بیشترین غلظت و مواد معدنی. رنگ تیره‌تر و طعم قوی‌تر برای علاقه‌مندان به عسل پرطعم.",
+    "category": "multifloral",
+    "categoryLabel": "عسل چهل‌گیاه",
+    "images": [
+      "/images/products/p013.jpg",
+      "/images/products/p013-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 255000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 38,
+    "ingredients": "۱۰۰٪ عسل پاییزه",
+    "shippingInfo": "موجودی فصلی محدود"
+  },
+  {
+    "id": "p014",
+    "slug": "asal-giyahane-vahshi",
+    "title": "عسل گیاهان وحشی",
+    "shortDescription": "از مراتع بدون کشت، کاملاً طبیعی",
+    "longDescription": "زنبورها تنها از گیاهان وحشی تغذیه می‌شوند. هیچ کشت انسانی در منطقه وجود ندارد و عسل کاملاً ارگانیک است.",
+    "category": "multifloral",
+    "categoryLabel": "عسل چهل‌گیاه",
+    "images": [
+      "/images/products/p014.jpg",
+      "/images/products/p014-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۵۰ گرم",
+        "grams": 350,
+        "price": 265000
+      },
+      {
+        "label": "۷۰۰ گرم",
+        "grams": 700,
+        "price": 480000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 61,
+    "isNew": true,
+    "ingredients": "۱۰۰٪ عسل گیاهان وحشی",
+    "shippingInfo": "ارسال با بسته‌بندی اکو"
+  },
+  {
+    "id": "p015",
+    "slug": "jel-royal-khales",
+    "title": "ژل رویال خالص",
+    "shortDescription": "ژل رویال تازه منجمد با بالاترین خلوص",
+    "longDescription": "ژل رویال خالص با خلوص ۹۹٪ از کندوهای منتخب. سرشار از پروتئین، ویتامین B و اسیدهای آمینه. برای تقویت انرژی و سیستم ایمنی.",
+    "category": "royal-jelly",
+    "categoryLabel": "ژل رویال",
+    "images": [
+      "/images/products/p015.jpg",
+      "/images/products/p015-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۱۰ گرم",
+        "grams": 10,
+        "price": 580000
+      },
+      {
+        "label": "۲۰ گرم",
+        "grams": 20,
+        "price": 1050000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 72,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ ژل رویال خالص",
+    "shippingInfo": "ارسال سردخانه‌ای الزامی"
+  },
+  {
+    "id": "p016",
+    "slug": "asal-va-jel-royal",
+    "title": "ترکیب عسل و ژل رویال",
+    "shortDescription": "عسل طبیعی غنی‌شده با ژل رویال تازه",
+    "longDescription": "ترکیب اختصاصی عسل چهل‌گیاه با ۳٪ ژل رویال خالص. طعم عسل با فواید ژل رویال، مناسب مصرف روزانه.",
+    "category": "royal-jelly",
+    "categoryLabel": "ژل رویال",
+    "images": [
+      "/images/products/p016.jpg",
+      "/images/products/p016-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۲۵۰ گرم",
+        "grams": 250,
+        "price": 495000
+      },
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 920000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 48,
+    "ingredients": "عسل طبیعی، ژل رویال ۳٪",
+    "shippingInfo": "نگهداری در یخچال پس از باز کردن"
+  },
+  {
+    "id": "p017",
+    "slug": "jel-royal-capsule",
+    "title": "کپسول ژل رویال",
+    "shortDescription": "مصرف آسان، ۶۰ عدد کپسول گیاهی",
+    "longDescription": "کپسول‌های ژل رویال خشک‌شده برای مصرف راحت در سفر و محل کار. هر کپسول معادل ۵۰۰ میلی‌گرم ژل رویال خالص.",
+    "category": "royal-jelly",
+    "categoryLabel": "ژل رویال",
+    "images": [
+      "/images/products/p017.jpg",
+      "/images/products/p017-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۶۰ عدد",
+        "grams": 60,
+        "price": 385000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 29,
+    "isNew": true,
+    "ingredients": "ژل رویال خشک، کپسول گیاهی",
+    "shippingInfo": "ارسال عادی"
+  },
+  {
+    "id": "p018",
+    "slug": "shehad-ba-moom",
+    "title": "شهد با موم طبیعی",
+    "shortDescription": "موم عسل تازه با عسل خام، تجربه‌ای اصیل",
+    "longDescription": "تکه‌های موم عسل با عسل طبیعی داخل آن. موم را می‌جوید و عسل را می‌چشید، همان تجربه‌ای که نسل‌های قبل داشتند.",
+    "category": "honeycomb",
+    "categoryLabel": "شهد با موم",
+    "images": [
+      "/images/products/p018.jpg",
+      "/images/products/p018-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۰۰ گرم",
+        "grams": 300,
+        "price": 420000
+      },
+      {
+        "label": "۶۰۰ گرم",
+        "grams": 600,
+        "price": 780000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 89,
+    "isBestseller": true,
+    "ingredients": "موم عسل طبیعی، عسل خام",
+    "shippingInfo": "بسته‌بندی وکیوم"
+  },
+  {
+    "id": "p019",
+    "slug": "moom-asal-tabiei",
+    "title": "موم عسل طبیعی",
+    "shortDescription": "موم زرد خالص برای مصارف سنتی و صنایع دستی",
+    "longDescription": "موم عسل خالص برداشت‌شده از کندو. مناسب برای شمع‌سازی، لوازم آرایشی طبیعی و مصارف طب سنتی.",
+    "category": "honeycomb",
+    "categoryLabel": "شهد با موم",
+    "images": [
+      "/images/products/p019.jpg",
+      "/images/products/p019-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۲۰۰ گرم",
+        "grams": 200,
+        "price": 185000
+      },
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 395000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 23,
+    "ingredients": "۱۰۰٪ موم عسل طبیعی",
+    "shippingInfo": "ارسال استاندارد"
+  },
+  {
+    "id": "p020",
+    "slug": "shehad-moom-koochek",
+    "title": "موم عسل کوچک (هدیه)",
+    "shortDescription": "تکه‌های موم عسل در بسته‌بندی هدیه",
+    "longDescription": "موم عسل در اندازه‌های کوچک و زیبا برای هدیه دادن. هر بسته شامل ۴ تکه موم با عسل طبیعی.",
+    "category": "honeycomb",
+    "categoryLabel": "شهد با موم",
+    "images": [
+      "/images/products/p020.jpg",
+      "/images/products/p020-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۱۵۰ گرم",
+        "grams": 150,
+        "price": 245000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 31,
+    "ingredients": "موم عسل، عسل طبیعی",
+    "shippingInfo": "جعبه هدیه شامل"
+  },
+  {
+    "id": "p021",
+    "slug": "shehad-moom-premium",
+    "title": "شهد موم ممتاز",
+    "shortDescription": "موم عسل درجه یک با عسل آویشن",
+    "longDescription": "ترکیب لوکس موم عسل تازه با عسل آویشن خالص. بسته‌بندی شیشه‌ای با درب چوبی.",
+    "category": "honeycomb",
+    "categoryLabel": "شهد با موم",
+    "images": [
+      "/images/products/p021.jpg",
+      "/images/products/p021-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۴۰۰ گرم",
+        "grams": 400,
+        "price": 650000
+      }
+    ],
+    "inStock": true,
+    "rating": 5,
+    "reviewCount": 18,
+    "ingredients": "موم عسل، عسل آویشن",
+    "shippingInfo": "ارسال ویژه"
+  },
+  {
+    "id": "p022",
+    "slug": "asal-sedr",
+    "title": "عسل سدر یمنی",
+    "shortDescription": "عسل سدر اصل با طعم و عطر منحصربه‌فرد",
+    "longDescription": "عسل سدر از درخت سدر بومی یمن برداشت می‌شود. یکی از گران‌ترین و خوش‌طعم‌ترین عسل‌های جهان با خواص درمانی شناخته‌شده.",
+    "category": "specialty",
+    "categoryLabel": "عسل‌های خاص",
+    "images": [
+      "/images/products/p022.jpg",
+      "/images/products/p022-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۲۵۰ گرم",
+        "grams": 250,
+        "price": 890000
+      },
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 1650000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 64,
+    "isBestseller": true,
+    "ingredients": "۱۰۰٪ عسل سدر",
+    "shippingInfo": "گواهی اصالت ضمیمه"
+  },
+  {
+    "id": "p023",
+    "slug": "asal-gavan",
+    "title": "عسل گون",
+    "shortDescription": "عسل گون زرد با طعم ملایم و خواص تقویتی",
+    "longDescription": "عسل گون از گل‌های گون بومی ایران. رنگ زرد روشن و طعم ملایم. برای زنان باردار و سالمندان بسیار توصیه می‌شود.",
+    "category": "specialty",
+    "categoryLabel": "عسل‌های خاص",
+    "images": [
+      "/images/products/p023.jpg",
+      "/images/products/p023-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 365000
+      },
+      {
+        "label": "۱ کیلوگرم",
+        "grams": 1000,
+        "price": 680000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 95,
+    "ingredients": "۱۰۰٪ عسل گون",
+    "shippingInfo": "ارسال استاندارد"
+  },
+  {
+    "id": "p024",
+    "slug": "asal-barbat",
+    "title": "عسل بربط",
+    "shortDescription": "عسل بربط جنوبی، طعم تلخ-شیرین خاص",
+    "longDescription": "عسل بربط از درخت بربط در مناطق جنوب ایران. طعم تلخ-شیرین متمایز و خواص درمانی فراوان در طب سنتی.",
+    "category": "specialty",
+    "categoryLabel": "عسل‌های خاص",
+    "images": [
+      "/images/products/p024.jpg",
+      "/images/products/p024-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۴۰۰ گرم",
+        "grams": 400,
+        "price": 520000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 41,
+    "ingredients": "۱۰۰٪ عسل بربط",
+    "shippingInfo": "موجودی محدود"
+  },
+  {
+    "id": "p025",
+    "slug": "asal-angabin",
+    "title": "عسل انگبین",
+    "shortDescription": "عسل انگبین طبیعی، شیرین و مقوی",
+    "longDescription": "عسل انگبین از ترشحات حشرات روی درختان بربط و توت. طعم شیرین خاص و بافت غلیظ. یکی از عسل‌های سنتی و ارزشمند ایران.",
+    "category": "specialty",
+    "categoryLabel": "عسل‌های خاص",
+    "images": [
+      "/images/products/p025.jpg",
+      "/images/products/p025-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۰۰ گرم",
+        "grams": 300,
+        "price": 445000
+      },
+      {
+        "label": "۶۰۰ گرم",
+        "grams": 600,
+        "price": 820000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 27,
+    "ingredients": "۱۰۰٪ عسل انگبین",
+    "shippingInfo": "ارسال ۳ تا ۵ روز"
+  },
+  {
+    "id": "p026",
+    "slug": "asal-kaseh",
+    "title": "عسل کاسه‌ای",
+    "shortDescription": "عسل سنتی کاسه‌ای با بافت خام و طبیعی",
+    "longDescription": "عسل کاسه‌ای به روش سنتی بدون فیلتراسیون برداشت می‌شود. ذرات گرده و بره‌موم در عسل باقی می‌ماند و خواص آن حفظ می‌شود.",
+    "category": "specialty",
+    "categoryLabel": "عسل‌های خاص",
+    "images": [
+      "/images/products/p026.jpg",
+      "/images/products/p026-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۵۰۰ گرم",
+        "grams": 500,
+        "price": 295000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 53,
+    "ingredients": "عسل کاسه‌ای خام",
+    "shippingInfo": "ارسال با ظرف شیشه‌ای"
+  },
+  {
+    "id": "p027",
+    "slug": "set-hediye-lux",
+    "title": "ست هدیه لوکس",
+    "shortDescription": "مجموعه ۳ عسل ممتاز در جعبه چوبی دست‌ساز",
+    "longDescription": "شامل عسل آویشن، عسل سدر و شهد با موم در شیشه‌های ۱۰۰ گرمی. جعبه چوبی دست‌ساز با حک لوگوی حاجی عسل. هدیه‌ای بی‌نظیر برای مناسبت‌های خاص.",
+    "category": "gift-set",
+    "categoryLabel": "ست هدیه",
+    "images": [
+      "/images/products/p027.jpg",
+      "/images/products/p027-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "ست ۳ عددی",
+        "grams": 300,
+        "price": 1250000
+      }
+    ],
+    "inStock": true,
+    "rating": 5,
+    "reviewCount": 44,
+    "isBestseller": true,
+    "ingredients": "عسل آویشن، عسل سدر، شهد با موم",
+    "shippingInfo": "بسته‌بندی هدیه ویژه"
+  },
+  {
+    "id": "p028",
+    "slug": "baste-azmayeshi",
+    "title": "بسته آزمایشی",
+    "shortDescription": "۶ طعم مختلف در بسته‌بندی کوچک، شروع خوب",
+    "longDescription": "برای کسانی که می‌خواهند طعم‌های مختلف را امتحان کنند. شامل ۶ نمونه ۵۰ گرمی از محبوب‌ترین عسل‌ها.",
+    "category": "gift-set",
+    "categoryLabel": "ست هدیه",
+    "images": [
+      "/images/products/p028.jpg",
+      "/images/products/p028-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "۳۰۰ گرم (۶×۵۰g)",
+        "grams": 300,
+        "price": 385000
+      }
+    ],
+    "discountPrice": 345000,
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 112,
+    "isNew": true,
+    "ingredients": "۶ نوع عسل طبیعی",
+    "shippingInfo": "ارسال سریع"
+  },
+  {
+    "id": "p029",
+    "slug": "set-hediye-nowruz",
+    "title": "ست هدیه نوروزی",
+    "shortDescription": "بسته ویژه نوروز با عسل و موم و ژل رویال",
+    "longDescription": "ست نوروزی شامل عسل چهل‌گیاه ۵۰۰ گرم، شهد با موم ۲۰۰ گرم و ژل رویال ۱۰ گرم. جعبه قرمز سنتی با تزئینات نوروزی.",
+    "category": "gift-set",
+    "categoryLabel": "ست هدیه",
+    "images": [
+      "/images/products/p029.jpg",
+      "/images/products/p029-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "ست کامل",
+        "grams": 710,
+        "price": 980000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 36,
+    "ingredients": "عسل، موم، ژل رویال",
+    "shippingInfo": "ارسال قبل از نوروز تضمین شده"
+  },
+  {
+    "id": "p030",
+    "slug": "set-hediye-salamati",
+    "title": "ست هدیه سلامتی",
+    "shortDescription": "مجموعه محصولات زنبور برای تقویت ایمنی",
+    "longDescription": "شامل عسل آویشن ۳۰۰ گرم، ژل رویال ۱۵ گرم، گرده گل ۱۰۰ گرم و پراپولیس ۳۰ میلی‌لیتر. بسته‌بندی جعبه سلامتی با راهنمای مصرف.",
+    "category": "gift-set",
+    "categoryLabel": "ست هدیه",
+    "images": [
+      "/images/products/p030.jpg",
+      "/images/products/p030-alt.jpg"
+    ],
+    "weightOptions": [
+      {
+        "label": "ست سلامتی",
+        "grams": 445,
+        "price": 1450000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 22,
+    "ingredients": "عسل، ژل رویال، گرده گل، پراپولیس",
+    "shippingInfo": "ارسال با بیمه"
+  },
+  {
+    "id": "p031",
+    "slug": "arag-nana",
+    "title": "عرق نعنا",
+    "shortDescription": "عرق نعنای تازه با عطر تند و طعم خنک، مناسب گوارش و دمنوش",
+    "longDescription": "عرق نعنا از برگ‌های تازه نعنا تقطیر می‌شود و عطری تند و طعمی خنک دارد. برای بهبود گوارش، رفع نفخ و افزودن به شربت و دمنوش مناسب است. بدون افزودنی و نگه‌دارنده صنعتی.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 95000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 135000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 64,
+    "isNew": true,
+    "ingredients": "عرق خالص نعنا، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p031.jpg",
+      "/images/products/p031-alt.jpg"
+    ]
+  },
+  {
+    "id": "p032",
+    "slug": "arag-bidmeshk",
+    "title": "عرق بیدمشک",
+    "shortDescription": "عرق بیدمشک معطر، خنک‌کننده و مناسب شربت‌های سنتی",
+    "longDescription": "عرق بیدمشک از شکوفه بیدمشک به روش سنتی تقطیر می‌شود. عطری ملایم و گلی دارد و در طب سنتی برای آرامش و خنکی بدن شناخته شده است. ایده‌آل برای شربت بیدمشک و سفره افطار.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 110000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 155000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 51,
+    "isBestseller": true,
+    "ingredients": "عرق خالص بیدمشک، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p032.jpg",
+      "/images/products/p032-alt.jpg"
+    ]
+  },
+  {
+    "id": "p033",
+    "slug": "arag-kasni",
+    "title": "عرق کاسنی",
+    "shortDescription": "عرق کاسنی تلخ‌ملایم، مناسب پاکسازی و مصرف روزانه",
+    "longDescription": "عرق کاسنی از ریشه و برگ کاسنی تقطیر می‌شود و طعمی تلخ‌ملایم دارد. در مصرف سنتی برای کمک به پاکسازی بدن و تعادل کبد شناخته می‌شود. بدون رنگ و اسانس مصنوعی.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 90000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 128000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 43,
+    "ingredients": "عرق خالص کاسنی، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p033.jpg",
+      "/images/products/p033-alt.jpg"
+    ]
+  },
+  {
+    "id": "p034",
+    "slug": "arag-shatareh",
+    "title": "عرق شاتره",
+    "shortDescription": "عرق شاتره سنتی، سبک و مناسب ترکیب با عرق کاسنی",
+    "longDescription": "عرق شاتره از گیاه شاتره به روش تقطیر سنتی تهیه می‌شود. طعمی گیاهی و سبک دارد و معمولاً همراه عرق کاسنی مصرف می‌شود. محصول بدون شیرین‌کننده و نگه‌دارنده.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 92000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 130000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 38,
+    "ingredients": "عرق خالص شاتره، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p034.jpg",
+      "/images/products/p034-alt.jpg"
+    ]
+  },
+  {
+    "id": "p035",
+    "slug": "arag-baharnarenj",
+    "title": "عرق بهارنارنج",
+    "shortDescription": "عرق بهارنارنج معطر، آرامش‌بخش و مناسب شربت و شیرینی",
+    "longDescription": "عرق بهارنارنج از شکوفه درخت نارنج تقطیر می‌شود و عطری مرکباتی و دلنشین دارد. برای شربت، شیرینی‌های سنتی و ایجاد حس آرامش در دمنوش‌ها انتخاب محبوبی است.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 125000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 175000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 72,
+    "isBestseller": true,
+    "isNew": true,
+    "ingredients": "عرق خالص بهارنارنج، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p035.jpg",
+      "/images/products/p035-alt.jpg"
+    ]
+  },
+  {
+    "id": "p036",
+    "slug": "golab-mohammadi",
+    "title": "گلاب دوآتشه کاشان",
+    "shortDescription": "گلاب دوآتشه از گل محمدی کاشان، غلیظ و معطر",
+    "longDescription": "گلاب دوآتشه از گل محمدی مرغوب کاشان با تقطیر مجدد به‌دست می‌آید. غلظت و عطر بالاتری نسبت به گلاب معمولی دارد و برای شیرینی، فالوده، شربت و مصارف آرایشی سنتی مناسب است.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۵۰۰ میلی‌لیتر",
+        "grams": 500,
+        "price": 145000
+      },
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 265000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 118,
+    "isBestseller": true,
+    "ingredients": "گلاب دوآتشه گل محمدی",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p036.jpg",
+      "/images/products/p036-alt.jpg"
+    ]
+  },
+  {
+    "id": "p037",
+    "slug": "arag-hel",
+    "title": "عرق هل",
+    "shortDescription": "عرق هل معطر با رایحه‌ای گرم، مناسب دمنوش و شیرینی",
+    "longDescription": "عرق هل از دانه‌های هل سبز تقطیر می‌شود و رایحه‌ای گرم و ادویه‌ای دارد. برای عطر بخشیدن به دمنوش، شله‌زرد، شیرینی و برخی غذاهای سنتی کاربرد دارد.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 135000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 190000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 29,
+    "ingredients": "عرق خالص هل، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p037.jpg",
+      "/images/products/p037-alt.jpg"
+    ]
+  },
+  {
+    "id": "p038",
+    "slug": "arag-avishan",
+    "title": "عرق آویشن",
+    "shortDescription": "عرق آویشن کوهی با عطر تند، مناسب فصل سرما",
+    "longDescription": "عرق آویشن از گیاه آویشن کوهی تقطیر می‌شود و عطری تند و گیاهی دارد. در مصرف سنتی برای فصل سرما و تقویت عمومی بدن محبوب است. بدون اسانس مصنوعی.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 105000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 148000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 55,
+    "ingredients": "عرق خالص آویشن، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p038.jpg",
+      "/images/products/p038-alt.jpg"
+    ]
+  },
+  {
+    "id": "p039",
+    "slug": "arag-shevid",
+    "title": "عرق شوید",
+    "shortDescription": "عرق شوید ملایم، مناسب گوارش و غذاهای سبک",
+    "longDescription": "عرق شوید از گیاه شوید تازه تقطیر می‌شود و طعمی ملایم و گیاهی دارد. برای کمک به گوارش و افزودن به برخی غذاها و نوشیدنی‌های سنتی استفاده می‌شود.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 88000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 125000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 21,
+    "ingredients": "عرق خالص شوید، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p039.jpg",
+      "/images/products/p039-alt.jpg"
+    ]
+  },
+  {
+    "id": "p040",
+    "slug": "arag-pooneh",
+    "title": "عرق پونه",
+    "shortDescription": "عرق پونه کوهی با عطر تند و طعمی تازه",
+    "longDescription": "عرق پونه از پونه کوهی تقطیر می‌شود و عطری تندتر از نعنا دارد. برای شربت، دمنوش و مصارف سنتی فصل گرم و سرد مناسب است. محصول خالص و بدون افزودنی.",
+    "category": "distillates",
+    "categoryLabel": "عرقیجات",
+    "weightOptions": [
+      {
+        "label": "۱ لیتر",
+        "grams": 1000,
+        "price": 98000
+      },
+      {
+        "label": "۱٫۵ لیتر",
+        "grams": 1500,
+        "price": 140000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 33,
+    "isNew": true,
+    "ingredients": "عرق خالص پونه، آب",
+    "shippingInfo": "ارسال در بطری مقاوم ظرف ۲ تا ۴ روز کاری",
+    "images": [
+      "/images/products/p040.jpg",
+      "/images/products/p040-alt.jpg"
+    ]
+  },
+  {
+    "id": "p041",
+    "slug": "berenj-tarom-hashemi",
+    "title": "برنج طارم هاشمی",
+    "shortDescription": "برنج طارم هاشمی شمال، دانه‌بلند و عطری",
+    "longDescription": "برنج طارم هاشمی از شالیزارهای شمال ایران است. دانه‌بلند، عطری و مناسب پخت کته و آبکش. پس از پخت دانه‌ها جدا و نرم می‌مانند و برای مهمانی و مصرف روزانه انتخاب مطمئنی است.",
+    "category": "rice",
+    "categoryLabel": "برنج",
+    "weightOptions": [
+      {
+        "label": "۵ کیلوگرم",
+        "grams": 5000,
+        "price": 685000
+      },
+      {
+        "label": "۱۰ کیلوگرم",
+        "grams": 10000,
+        "price": 1320000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 87,
+    "isBestseller": true,
+    "ingredients": "برنج طارم هاشمی ۱۰۰٪",
+    "shippingInfo": "ارسال در کیسه مقاوم ظرف ۲ تا ۵ روز کاری",
+    "images": [
+      "/images/products/p041.jpg",
+      "/images/products/p041-alt.jpg"
+    ]
+  },
+  {
+    "id": "p042",
+    "slug": "berenj-domsiah",
+    "title": "برنج دمسیاه",
+    "shortDescription": "برنج دمسیاه معطر گیلان، مناسب پلوهای مجلسی",
+    "longDescription": "برنج دمسیاه از ارقام معطر شمال است و پس از پخت عطر قوی و دانه‌های کشیده دارد. برای زرشک‌پلو، باقالی‌پلو و مهمانی‌ها بسیار مناسب است.",
+    "category": "rice",
+    "categoryLabel": "برنج",
+    "weightOptions": [
+      {
+        "label": "۵ کیلوگرم",
+        "grams": 5000,
+        "price": 745000
+      },
+      {
+        "label": "۱۰ کیلوگرم",
+        "grams": 10000,
+        "price": 1450000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 61,
+    "ingredients": "برنج دمسیاه ۱۰۰٪",
+    "shippingInfo": "ارسال در کیسه مقاوم ظرف ۲ تا ۵ روز کاری",
+    "images": [
+      "/images/products/p042.jpg",
+      "/images/products/p042-alt.jpg"
+    ]
+  },
+  {
+    "id": "p043",
+    "slug": "berenj-sadri",
+    "title": "برنج صدری",
+    "shortDescription": "برنج صدری دانه‌ریز و نرم، مناسب کته روزانه",
+    "longDescription": "برنج صدری بافت نرم‌تری نسبت به ارقام دانه‌بلند دارد و برای کته و مصرف روزمره خانواده مناسب است. پخت آسان و طعم ملایم از ویژگی‌های آن است.",
+    "category": "rice",
+    "categoryLabel": "برنج",
+    "weightOptions": [
+      {
+        "label": "۵ کیلوگرم",
+        "grams": 5000,
+        "price": 595000
+      },
+      {
+        "label": "۱۰ کیلوگرم",
+        "grams": 10000,
+        "price": 1150000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 44,
+    "ingredients": "برنج صدری ۱۰۰٪",
+    "shippingInfo": "ارسال در کیسه مقاوم ظرف ۲ تا ۵ روز کاری",
+    "images": [
+      "/images/products/p043.jpg",
+      "/images/products/p043-alt.jpg"
+    ]
+  },
+  {
+    "id": "p044",
+    "slug": "berenj-fajr",
+    "title": "برنج فجر",
+    "shortDescription": "برنج فجر پرمحصول شمال، اقتصادی و خوش‌پخت",
+    "longDescription": "برنج فجر از ارقام اصلاح‌شده شمال است؛ دانه‌ای متوسط، پخت یکنواخت و قیمت مناسب‌تر نسبت به طارم دارد. گزینه خوب برای مصرف هفتگی خانواده.",
+    "category": "rice",
+    "categoryLabel": "برنج",
+    "weightOptions": [
+      {
+        "label": "۵ کیلوگرم",
+        "grams": 5000,
+        "price": 545000
+      },
+      {
+        "label": "۱۰ کیلوگرم",
+        "grams": 10000,
+        "price": 1050000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 36,
+    "isNew": true,
+    "ingredients": "برنج فجر ۱۰۰٪",
+    "shippingInfo": "ارسال در کیسه مقاوم ظرف ۲ تا ۵ روز کاری",
+    "images": [
+      "/images/products/p044.jpg",
+      "/images/products/p044-alt.jpg"
+    ]
+  },
+  {
+    "id": "p045",
+    "slug": "berenj-basmati",
+    "title": "برنج باسماتی هندی",
+    "shortDescription": "برنج باسماتی دانه‌بلند معطر، مناسب پلو و بریانی",
+    "longDescription": "برنج باسماتی هندی با دانه‌های بسیار بلند و عطر مشخص شناخته می‌شود. پس از پخت دانه‌ها کشیده و جدا می‌مانند و برای بریانی، زرشک‌پلو و پلوهای مجلسی عالی است.",
+    "category": "rice",
+    "categoryLabel": "برنج",
+    "weightOptions": [
+      {
+        "label": "۵ کیلوگرم",
+        "grams": 5000,
+        "price": 625000
+      },
+      {
+        "label": "۱۰ کیلوگرم",
+        "grams": 10000,
+        "price": 1190000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 52,
+    "ingredients": "برنج باسماتی ۱۰۰٪",
+    "shippingInfo": "ارسال در کیسه مقاوم ظرف ۲ تا ۵ روز کاری",
+    "images": [
+      "/images/products/p045.jpg",
+      "/images/products/p045-alt.jpg"
+    ]
+  },
+  {
+    "id": "p046",
+    "slug": "zaferan-negin-ghaen",
+    "title": "زعفران نگین قائنات",
+    "shortDescription": "زعفران نگین اعلای قائنات، رنگ‌دهی و عطر قوی",
+    "longDescription": "زعفران نگین قائنات از رشته‌های ضخیم و قرمز یکدست تشکیل شده و قدرت رنگ‌دهی و عطر بالایی دارد. مناسب پلو، دسر، نوشیدنی و هدیه سازمانی. بسته‌بندی بهداشتی و دور از نور.",
+    "category": "saffron",
+    "categoryLabel": "زعفران",
+    "weightOptions": [
+      {
+        "label": "۱ گرم",
+        "grams": 1,
+        "price": 185000
+      },
+      {
+        "label": "۴٫۶۰۸ گرم",
+        "grams": 5,
+        "price": 820000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.9,
+    "reviewCount": 143,
+    "isBestseller": true,
+    "ingredients": "زعفران خالص نگین قائنات",
+    "shippingInfo": "ارسال در بسته‌بندی ضدنور ظرف ۱ تا ۳ روز کاری",
+    "images": [
+      "/images/products/p046.jpg",
+      "/images/products/p046-alt.jpg"
+    ]
+  },
+  {
+    "id": "p047",
+    "slug": "zaferan-sargol",
+    "title": "زعفران سرگل",
+    "shortDescription": "زعفران سرگل خالص، بدون خامه سفید، رنگ‌دهی عالی",
+    "longDescription": "زعفران سرگل فقط بخش قرمز کلاله را شامل می‌شود و بدون خامه سفید است. رنگ‌دهی قوی و عطر مطلوب دارد و برای آشپزی روزمره و حرفه‌ای انتخاب اقتصادی‌تری نسبت به نگین است.",
+    "category": "saffron",
+    "categoryLabel": "زعفران",
+    "weightOptions": [
+      {
+        "label": "۱ گرم",
+        "grams": 1,
+        "price": 165000
+      },
+      {
+        "label": "۴٫۶۰۸ گرم",
+        "grams": 5,
+        "price": 735000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.8,
+    "reviewCount": 97,
+    "isBestseller": true,
+    "ingredients": "زعفران خالص سرگل",
+    "shippingInfo": "ارسال در بسته‌بندی ضدنور ظرف ۱ تا ۳ روز کاری",
+    "images": [
+      "/images/products/p047.jpg",
+      "/images/products/p047-alt.jpg"
+    ]
+  },
+  {
+    "id": "p048",
+    "slug": "zaferan-pushal",
+    "title": "زعفران پوشال",
+    "shortDescription": "زعفران پوشال با مقداری خامه، مناسب مصرف خانگی",
+    "longDescription": "زعفران پوشال شامل رشته قرمز همراه بخشی از خامه زرد است. عطر و رنگ خوبی دارد و برای مصرف خانگی با قیمت مناسب‌تر عرضه می‌شود.",
+    "category": "saffron",
+    "categoryLabel": "زعفران",
+    "weightOptions": [
+      {
+        "label": "۱ گرم",
+        "grams": 1,
+        "price": 135000
+      },
+      {
+        "label": "۴٫۶۰۸ گرم",
+        "grams": 5,
+        "price": 595000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.6,
+    "reviewCount": 58,
+    "ingredients": "زعفران پوشال خالص",
+    "shippingInfo": "ارسال در بسته‌بندی ضدنور ظرف ۱ تا ۳ روز کاری",
+    "images": [
+      "/images/products/p048.jpg",
+      "/images/products/p048-alt.jpg"
+    ]
+  },
+  {
+    "id": "p049",
+    "slug": "zaferan-dasteh",
+    "title": "زعفران دسته",
+    "shortDescription": "زعفران دسته کامل، مناسب هدیه و نگهداری طولانی",
+    "longDescription": "زعفران دسته به صورت رشته‌های کامل کلاله عرضه می‌شود و ظاهر شکیل‌تری برای هدیه دارد. پس از آسیاب یا دم کردن، رنگ و عطر مطلوبی آزاد می‌کند.",
+    "category": "saffron",
+    "categoryLabel": "زعفران",
+    "weightOptions": [
+      {
+        "label": "۱ گرم",
+        "grams": 1,
+        "price": 155000
+      },
+      {
+        "label": "۴٫۶۰۸ گرم",
+        "grams": 5,
+        "price": 690000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.7,
+    "reviewCount": 41,
+    "isNew": true,
+    "ingredients": "زعفران دسته خالص",
+    "shippingInfo": "ارسال در بسته‌بندی ضدنور ظرف ۱ تا ۳ روز کاری",
+    "images": [
+      "/images/products/p049.jpg",
+      "/images/products/p049-alt.jpg"
+    ]
+  },
+  {
+    "id": "p050",
+    "slug": "zaferan-powder",
+    "title": "پودر زعفران خالص",
+    "shortDescription": "پودر زعفران آسیاب‌شده تازه، آماده مصرف فوری",
+    "longDescription": "پودر زعفران از آسیاب زعفران سرگل تازه تهیه می‌شود و برای استفاده سریع در غذا و نوشیدنی مناسب است. در قوطی درب‌دار و دور از رطوبت بسته‌بندی شده تا عطر آن حفظ شود.",
+    "category": "saffron",
+    "categoryLabel": "زعفران",
+    "weightOptions": [
+      {
+        "label": "۱ گرم",
+        "grams": 1,
+        "price": 145000
+      },
+      {
+        "label": "۳ گرم",
+        "grams": 3,
+        "price": 410000
+      }
+    ],
+    "inStock": true,
+    "rating": 4.5,
+    "reviewCount": 27,
+    "ingredients": "پودر زعفران خالص ۱۰۰٪",
+    "shippingInfo": "ارسال در قوطی درب‌دار ظرف ۱ تا ۳ روز کاری",
+    "images": [
+      "/images/products/p050.jpg",
+      "/images/products/p050-alt.jpg"
+    ]
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "name": "hajiasal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install chromium",
+    "check:paths": "node scripts/check-hajiasal-paths.mjs",
+    "optimize:hajiasal-images": "node scripts/optimize-hajiasal-images.mjs",
+    "images:hajiasal": "node scripts/svg-to-webp-hajiasal.mjs",
+    "seed:products": "node scripts/seed-products-to-mysql.mjs",
+    "seed:coupons": "node scripts/seed-coupons.mjs",
+    "seed:site-settings": "node scripts/seed-site-settings.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@supabase/supabase-js": "^2.110.0",
+    "@swc/helpers": "^0.5.23",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.23.0",
+    "motion": "^12.42.2",
+    "mysql2": "^3.23.0",
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hook-form": "^7.81.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "sharp": "^0.35.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
