@@ -82,9 +82,32 @@ hajiasal/
 
 | تنظیم | مقدار |
 |---|---|
-| App directory | پوشه دارای `server.js` |
-| Start | `node server.js` |
+| App directory | پوشه دارای `server.js` (مثلاً `/home/uabkxfzi/hajiasal`) |
+| Startup File | `server.js` |
+| Start / Mode | Production |
 | Node | 20 یا 22 |
+
+---
+
+## Deploy با Git Version Control (سی‌پنل)
+
+فایل‌های `.cpanel.yml` و `scripts/cpanel-deploy.sh` و `server.js` برای Deploy آماده هستند.
+
+1. در Git Version Control ریپو را به `main` جدید sync کن (`git fetch` + `git reset --hard origin/main` یا ریپو را دوباره Clone کن)
+2. دکمه **Deploy HEAD Commit** را بزن
+3. فایل‌ها به `/home/uabkxfzi/hajiasal` کپی می‌شوند و در صورت وجود `npm`، build اجرا می‌شود
+4. در **Setup Node.js App**:
+   - Application root: `hajiasal`
+   - Application URL: دامنه `hajiasal.ir`
+   - Application startup file: `server.js`
+5. یک‌بار `.env` را داخل `/home/uabkxfzi/hajiasal/.env` بساز (از روی `.env.example`)؛ Deploy آن را پاک نمی‌کند
+6. اگر build روی Deploy خطا داد: از همان پنل Node.js → Run NPM Install، بعد در Terminal داخل اپ:
+   ```bash
+   source ~/nodevenv/hajiasal/.../bin/activate   # اگر وجود دارد
+   cd ~/hajiasal
+   npm run build
+   touch tmp/restart.txt
+   ```
 
 ---
 
@@ -92,8 +115,7 @@ hajiasal/
 
 | چه | آدرس |
 |---|---|
-| فروشگاه | https://hajiasal.ir/hajiasal |
-| `/` | ریدایرکت به `/hajiasal` |
+| فروشگاه | https://hajiasal.ir/ |
 | ادمین | https://hajiasal.ir/admin |
 | فروشنده | https://hajiasal.ir/seller |
 
@@ -106,5 +128,6 @@ hajiasal/
 | سفارش/لاگین کار نمی‌کند | `MYSQL_*` اشتباه یا schema اجرا نشده |
 | OTP نمی‌آید | لینک ملی‌پیامک |
 | عکس‌ها نیست | پوشه `public` کنار `server.js` نباشد |
+| Deploy در سی‌پنل خطا می‌دهد | اول `reset --hard origin/main`؛ `.cpanel.yml` باید در ریشه باشد |
 
 بعد از یادداشت رمزها، `CREDENTIALS.txt` را از هاست حذف کنید.

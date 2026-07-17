@@ -1,0 +1,15 @@
+---
+# Deploy برای cPanel Git Version Control
+# Docs: https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/
+#
+# مسیر اپ Node.js (Setup Node.js App → Application Root)
+# اگر مسیر اپ فرق دارد، فقط DEPLOYPATH را عوض کن.
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/uabkxfzi/hajiasal
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/tmp
+    - /usr/bin/rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='.next' --exclude='.env' --exclude='.env.*' --exclude='data' --exclude='test-results' --exclude='playwright-report' --exclude='FINISH-GITHUB-SECURITY.ps1' ./ $DEPLOYPATH/
+    - /bin/chmod +x $DEPLOYPATH/scripts/cpanel-deploy.sh
+    - /bin/bash $DEPLOYPATH/scripts/cpanel-deploy.sh
+    - /bin/touch $DEPLOYPATH/tmp/restart.txt
