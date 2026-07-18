@@ -1,6 +1,6 @@
 # CONTEXT — Hajiasal Seller Panel
 
-## Stack
+## Stack.
 - Next.js 16 App Router, React 19, Tailwind v4, mysql2, zod, Phosphor, motion
 - Auth: جدول `sellers` + کوکی `hajiasal_seller_session` (۷ روز)
 - Isolation: هر query/mutation فقط روی `seller_id` همان session
