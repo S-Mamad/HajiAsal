@@ -11,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/admin/dashboard")]: "داشبورد",
   [hajiasalPath("/admin/orders")]: "سفارش‌ها",
   [hajiasalPath("/admin/products")]: "محصولات",
+  [hajiasalPath("/admin/brands")]: "برندها",
   [hajiasalPath("/admin/sellers")]: "فروشندگان",
   [hajiasalPath("/admin/categories")]: "دسته‌بندی‌ها",
   [hajiasalPath("/admin/inventory")]: "موجودی",
@@ -19,78 +20,60 @@ const PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/admin/coupons")]: "کوپن‌ها",
   [hajiasalPath("/admin/messages")]: "پیام‌ها",
   [hajiasalPath("/admin/newsletter")]: "خبرنامه",
+  [hajiasalPath("/admin/articles")]: "مقالات",
+  [hajiasalPath("/admin/media")]: "رسانه",
+  [hajiasalPath("/admin/banners")]: "بنرها",
+  [hajiasalPath("/admin/pages")]: "صفحات",
+  [hajiasalPath("/admin/qa")]: "پرسش و پاسخ",
+  [hajiasalPath("/admin/tickets")]: "تیکت‌ها",
+  [hajiasalPath("/admin/notifications")]: "اعلان‌ها",
+  [hajiasalPath("/admin/users")]: "کاربران پنل",
   [hajiasalPath("/admin/content")]: "محتوا",
   [hajiasalPath("/admin/reports")]: "گزارش‌ها",
+  [hajiasalPath("/admin/logs")]: "لاگ سیستم",
   [hajiasalPath("/admin/settings")]: "تنظیمات",
 };
 
+function matchDetail(
+  pathname: string,
+  base: string,
+  listLabel: string,
+  detailLabel: string,
+) {
+  const basePath = hajiasalPath(base);
+  if (pathname.includes(`${basePath}/`) && pathname !== basePath) {
+    return [
+      { label: "مدیریت", href: hajiasalPath("/admin/dashboard") },
+      { label: listLabel, href: basePath },
+      { label: detailLabel },
+    ];
+  }
+  return null;
+}
+
 function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
-  const crumbs: { label: string; href?: string }[] = [
-    { label: "مدیریت", href: hajiasalPath("/admin/dashboard") },
-  ];
-
-  if (
-    pathname.includes("/admin/sellers/") &&
-    pathname !== hajiasalPath("/admin/sellers")
-  ) {
-    crumbs.push({ label: "فروشندگان", href: hajiasalPath("/admin/sellers") });
-    crumbs.push({ label: "مدیریت فروشنده" });
-    return crumbs;
-  }
-
-  if (
-    pathname.includes("/admin/products/") &&
-    pathname !== hajiasalPath("/admin/products")
-  ) {
-    crumbs.push({ label: "محصولات", href: hajiasalPath("/admin/products") });
-    crumbs.push({ label: "ویرایش محصول" });
-    return crumbs;
-  }
-
-  if (
-    pathname.includes("/admin/orders/") &&
-    pathname !== hajiasalPath("/admin/orders")
-  ) {
-    crumbs.push({ label: "سفارش‌ها", href: hajiasalPath("/admin/orders") });
-    crumbs.push({ label: "جزئیات سفارش" });
-    return crumbs;
-  }
-
-  const title = PAGE_TITLES[pathname];
-  if (title && pathname !== hajiasalPath("/admin/dashboard")) {
-    crumbs.push({ label: title });
-  } else if (pathname === hajiasalPath("/admin/dashboard")) {
-    crumbs.push({ label: "داشبورد" });
-  }
-
-  return crumbs;
+  return (
+    matchDetail(pathname, "/admin/sellers", "فروشندگان", "مدیریت فروشنده") ??
+    matchDetail(pathname, "/admin/products", "محصولات", "جزئیات محصول") ??
+    matchDetail(pathname, "/admin/orders", "سفارش‌ها", "جزئیات سفارش") ??
+    matchDetail(pathname, "/admin/customers", "مشتریان", "پروفایل مشتری") ??
+    matchDetail(pathname, "/admin/articles", "مقالات", "ویرایش مقاله") ??
+    matchDetail(pathname, "/admin/tickets", "تیکت‌ها", "جزئیات تیکت") ?? [
+      { label: "مدیریت", href: hajiasalPath("/admin/dashboard") },
+      ...(PAGE_TITLES[pathname]
+        ? [{ label: PAGE_TITLES[pathname] }]
+        : [{ label: "پنل مدیریت" }]),
+    ]
+  );
 }
 
 function getPageTitle(pathname: string): string {
-  if (
-    pathname.includes("/admin/sellers/") &&
-    pathname !== hajiasalPath("/admin/sellers")
-  ) {
-    return "مدیریت فروشنده";
-  }
-  if (
-    pathname.includes("/admin/orders/") &&
-    pathname !== hajiasalPath("/admin/orders")
-  ) {
-    return "جزئیات سفارش";
-  }
-  if (
-    pathname.includes("/admin/products/") &&
-    pathname !== hajiasalPath("/admin/products")
-  ) {
-    return "ویرایش محصول";
-  }
-  return PAGE_TITLES[pathname] ?? "پنل مدیریت";
+  const crumbs = getBreadcrumbs(pathname);
+  return crumbs[crumbs.length - 1]?.label ?? PAGE_TITLES[pathname] ?? "پنل مدیریت";
 }
 
 interface AdminHeaderProps {
   title?: string;
-  /** Single-line title for mobile top bar */
   compact?: boolean;
 }
 
@@ -101,17 +84,17 @@ export function AdminHeader({ title, compact = false }: AdminHeaderProps) {
 
   if (compact) {
     return (
-      <h2 className="truncate text-sm font-semibold text-slate-900">
+      <h2 className="truncate text-sm font-semibold text-stone-900">
         {pageTitle}
       </h2>
     );
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+    <header className="border-b border-stone-200/80 bg-white/80 px-4 py-4 backdrop-blur sm:px-6">
       <nav
         className={cn(
-          "mb-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500",
+          "mb-2 flex flex-wrap items-center gap-1.5 text-xs text-stone-500",
         )}
       >
         {breadcrumbs.map((crumb, index) => (
@@ -120,19 +103,19 @@ export function AdminHeader({ title, compact = false }: AdminHeaderProps) {
             className="flex items-center gap-1.5"
           >
             {index > 0 ? (
-              <Icon icon={CaretLeft} size={12} className="text-slate-400" />
+              <Icon icon={CaretLeft} size={12} className="text-stone-400" />
             ) : null}
             {crumb.href ? (
-              <Link href={crumb.href} className="hover:text-slate-700">
+              <Link href={crumb.href} className="hover:text-stone-700">
                 {crumb.label}
               </Link>
             ) : (
-              <span className="text-slate-700">{crumb.label}</span>
+              <span className="text-stone-700">{crumb.label}</span>
             )}
           </span>
         ))}
       </nav>
-      <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
+      <h2 className="text-lg font-semibold text-stone-900 sm:text-xl">
         {pageTitle}
       </h2>
     </header>

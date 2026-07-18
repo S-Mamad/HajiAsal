@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "@phosphor-icons/react";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { AdminInput, FormField } from "@/components/admin/ui/AdminForm";
 import { hajiasalPath } from "@/lib/paths";
 
 export function AdminLogin() {
   const router = useRouter();
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,12 +25,15 @@ export function AdminLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({
+          password,
+          ...(login.trim() ? { login: login.trim() } : {}),
+        }),
       });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.message ?? "رمز عبور نادرست است");
+        setError(data.message ?? "اطلاعات ورود نادرست است");
         return;
       }
 
@@ -42,30 +47,41 @@ export function AdminLogin() {
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-slate-950 px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(148,163,184,0.18),_transparent_55%)]" />
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-white p-6 shadow-2xl sm:p-8">
+    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#1c1917] px-4 py-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(184,134,46,0.22),_transparent_55%)]" />
+      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#f7f1e8] p-6 shadow-2xl sm:p-8">
         <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1c1917] text-amber-400 shadow-lg">
             <ShieldCheck size={24} weight="fill" />
           </span>
           <div>
-            <h1 className="text-xl font-semibold text-slate-900">پنل مدیریت</h1>
-            <p className="text-sm text-slate-500">حاجی عسل · کنترل کامل فروشگاه</p>
+            <h1 className="text-xl font-semibold text-stone-900">پنل مدیریت</h1>
+            <p className="text-sm text-stone-500">حاجی عسل · کنترل کامل فروشگاه</p>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-slate-700">رمز عبور</span>
-            <input
+          <FormField
+            label="ایمیل یا موبایل"
+            hint="برای ورود bootstrap می‌توانید خالی بگذارید"
+            tooltip="اگر هنوز کاربر ادمین نساخته‌اید، فقط رمز ADMIN_PASSWORD کافی است"
+          >
+            <AdminInput
+              dir="ltr"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              autoComplete="username"
+              placeholder="admin@hajiasal.local"
+            />
+          </FormField>
+          <FormField label="رمز عبور" required>
+            <AdminInput
               type="password"
               dir="ltr"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="h-12 rounded-xl border border-slate-300 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white focus:ring-2 focus:ring-slate-200"
             />
-          </label>
+          </FormField>
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <AdminButton
             type="submit"
@@ -75,8 +91,8 @@ export function AdminLogin() {
             {loading ? "در حال ورود..." : "ورود به پنل"}
           </AdminButton>
         </form>
-        <p className="mt-6 text-center text-xs text-slate-400">
-          <Link href={hajiasalPath("/")} className="hover:text-slate-600">
+        <p className="mt-6 text-center text-xs text-stone-400">
+          <Link href={hajiasalPath("/")} className="hover:text-stone-600">
             بازگشت به فروشگاه
           </Link>
         </p>

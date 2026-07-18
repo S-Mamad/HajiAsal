@@ -6,6 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, Package } from "@phosphor-icons/react";
 import { StatusBadge } from "@/components/admin/ui/StatusBadge";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { AdminInput, AdminTextarea, FormField } from "@/components/admin/ui/AdminForm";
+import { useAdminToast } from "@/components/admin/ui/AdminToast";
+import { Can } from "@/components/admin/auth/AdminAuthProvider";
+import { ConfirmModal } from "@/components/admin/ui/AdminModal";
 import { Icon } from "@/components/ui/Icon";
 import type { OrderStatus, StoredOrder } from "@/lib/server/orders";
 import { hajiasalPath } from "@/lib/paths";
@@ -22,18 +26,24 @@ const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const toast = useAdminToast();
   const orderId = params.id;
 
   const [order, setOrder] = useState<StoredOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [tracking, setTracking] = useState("");
+  const [adminNote, setAdminNote] = useState("");
+  const [refundOpen, setRefundOpen] = useState(false);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}`);
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        credentials: "include",
+      });
       if (res.status === 401) {
         router.push(hajiasalPath("/admin"));
         return;
@@ -41,6 +51,8 @@ export default function AdminOrderDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری");
       setOrder(data.order);
+      setTracking(data.order.trackingCode ?? "");
+      setAdminNote(data.order.adminNote ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
     } finally {
@@ -52,7 +64,7 @@ export default function AdminOrderDetailPage() {
     void loadOrder();
   }, [loadOrder]);
 
-  const updateStatus = async (status: OrderStatus) => {
+  const patchOrder = async (body: Record<string, unknown>) => {
     if (!order) return;
     setSaving(true);
     setError("");
@@ -60,20 +72,26 @@ export default function AdminOrderDetailPage() {
       const res = await fetch(`/api/admin/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        credentials: "include",
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در به‌روزرسانی");
       setOrder(data.order);
+      setTracking(data.order.trackingCode ?? "");
+      setAdminNote(data.order.adminNote ?? "");
+      toast.success("سفارش به‌روز شد");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در به‌روزرسانی");
+      const msg = err instanceof Error ? err.message : "خطا در به‌روزرسانی";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <p className="text-sm text-slate-500">در حال بارگذاری...</p>;
+    return <p className="text-sm text-stone-500">در حال بارگذاری...</p>;
   }
 
   if (!order) {
@@ -92,7 +110,7 @@ export default function AdminOrderDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href={hajiasalPath("/admin/orders")}
-          className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm text-stone-600 hover:text-stone-900"
         >
           <Icon icon={ArrowRight} size={16} />
           بازگشت به سفارش‌ها
@@ -104,9 +122,8 @@ export default function AdminOrderDetailPage() {
             size="sm"
             external
             target="_blank"
-            className="w-full sm:w-auto"
           >
-            مشاهده / پرینت فاکتور
+            چاپ فاکتور
           </AdminButton>
           <AdminButton
             href={`/api/orders/${order.id}/invoice?download=1`}
@@ -114,48 +131,51 @@ export default function AdminOrderDetailPage() {
             size="sm"
             external
             download
-            className="w-full sm:w-auto"
           >
             دانلود فاکتور
           </AdminButton>
           <StatusBadge status={order.status} />
-          <select
-            value={order.status}
-            disabled={saving}
-            onChange={(e) => void updateStatus(e.target.value as OrderStatus)}
-            className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm sm:w-auto"
-            aria-label="تغییر وضعیت سفارش"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <Can permission="orders.edit">
+            <select
+              value={order.status}
+              disabled={saving}
+              onChange={(e) =>
+                void patchOrder({ status: e.target.value as OrderStatus })
+              }
+              className="h-11 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm sm:w-auto"
+              aria-label="تغییر وضعیت سفارش"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </Can>
         </div>
       </div>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 lg:col-span-2">
-          <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-stone-200 bg-white p-5 lg:col-span-2">
+          <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-stone-900">
             <Icon icon={Package} size={18} />
             اقلام سفارش
           </h3>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-stone-100">
             {order.items.map((item) => (
               <li
                 key={`${item.productId}-${item.weight.grams}`}
                 className="flex items-center justify-between gap-4 py-3"
               >
                 <div>
-                  <p className="font-medium text-slate-900">{item.title}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-medium text-stone-900">{item.title}</p>
+                  <p className="text-xs text-stone-500">
                     {item.weight.label} × {item.quantity.toLocaleString("fa-IR")}
                   </p>
                 </div>
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-stone-700 tabular-nums">
                   {(item.weight.price * item.quantity).toLocaleString("fa-IR")}{" "}
                   تومان
                 </p>
@@ -165,9 +185,9 @@ export default function AdminOrderDetailPage() {
         </section>
 
         <section className="space-y-4">
-          <article className="rounded-xl border border-slate-200 bg-white p-5">
+          <article className="rounded-xl border border-stone-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">مشتری</h3>
+              <h3 className="text-sm font-semibold text-stone-900">مشتری</h3>
               {order.userId || order.customer.phone ? (
                 <AdminButton
                   href={hajiasalPath(
@@ -182,86 +202,118 @@ export default function AdminOrderDetailPage() {
             </div>
             <dl className="space-y-2 text-sm">
               <div>
-                <dt className="text-slate-400">نام</dt>
-                <dd className="text-slate-800">{order.customer.fullName}</dd>
+                <dt className="text-stone-400">نام</dt>
+                <dd className="text-stone-800">{order.customer.fullName}</dd>
               </div>
               <div>
-                <dt className="text-slate-400">تلفن</dt>
-                <dd dir="ltr" className="text-slate-800">
+                <dt className="text-stone-400">تلفن</dt>
+                <dd dir="ltr" className="text-stone-800 tabular-nums">
                   {order.customer.phone}
                 </dd>
               </div>
               <div>
-                <dt className="text-slate-400">شهر</dt>
-                <dd className="text-slate-800">{order.customer.city}</dd>
+                <dt className="text-stone-400">شهر</dt>
+                <dd className="text-stone-800">{order.customer.city}</dd>
               </div>
               <div>
-                <dt className="text-slate-400">آدرس</dt>
-                <dd className="text-slate-800">{order.customer.address}</dd>
+                <dt className="text-stone-400">آدرس</dt>
+                <dd className="text-stone-800">{order.customer.address}</dd>
               </div>
             </dl>
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">خلاصه</h3>
+          <article className="rounded-xl border border-stone-200 bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-stone-900">ارسال و یادداشت</h3>
+            <div className="space-y-3">
+              <FormField label="کد رهگیری" tooltip="پس از ارسال مرسوله ثبت شود">
+                <AdminInput
+                  dir="ltr"
+                  value={tracking}
+                  onChange={(e) => setTracking(e.target.value)}
+                />
+              </FormField>
+              <FormField label="یادداشت داخلی">
+                <AdminTextarea
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                />
+              </FormField>
+              <Can permission="orders.edit">
+                <AdminButton
+                  disabled={saving}
+                  onClick={() =>
+                    void patchOrder({
+                      trackingCode: tracking || null,
+                      adminNote: adminNote || null,
+                    })
+                  }
+                >
+                  ذخیره رهگیری / یادداشت
+                </AdminButton>
+              </Can>
+              <Can permission="orders.refund">
+                <AdminButton
+                  variant="danger"
+                  disabled={saving || Boolean(order.refundedAt)}
+                  onClick={() => setRefundOpen(true)}
+                >
+                  {order.refundedAt ? "بازپرداخت ثبت شده" : "ثبت بازپرداخت"}
+                </AdminButton>
+              </Can>
+            </div>
+          </article>
+
+          <article className="rounded-xl border border-stone-200 bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-stone-900">خلاصه</h3>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-slate-400">جمع جزء</dt>
-                <dd>{order.subtotal.toLocaleString("fa-IR")} تومان</dd>
+                <dt className="text-stone-400">جمع جزء</dt>
+                <dd className="tabular-nums">
+                  {order.subtotal.toLocaleString("fa-IR")} تومان
+                </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-400">ارسال</dt>
-                <dd>{order.shipping.toLocaleString("fa-IR")} تومان</dd>
+                <dt className="text-stone-400">ارسال</dt>
+                <dd className="tabular-nums">
+                  {order.shipping.toLocaleString("fa-IR")} تومان
+                </dd>
               </div>
               {order.discount > 0 ? (
                 <div className="flex justify-between text-emerald-700">
                   <dt>تخفیف</dt>
-                  <dd>-{order.discount.toLocaleString("fa-IR")} تومان</dd>
-                </div>
-              ) : null}
-              <div className="flex justify-between border-t border-slate-100 pt-2 font-semibold">
-                <dt>مبلغ کل</dt>
-                <dd>{order.total.toLocaleString("fa-IR")} تومان</dd>
-              </div>
-            </dl>
-          </article>
-
-          <article className="rounded-xl border border-slate-200 bg-white p-5 text-sm">
-            <dl className="space-y-2">
-              <div>
-                <dt className="text-slate-400">شناسه سفارش</dt>
-                <dd dir="ltr" className="font-mono text-xs">
-                  {order.id}
-                </dd>
-              </div>
-              {order.trackingCode ? (
-                <div>
-                  <dt className="text-slate-400">کد پیگیری</dt>
-                  <dd dir="ltr" className="font-mono text-xs">
-                    {order.trackingCode}
+                  <dd className="tabular-nums">
+                    -{order.discount.toLocaleString("fa-IR")} تومان
                   </dd>
                 </div>
               ) : null}
-              <div>
-                <dt className="text-slate-400">تاریخ ثبت</dt>
-                <dd>
-                  {new Date(order.createdAt).toLocaleString("fa-IR")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-400">روش پرداخت</dt>
-                <dd>
-                  {order.paymentMethod === "cod"
-                    ? "پرداخت در محل"
-                    : order.paymentMethod === "online"
-                      ? "پرداخت آنلاین"
-                      : "کارت به کارت"}
+              <div className="flex justify-between border-t border-stone-100 pt-2 font-semibold">
+                <dt>مبلغ کل</dt>
+                <dd className="tabular-nums">
+                  {order.total.toLocaleString("fa-IR")} تومان
                 </dd>
               </div>
             </dl>
           </article>
         </section>
       </div>
+
+      <ConfirmModal
+        open={refundOpen}
+        onClose={() => setRefundOpen(false)}
+        onConfirm={() => {
+          setRefundOpen(false);
+          void patchOrder({
+            refund: true,
+            refundNote: "ثبت بازپرداخت از پنل ادمین",
+            status: "cancelled",
+          });
+        }}
+        title="ثبت بازپرداخت"
+        description="وضعیت سفارش به لغو شده تغییر می‌کند و بازپرداخت در لاگ ثبت می‌شود."
+        confirmLabel="تأیید بازپرداخت"
+        danger
+        loading={saving}
+      />
     </div>
   );
 }

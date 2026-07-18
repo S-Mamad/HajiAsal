@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getAllProductsAsync,
   createProductAsync,
@@ -32,18 +32,16 @@ const createSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "products.view");
+  if (!gate.ok) return gate.response;
 
   const products = await getAllProductsAsync({ scope: "admin" });
   return NextResponse.json({ products });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "products.create");
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await request.json();

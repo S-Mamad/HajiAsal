@@ -1,23 +1,21 @@
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
 import {
   getSiteSettings,
   updateSiteSettings,
 } from "@/lib/server/site-settings";
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "content.view");
+  if (!__gate.ok) return __gate.response;
 
   const settings = await getSiteSettings();
   return NextResponse.json({ settings });
 }
 
 export async function PATCH(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "content.manage");
+  if (!__gate.ok) return __gate.response;
 
   try {
     const body = await request.json();

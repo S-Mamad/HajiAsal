@@ -6,6 +6,7 @@ import { CurrencyCircleDollar, Package } from "@phosphor-icons/react";
 import { StatCard } from "@/components/admin/ui/StatCard";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { exportToCsv, exportToExcel } from "@/lib/admin/export";
 import { hajiasalPath } from "@/lib/paths";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -68,13 +69,33 @@ export default function AdminReportsPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">گزارش فروش و عملکرد</p>
-        <AdminButton
-          type="button"
-          variant="outline"
-          onClick={() => void loadReports()}
-        >
-          بروزرسانی
-        </AdminButton>
+        <div className="flex flex-wrap gap-2">
+          <AdminButton
+            type="button"
+            variant="outline"
+            onClick={() => void loadReports()}
+          >
+            بروزرسانی
+          </AdminButton>
+          {data ? (
+            <AdminButton
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const rows = data.topProducts.map((p) => ({
+                  id: p.id,
+                  title: p.title,
+                  qty: p.qty,
+                  revenue: p.revenue,
+                }));
+                exportToCsv("reports-top-products", rows);
+                exportToExcel("reports-top-products", rows);
+              }}
+            >
+              Export
+            </AdminButton>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

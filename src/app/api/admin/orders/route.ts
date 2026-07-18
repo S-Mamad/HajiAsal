@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { getContactMessagesBySource } from "@/lib/server/newsletter";
 import {
   getAllOrders,
@@ -20,12 +21,8 @@ const statusSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const { isAdminRequestAuthenticatedAsync } = await import(
-    "@/lib/server/admin"
-  );
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "orders.view");
+  if (!gate.ok) return gate.response;
 
   const [orders, messages] = await Promise.all([
     getAllOrders(),
@@ -35,12 +32,8 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const { isAdminRequestAuthenticatedAsync } = await import(
-    "@/lib/server/admin"
-  );
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "orders.edit");
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await request.json();

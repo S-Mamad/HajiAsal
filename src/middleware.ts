@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/session-edge";
 
 const PROTECTED_PREFIXES = ["/account"];
+const ADMIN_COOKIE = "hajiasal_admin_session";
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
@@ -13,10 +14,27 @@ function isProtected(pathname: string): boolean {
   );
 }
 
+function isAdminPanelPath(pathname: string): boolean {
+  if (pathname === "/admin" || pathname === "/admin/") return false;
+  return pathname.startsWith("/admin/");
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/seller")) {
+  if (pathname.startsWith("/seller")) {
+    return NextResponse.next();
+  }
+
+  if (isAdminPanelPath(pathname)) {
+    const token = request.cookies.get(ADMIN_COOKIE)?.value;
+    if (!token) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/admin")) {
     return NextResponse.next();
   }
 

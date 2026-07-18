@@ -44,6 +44,9 @@ export interface StoredOrder {
   createdAt: string;
   updatedAt: string;
   trackingCode?: string;
+  adminNote?: string;
+  refundedAt?: string;
+  refundNote?: string;
 }
 
 const ORDERS_FILE = "orders.json";
@@ -75,6 +78,9 @@ function mapRowToOrder(row: Record<string, unknown>): StoredOrder {
     updatedAt: toIso(row.updated_at),
     trackingCode: (row.tracking_code as string) ?? undefined,
     userId: (row.user_id as string) ?? undefined,
+    adminNote: (row.admin_note as string) ?? undefined,
+    refundedAt: row.refunded_at ? toIso(row.refunded_at) : undefined,
+    refundNote: (row.refund_note as string) ?? undefined,
   };
 }
 
@@ -249,26 +255,119 @@ export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
 ): Promise<StoredOrder | null> {
+  return updateOrderAdmin(orderId, { status });
+}
+
+export async function updateOrderAdmin(
+  orderId: string,
+  patch: {
+    status?: OrderStatus;
+    trackingCode?: string | null;
+    adminNote?: string | null;
+    refundedAt?: string | null;
+    refundNote?: string | null;
+  },
+): Promise<StoredOrder | null> {
   const now = new Date().toISOString();
   if (isMysqlConfigured()) {
-    const result = await mysqlExecute(
-      "UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
-      [status, now, orderId],
-    );
-    if (result.affectedRows === 0) return null;
-    return getOrderById(orderId);
+    const sets: string[] = ["updated_at = ?"];
+    const params: unknown[] = [now];
+    if (patch.status !== undefined) {
+      sets.push("status = ?");
+      params.push(patch.status);
+    }
+    if (patch.trackingCode !== undefined) {
+      sets.push("tracking_code = ?");
+      params.push(patch.trackingCode);
+    }
+    if (patch.adminNote !== undefined) {
+      sets.push("admin_note = ?");
+      params.push(patch.adminNote);
+    }
+    // refund columns may not exist until migration; ignore failures via try/catch below
+    if (patch.refundedAt !== undefined) {
+      sets.push("refunded_at = ?");
+      params.push(patch.refundedAt);
+    }
+    if (patch.refundNote !== undefined) {
+      sets.push("refund_note = ?");
+      params.push(patch.refundNote);
+    }
+    params.push(orderId);
+    try {
+      const result = await mysqlExecute(
+        `UPDATE orders SET ${sets.join(", ")} WHERE id = ?`,
+        params,
+      );
+      if (result.affectedRows === 0) return null;
+      return getOrderById(orderId);
+    } catch {
+      // Fallback without refund columns
+      const basicSets = ["updated_at = ?"];
+      const basicParams: unknown[] = [now];
+      if (patch.status !== undefined) {
+        basicSets.push("status = ?");
+        basicParams.push(patch.status);
+      }
+      if (patch.trackingCode !== undefined) {
+        basicSets.push("tracking_code = ?");
+        basicParams.push(patch.trackingCode);
+      }
+      if (patch.adminNote !== undefined) {
+        basicSets.push("admin_note = ?");
+        basicParams.push(patch.adminNote);
+      }
+      basicParams.push(orderId);
+      const result = await mysqlExecute(
+        `UPDATE orders SET ${basicSets.join(", ")} WHERE id = ?`,
+        basicParams,
+      );
+      if (result.affectedRows === 0) return null;
+      return getOrderById(orderId);
+    }
   }
 
   if (canUseFilesystemPersistence()) {
     const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
     const idx = orders.findIndex((o) => o.id === orderId);
     if (idx === -1) return null;
-    orders[idx] = { ...orders[idx]!, status, updatedAt: now };
+    orders[idx] = {
+      ...orders[idx]!,
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.trackingCode !== undefined
+        ? { trackingCode: patch.trackingCode ?? undefined }
+        : {}),
+      ...(patch.adminNote !== undefined
+        ? { adminNote: patch.adminNote ?? undefined }
+        : {}),
+      ...(patch.refundedAt !== undefined
+        ? { refundedAt: patch.refundedAt ?? undefined }
+        : {}),
+      ...(patch.refundNote !== undefined
+        ? { refundNote: patch.refundNote ?? undefined }
+        : {}),
+      updatedAt: now,
+    };
     await writeJsonFile(ORDERS_FILE, orders);
     return orders[idx]!;
   }
 
-  return memoryUpdateOrder<StoredOrder>(orderId, { status, updatedAt: now });
+  return memoryUpdateOrder<StoredOrder>(orderId, {
+    ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.trackingCode !== undefined
+      ? { trackingCode: patch.trackingCode ?? undefined }
+      : {}),
+    ...(patch.adminNote !== undefined
+      ? { adminNote: patch.adminNote ?? undefined }
+      : {}),
+    ...(patch.refundedAt !== undefined
+      ? { refundedAt: patch.refundedAt ?? undefined }
+      : {}),
+    ...(patch.refundNote !== undefined
+      ? { refundNote: patch.refundNote ?? undefined }
+      : {}),
+    updatedAt: now,
+  });
 }
 
 export function getPersistenceMode(): "mysql" | "file" | "memory" {

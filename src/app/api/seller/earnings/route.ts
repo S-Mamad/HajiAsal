@@ -1,38 +1,26 @@
 import { NextResponse } from "next/server";
-import {
-  getSellerFromRequest,
-  getSellerOrders,
-  toPublicSeller,
-} from "@/lib/server/sellers";
+import { gateSeller } from "@/lib/server/seller-gate";
+import { getSellerOrders } from "@/lib/server/sellers";
 
 export async function GET(request: Request) {
-  const seller = await getSellerFromRequest(request);
-  if (!seller) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gated = await gateSeller(request, "wallet.view");
+  if (!gated.ok) return gated.response;
 
-  const orders = await getSellerOrders(seller.id);
+  const orders = await getSellerOrders(gated.ctx.seller.id);
   const active = orders.filter((o) => o.status !== "cancelled");
-
   const byStatus: Record<string, number> = {};
-  for (const o of orders) {
-    byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
+  for (const o of active) {
+    byStatus[o.status] = (byStatus[o.status] ?? 0) + o.sellerSubtotal;
   }
-
-  const totalEarnings = active.reduce((s, o) => s + o.sellerSubtotal, 0);
-  const last30 = active.filter(
-    (o) =>
-      new Date(o.createdAt).getTime() >
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-  );
-  const monthEarnings = last30.reduce((s, o) => s + o.sellerSubtotal, 0);
+  const last30 = Date.now() - 30 * 86400000;
+  const recent = active
+    .filter((o) => new Date(o.createdAt).getTime() >= last30)
+    .reduce((s, o) => s + o.sellerSubtotal, 0);
 
   return NextResponse.json({
-    seller: toPublicSeller(seller),
-    totalEarnings,
-    monthEarnings,
-    orderCount: orders.length,
+    total: active.reduce((s, o) => s + o.sellerSubtotal, 0),
+    recent30d: recent,
     byStatus,
-    recent: orders.slice(0, 12),
+    orderCount: active.length,
   });
 }

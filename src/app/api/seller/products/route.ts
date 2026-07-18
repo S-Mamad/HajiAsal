@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import {
-  getSellerFromRequest,
-  getSellerProducts,
-} from "@/lib/server/sellers";
+import { gateSeller, clientIpFromRequest } from "@/lib/server/seller-gate";
+import { getSellerProducts } from "@/lib/server/sellers";
 import {
   createProductAsync,
   getProductByIdAsync,
   updateProductAsync,
+  deleteProductAsync,
 } from "@/lib/server/products-store";
+import { logSellerActivity } from "@/lib/server/seller-activity";
 import type { Product, ProductCategory } from "@/types";
 
 const weightSchema = z.object({
@@ -28,8 +28,12 @@ const createSchema = z.object({
   images: z.array(z.string().min(1)).max(8).optional().default([]),
   weightOptions: z.array(weightSchema).min(1),
   inStock: z.boolean().optional().default(true),
+  stockQty: z.number().int().min(0).optional(),
+  status: z.enum(["active", "draft", "archived", "disabled"]).optional(),
   ingredients: z.string().max(1000).optional(),
   shippingInfo: z.string().max(1000).optional(),
+  action: z.enum(["duplicate"]).optional(),
+  productId: z.string().optional(),
 });
 
 const updateSchema = z.object({
@@ -42,6 +46,8 @@ const updateSchema = z.object({
   images: z.array(z.string()).max(8).optional(),
   weightOptions: z.array(weightSchema).min(1).optional(),
   inStock: z.boolean().optional(),
+  stockQty: z.number().int().min(0).optional(),
+  status: z.enum(["active", "draft", "archived", "disabled"]).optional(),
   ingredients: z.string().max(1000).optional(),
   shippingInfo: z.string().max(1000).optional(),
 });
@@ -56,29 +62,64 @@ function slugify(input: string): string {
 }
 
 export async function GET(request: Request) {
-  const seller = await getSellerFromRequest(request);
-  if (!seller) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gated = await gateSeller(request, "products.manage");
+  if (!gated.ok) return gated.response;
 
-  const products = await getSellerProducts(seller.id);
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  const products = await getSellerProducts(gated.ctx.seller.id);
+  if (id) {
+    const product = products.find((p) => p.id === id);
+    if (!product) {
+      return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
+    }
+    return NextResponse.json({ product });
+  }
   return NextResponse.json({ products });
 }
 
 export async function POST(request: Request) {
-  const seller = await getSellerFromRequest(request);
-  if (!seller) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gated = await gateSeller(request, "products.manage");
+  if (!gated.ok) return gated.response;
 
   try {
     const body = await request.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "اطلاعات محصول نامعتبر است" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "اطلاعات محصول نامعتبر است" }, { status: 400 });
+    }
+
+    if (parsed.data.action === "duplicate" && parsed.data.productId) {
+      const existing = await getProductByIdAsync(parsed.data.productId, {
+        allowHidden: true,
+      });
+      if (!existing || existing.sellerId !== gated.ctx.seller.id) {
+        return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
+      }
+      const now = new Date().toISOString();
+      const id = `sp-${gated.ctx.seller.id}-${randomUUID().slice(0, 8)}`;
+      const copy: Product = {
+        ...existing,
+        id,
+        slug: `${existing.slug}-copy-${id.slice(-4)}`,
+        title: `${existing.title} (کپی)`,
+        approvalStatus: "pending",
+        submittedAt: now,
+        createdAt: now,
+        status: "draft",
+      };
+      const created = await createProductAsync(copy);
+      if (!created) {
+        return NextResponse.json({ error: "کپی ناموفق" }, { status: 500 });
+      }
+      await logSellerActivity({
+        sellerId: gated.ctx.seller.id,
+        action: "product.duplicate",
+        entityType: "product",
+        entityId: id,
+        ip: clientIpFromRequest(request),
+      });
+      return NextResponse.json({ success: true, product: created });
     }
 
     const now = new Date().toISOString();
@@ -86,8 +127,10 @@ export async function POST(request: Request) {
       parsed.data.slug?.trim() ||
       slugify(parsed.data.title) ||
       `product-${Date.now()}`;
-    const id = `sp-${seller.id}-${randomUUID().slice(0, 8)}`;
+    const id = `sp-${gated.ctx.seller.id}-${randomUUID().slice(0, 8)}`;
     const slug = `${baseSlug}-${id.slice(-6)}`;
+    const stockQty =
+      parsed.data.stockQty ?? (parsed.data.inStock === false ? 0 : 1);
 
     const product: Product = {
       id,
@@ -100,24 +143,31 @@ export async function POST(request: Request) {
         parsed.data.categoryLabel?.trim() || parsed.data.category,
       images: parsed.data.images ?? [],
       weightOptions: parsed.data.weightOptions,
-      inStock: parsed.data.inStock ?? true,
+      inStock: stockQty > 0,
+      stockQty,
+      status: parsed.data.status ?? "active",
       rating: 0,
       reviewCount: 0,
       ingredients: parsed.data.ingredients,
       shippingInfo: parsed.data.shippingInfo,
       createdAt: now,
-      sellerId: seller.id,
-      approvalStatus: "pending",
+      sellerId: gated.ctx.seller.id,
+      approvalStatus: parsed.data.status === "draft" ? "pending" : "pending",
       submittedAt: now,
     };
 
     const created = await createProductAsync(product);
     if (!created) {
-      return NextResponse.json(
-        { error: "ایجاد محصول ممکن نشد" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "ایجاد محصول ممکن نشد" }, { status: 500 });
     }
+
+    await logSellerActivity({
+      sellerId: gated.ctx.seller.id,
+      action: "product.create",
+      entityType: "product",
+      entityId: id,
+      ip: clientIpFromRequest(request),
+    });
 
     return NextResponse.json({
       success: true,
@@ -131,10 +181,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const seller = await getSellerFromRequest(request);
-  if (!seller) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gated = await gateSeller(request, "products.manage");
+  if (!gated.ok) return gated.response;
 
   try {
     const body = await request.json();
@@ -146,7 +194,7 @@ export async function PATCH(request: Request) {
     const existing = await getProductByIdAsync(parsed.data.productId, {
       allowHidden: true,
     });
-    if (!existing || existing.sellerId !== seller.id) {
+    if (!existing || existing.sellerId !== gated.ctx.seller.id) {
       return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
     }
 
@@ -168,7 +216,10 @@ export async function PATCH(request: Request) {
         : undefined,
     };
 
-    // Content edits require fresh admin approval
+    if (rest.stockQty !== undefined) {
+      updates.inStock = rest.stockQty > 0;
+    }
+
     if (contentChanged) {
       updates.approvalStatus = "pending";
       updates.submittedAt = new Date().toISOString();
@@ -181,6 +232,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "به‌روزرسانی ناموفق بود" }, { status: 500 });
     }
 
+    await logSellerActivity({
+      sellerId: gated.ctx.seller.id,
+      action: "product.update",
+      entityType: "product",
+      entityId: productId,
+      ip: clientIpFromRequest(request),
+    });
+
     return NextResponse.json({
       success: true,
       product,
@@ -192,4 +251,46 @@ export async function PATCH(request: Request) {
     const message = err instanceof Error ? err.message : "خطای سرور";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+const deleteSchema = z.object({
+  productId: z.string().min(1).optional(),
+  productIds: z.array(z.string()).optional(),
+});
+
+export async function DELETE(request: Request) {
+  const gated = await gateSeller(request, "products.manage");
+  if (!gated.ok) return gated.response;
+
+  const body = await request.json().catch(() => null);
+  const parsed = deleteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "نامعتبر" }, { status: 400 });
+  }
+
+  const ids =
+    parsed.data.productIds ??
+    (parsed.data.productId ? [parsed.data.productId] : []);
+  if (!ids.length) {
+    return NextResponse.json({ error: "شناسه لازم است" }, { status: 400 });
+  }
+
+  let deleted = 0;
+  for (const id of ids) {
+    const existing = await getProductByIdAsync(id, { allowHidden: true });
+    if (!existing || existing.sellerId !== gated.ctx.seller.id) continue;
+    const ok = await deleteProductAsync(id);
+    if (ok) {
+      deleted += 1;
+      await logSellerActivity({
+        sellerId: gated.ctx.seller.id,
+        action: "product.delete",
+        entityType: "product",
+        entityId: id,
+        ip: clientIpFromRequest(request),
+      });
+    }
+  }
+
+  return NextResponse.json({ success: true, deleted });
 }

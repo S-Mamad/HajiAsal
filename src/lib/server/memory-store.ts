@@ -11,6 +11,7 @@ export interface MemorySession {
   expiresAt: string;
   revokedAt?: string;
   sellerId?: string;
+  adminUserId?: string | null;
   ipAddress?: string;
   userAgent?: string;
 }

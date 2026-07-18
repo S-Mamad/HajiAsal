@@ -1,56 +1,54 @@
 # مشخصات پنل مدیریت و فروشنده حاجی‌عسل
 
-## ادمین
+## ادمین — مسیرها
 
 | مسیر | وضعیت |
 |------|--------|
-| `/admin` | ورود ادمین (بدون کروم فروشگاه) |
-| `/admin/dashboard` | KPI + سفارش/پیام اخیر |
+| `/admin` | ورود (کاربر ادمین / bootstrap) |
+| `/admin/dashboard` | KPI + نمودار + آخرین‌ها |
 | `/admin/orders` · `[id]` | سفارش‌ها |
-| `/admin/products` · `[id]` | محصولات |
-| `/admin/sellers` · `[id]` | مدیریت فروشندگان (CRUD، تأیید حساب و محصول) |
+| `/admin/products` · `[id]` · `new` | محصولات |
+| `/admin/brands` | برندها |
 | `/admin/categories` | دسته‌ها |
+| `/admin/sellers` · `[id]` | فروشندگان |
 | `/admin/inventory` | موجودی |
-| `/admin/customers` | مشتریان |
+| `/admin/customers` · `[id]` | مشتریان |
 | `/admin/reviews` | نظرات |
 | `/admin/coupons` | کوپن |
 | `/admin/messages` | پیام تماس |
 | `/admin/newsletter` | خبرنامه |
-| `/admin/content` | محتوا |
-| `/admin/reports` | گزارش + نمودار ۳۰ روز |
+| `/admin/articles` | مقالات |
+| `/admin/media` | رسانه |
+| `/admin/banners` | بنرها |
+| `/admin/pages` | صفحات CMS |
+| `/admin/qa` | پرسش و پاسخ محصول |
+| `/admin/tickets` | تیکت پشتیبانی |
+| `/admin/notifications` | اعلان‌ها |
+| `/admin/users` | کاربران پنل |
+| `/admin/reports` | گزارش‌ها |
+| `/admin/logs` | لاگ سیستم |
+| `/admin/content` | محتوا (legacy alias) |
 | `/admin/settings` | تنظیمات |
 
 - کوکی: `hajiasal_admin_session`
-- رمز: `ADMIN_PASSWORD`
+- Auth: جدول `admin_users` + نقش؛ bootstrap با `ADMIN_PASSWORD`
 - StoreChrome برای `/admin` غیرفعال است
-- منوی موبایل سایدبار فعال است
+- مستندات: `ADMIN-ARCHITECTURE-FA.md`, `ADMIN-RBAC-FA.md`, `ADMIN-UI-STANDARDS-FA.md`
 
-## فروشنده (جدید)
+## فروشنده
 
-| مسیر | کار |
-|------|-----|
-| `/seller` | ورود با موبایل + رمز |
-| `/seller/dashboard` | KPI فروشنده |
-| `/seller/orders` | سفارش‌های شامل محصولات فروشنده |
-| `/seller/products` | کاتالوگ اختصاصی |
-| `/seller/inventory` | toggle موجودی |
-| `/seller/earnings` | درآمد و سهم |
-| `/seller/settings` | پروفایل فروشگاه |
+مسیرهای `/seller/*` و کوکی `hajiasal_seller_session` جدا از ادمین هستند.
 
-### دمو ورود فروشنده (فقط توسعه)
-- موبایل: `09121111111` یا `09122222222`
-- لوکال: `SELLER_DEMO_PASSWORD` در `.env.local`
-- Production: فقط `SELLER_PASSWORD_S1` / `SELLER_PASSWORD_S2` (hashهای committed کار نمی‌کنند)
+**وضعیت پیاده‌سازی (۲۰۲۶-۰۷):** Foundation + ۱۷ ماژول مسیر/UI/API پایه تحویل شده‌اند (F0–F4). Migration: `mysql-migrations/007_seller_panel.sql`.
 
-### داده
-- جدول Supabase `sellers` (+ fallback: `sellers.json` / `sellers-runtime.json`)
-- محصولات فروشنده: `products.seller_id` + `approval_status` (pending/approved/rejected)
-- `src/hajiasal/data/seller-catalog.json` فقط fallback دمو تا وقتی فروشنده محصول اختصاصی ندارد
-- کوکی: `hajiasal_seller_session`
-- API: `/api/seller/*` و ادمین: `/api/admin/sellers`, `/api/admin/seller-products/[id]`
+مستندات اختصاصی پنل فروشنده:
 
-### قوانین تأیید
-- حساب فروشنده: `pending | active | suspended | rejected`
-- محصول فروشنده فقط پس از `approved` در فروشگاه عمومی دیده می‌شود
-- ویرایش محتوای محصول توسط فروشنده دوباره وضعیت را `pending` می‌کند
-- موجودی (inStock) بدون نیاز به تأیید مجدد قابل تغییر است
+- `CONTEXT-SELLER.md`
+- `SELLER-SPEC.md`
+- `SELLER-ARCHITECTURE-FA.md`
+- `SELLER-RBAC-FA.md`
+- `SELLER-UI-STANDARDS-FA.md`
+- `SELLER-GLOBAL-FEATURES-FA.md`
+- `SELLER-MODULES-FA.md`
+- `SELLER-MODULE-CHECKLIST-FA.md`
+- پلن اجرا: `plans/hajiasal-seller/`

@@ -133,9 +133,20 @@ export default function SellerProductsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-2">
+        <AdminButton
+          href={hajiasalPath("/seller/products/new")}
+          className="!bg-amber-800 hover:!bg-amber-900"
+        >
+          افزودن محصول
+        </AdminButton>
+        <AdminButton variant="outline" onClick={() => void load()}>
+          بروزرسانی
+        </AdminButton>
+      </div>
       <div className="rounded-xl border border-stone-200 bg-white p-4">
         <p className="mb-1 text-sm font-medium text-stone-800">
-          افزودن محصول اختصاصی
+          افزودن سریع
         </p>
         <p className="mb-3 text-xs text-stone-500">
           هر محصول بعد از ثبت، تا تأیید ادمین در فروشگاه عمومی نمایش داده

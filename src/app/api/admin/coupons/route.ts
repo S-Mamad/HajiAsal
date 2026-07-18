@@ -1,6 +1,6 @@
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
 import { getAllCouponsAsync } from "@/lib/server/coupons";
 import { isMysqlConfigured, mysqlExecute } from "@/lib/server/mysql";
 import { logAdminAction } from "@/lib/server/audit-log";
@@ -16,18 +16,16 @@ const couponSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "coupons.view");
+  if (!__gate.ok) return __gate.response;
 
   const coupons = await getAllCouponsAsync();
   return NextResponse.json({ coupons });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "coupons.manage");
+  if (!__gate.ok) return __gate.response;
 
   try {
     const body = await request.json();
@@ -83,9 +81,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "coupons.manage");
+  if (!__gate.ok) return __gate.response;
 
   try {
     const body = await request.json();
@@ -144,9 +141,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "coupons.manage");
+  if (!__gate.ok) return __gate.response;
 
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");

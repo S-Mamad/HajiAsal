@@ -30,6 +30,8 @@ export interface Product {
   weightOptions: WeightOption[];
   discountPrice?: number;
   inStock: boolean;
+  stockQty?: number;
+  status?: "active" | "draft" | "archived" | "disabled";
   rating: number;
   reviewCount: number;
   isBestseller?: boolean;

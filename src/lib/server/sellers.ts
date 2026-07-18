@@ -494,7 +494,27 @@ export async function buildSellerDashboard(sellerId: string) {
     getSellerOrders(sellerId),
   ]);
 
+  const { getSellerWalletBalance } = await import("./seller-wallet");
+  const { listSellerNotifications } = await import("./seller-notifications");
+  const { isMysqlConfigured, mysqlQuery } = await import("./mysql");
+
+  const now = Date.now();
+  const dayMs = 86400000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const todayTs = startOfToday.getTime();
+
   const activeOrders = orders.filter((o) => o.status !== "cancelled");
+  const sumInRange = (from: number) =>
+    activeOrders
+      .filter((o) => new Date(o.createdAt).getTime() >= from)
+      .reduce((s, o) => s + o.sellerSubtotal, 0);
+
+  const salesToday = sumInRange(todayTs);
+  const salesWeek = sumInRange(now - 7 * dayMs);
+  const salesMonth = sumInRange(now - 30 * dayMs);
+  const revenueTotal = activeOrders.reduce((s, o) => s + o.sellerSubtotal, 0);
+
   const pending = orders.filter(
     (o) =>
       o.status === "pending_payment" ||
@@ -504,19 +524,97 @@ export async function buildSellerDashboard(sellerId: string) {
   const pendingProducts = products.filter(
     (p) => p.approvalStatus === "pending",
   );
+  const lowStockCount = products.filter((p) => {
+    const qty = p.stockQty ?? (p.inStock ? 1 : 0);
+    return qty <= 10;
+  }).length;
   const outOfStock = products.filter((p) => !p.inStock);
-  const revenue = activeOrders.reduce((s, o) => s + o.sellerSubtotal, 0);
+
+  const salesByDay: { date: string; amount: number }[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(todayTs - i * dayMs);
+    const key = d.toISOString().slice(0, 10);
+    const amount = activeOrders
+      .filter((o) => o.createdAt.slice(0, 10) === key)
+      .reduce((s, o) => s + o.sellerSubtotal, 0);
+    salesByDay.push({ date: key, amount });
+  }
+
+  let walletAvailable = 0;
+  let walletPending = 0;
+  try {
+    const bal = await getSellerWalletBalance(sellerId);
+    walletAvailable = bal.available;
+    walletPending = bal.pending;
+  } catch {
+    /* ignore */
+  }
+
+  let recentNotifications: Array<{
+    id: string;
+    title: string;
+    createdAt: string;
+  }> = [];
+  try {
+    const n = await listSellerNotifications({ sellerId, limit: 5 });
+    recentNotifications = n.rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      createdAt: r.createdAt,
+    }));
+  } catch {
+    /* ignore */
+  }
+
+  let recentTickets: Array<{
+    id: string;
+    subject: string;
+    status: string;
+    updatedAt: string;
+  }> = [];
+  if (isMysqlConfigured()) {
+    try {
+      const rows = await mysqlQuery<{
+        id: string;
+        subject: string;
+        status: string;
+        updated_at: unknown;
+      } & import("mysql2/promise").RowDataPacket>(
+        `SELECT id, subject, status, updated_at FROM seller_tickets
+         WHERE seller_id = ? ORDER BY updated_at DESC LIMIT 5`,
+        [sellerId],
+      );
+      recentTickets = rows.map((r) => ({
+        id: String(r.id),
+        subject: String(r.subject),
+        status: String(r.status),
+        updatedAt: String(r.updated_at),
+      }));
+    } catch {
+      /* ignore */
+    }
+  }
 
   return {
     kpis: {
       productCount: products.length,
       pendingProducts: pendingProducts.length,
       outOfStock: outOfStock.length,
+      lowStockCount,
       orderCount: orders.length,
       pendingOrders: pending.length,
-      revenue,
+      revenue: revenueTotal,
+      salesToday,
+      salesWeek,
+      salesMonth,
+      revenueTotal,
+      walletAvailable,
+      walletPending,
     },
+    salesByDay,
     recentOrders: orders.slice(0, 8),
+    recentTickets,
+    recentNotifications,
     products: products.slice(0, 6),
   };
 }

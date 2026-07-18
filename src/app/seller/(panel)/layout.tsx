@@ -17,5 +17,12 @@ export default async function SellerPanelLayout({
   const seller = await getSellerFromCookies();
   if (!seller) redirect(hajiasalPath("/seller"));
 
-  return <SellerLayout shopName={seller.shopName}>{children}</SellerLayout>;
+  return (
+    <SellerLayout
+      shopName={seller.shopName}
+      capabilities={seller.capabilities}
+    >
+      {children}
+    </SellerLayout>
+  );
 }

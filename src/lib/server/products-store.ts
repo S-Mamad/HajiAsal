@@ -70,6 +70,13 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
       ? Number(row.discount_price)
       : undefined,
     inStock: toBool(row.in_stock),
+    stockQty:
+      row.stock_qty != null
+        ? Number(row.stock_qty)
+        : toBool(row.in_stock)
+          ? 1
+          : 0,
+    status: (row.status as Product["status"]) ?? "active",
     rating: Number(row.rating ?? 0),
     reviewCount: Number(row.review_count ?? 0),
     isBestseller: toBool(row.bestseller),
@@ -428,6 +435,31 @@ export async function updateProductAsync(
       );
       if (saved) {
         const [result] = await applyLocalOverrides([mapRowToProduct(saved)]);
+        if (result && (updates.stockQty !== undefined || updates.status !== undefined)) {
+          try {
+            await mysqlExecute(
+              `UPDATE products SET stock_qty = COALESCE(?, stock_qty), status = COALESCE(?, status), in_stock = ? WHERE id = ?`,
+              [
+                updates.stockQty ?? null,
+                updates.status ?? null,
+                merged.inStock ? 1 : 0,
+                id,
+              ],
+            );
+            return {
+              ...result,
+              stockQty: updates.stockQty ?? result.stockQty,
+              status: updates.status ?? result.status,
+              inStock: merged.inStock,
+            };
+          } catch {
+            return {
+              ...result,
+              stockQty: updates.stockQty ?? result.stockQty,
+              status: updates.status ?? result.status,
+            };
+          }
+        }
         return result ?? null;
       }
       return merged;

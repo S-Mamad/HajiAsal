@@ -16,6 +16,22 @@ type SellerRow = RowDataPacket & Record<string, unknown>;
 
 export type SellerStatus = "pending" | "active" | "suspended" | "rejected";
 
+export type SellerShopSettings = {
+  workingHours?: string;
+  prepTimeHours?: number;
+  holidays?: string[];
+  autoMessage?: string;
+  shippingNotes?: string;
+  lowStockThreshold?: number;
+};
+
+export type SellerNotificationPrefs = {
+  emailOrders?: boolean;
+  emailLowStock?: boolean;
+  emailTickets?: boolean;
+  emailWallet?: boolean;
+};
+
 export interface Seller {
   id: string;
   shopName: string;
@@ -32,6 +48,16 @@ export interface Seller {
   reviewNote?: string;
   createdAt?: string;
   updatedAt?: string;
+  logo?: string;
+  banner?: string;
+  address?: string;
+  contactPhone?: string;
+  bankName?: string;
+  bankSheba?: string;
+  bankCard?: string;
+  capabilities?: import("@/lib/seller/capabilities").SellerCapabilitiesMap;
+  shopSettings?: SellerShopSettings;
+  notificationPrefs?: SellerNotificationPrefs;
 }
 
 export type PublicSeller = Omit<Seller, "passwordHash" | "isDemo">;
@@ -58,6 +84,16 @@ export type SellerUpdateInput = {
   notes?: string | null;
   commissionPercent?: number;
   reviewNote?: string | null;
+  logo?: string | null;
+  banner?: string | null;
+  address?: string | null;
+  contactPhone?: string | null;
+  bankName?: string | null;
+  bankSheba?: string | null;
+  bankCard?: string | null;
+  capabilities?: import("@/lib/seller/capabilities").SellerCapabilitiesMap | null;
+  shopSettings?: SellerShopSettings | null;
+  notificationPrefs?: SellerNotificationPrefs | null;
 };
 
 const SELLERS_RUNTIME_FILE = "sellers-runtime.json";
@@ -80,6 +116,22 @@ export function hashSellerPassword(password: string): string {
 export function toPublicSeller(seller: Seller): PublicSeller {
   const { passwordHash: _hash, isDemo: _demo, ...rest } = seller;
   return rest;
+}
+
+function parseJsonObject<T extends object>(value: unknown): T | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "object" && !Array.isArray(value)) return value as T;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as T;
+      }
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 function mapRowToSeller(row: Record<string, unknown>): Seller {
@@ -115,6 +167,40 @@ function mapRowToSeller(row: Record<string, unknown>): Seller {
       : row.updatedAt
         ? String(row.updatedAt)
         : undefined,
+    logo: row.logo != null ? String(row.logo) : undefined,
+    banner: row.banner != null ? String(row.banner) : undefined,
+    address: row.address != null ? String(row.address) : undefined,
+    contactPhone:
+      row.contact_phone != null
+        ? String(row.contact_phone)
+        : row.contactPhone != null
+          ? String(row.contactPhone)
+          : undefined,
+    bankName:
+      row.bank_name != null
+        ? String(row.bank_name)
+        : row.bankName != null
+          ? String(row.bankName)
+          : undefined,
+    bankSheba:
+      row.bank_sheba != null
+        ? String(row.bank_sheba)
+        : row.bankSheba != null
+          ? String(row.bankSheba)
+          : undefined,
+    bankCard:
+      row.bank_card != null
+        ? String(row.bank_card)
+        : row.bankCard != null
+          ? String(row.bankCard)
+          : undefined,
+    capabilities: parseJsonObject(row.capabilities),
+    shopSettings: parseJsonObject<SellerShopSettings>(
+      row.shop_settings ?? row.shopSettings,
+    ),
+    notificationPrefs: parseJsonObject<SellerNotificationPrefs>(
+      row.notification_prefs ?? row.notificationPrefs,
+    ),
   };
 }
 
@@ -425,6 +511,66 @@ export async function updateSellerAsync(
           : existing.reviewNote,
     reviewedAt: statusChanged ? now : existing.reviewedAt,
     updatedAt: now,
+    logo:
+      input.logo === null
+        ? undefined
+        : input.logo !== undefined
+          ? input.logo
+          : existing.logo,
+    banner:
+      input.banner === null
+        ? undefined
+        : input.banner !== undefined
+          ? input.banner
+          : existing.banner,
+    address:
+      input.address === null
+        ? undefined
+        : input.address !== undefined
+          ? input.address
+          : existing.address,
+    contactPhone:
+      input.contactPhone === null
+        ? undefined
+        : input.contactPhone !== undefined
+          ? input.contactPhone
+          : existing.contactPhone,
+    bankName:
+      input.bankName === null
+        ? undefined
+        : input.bankName !== undefined
+          ? input.bankName
+          : existing.bankName,
+    bankSheba:
+      input.bankSheba === null
+        ? undefined
+        : input.bankSheba !== undefined
+          ? input.bankSheba
+          : existing.bankSheba,
+    bankCard:
+      input.bankCard === null
+        ? undefined
+        : input.bankCard !== undefined
+          ? input.bankCard
+          : existing.bankCard,
+    capabilities:
+      input.capabilities === null
+        ? undefined
+        : input.capabilities !== undefined
+          ? input.capabilities
+          : existing.capabilities,
+    shopSettings:
+      input.shopSettings === null
+        ? undefined
+        : input.shopSettings !== undefined
+          ? input.shopSettings
+          : existing.shopSettings,
+    notificationPrefs:
+      input.notificationPrefs === null
+        ? undefined
+        : input.notificationPrefs !== undefined
+          ? input.notificationPrefs
+          : existing.notificationPrefs,
   };
 
   if (isMysqlConfigured()) {
@@ -432,11 +578,43 @@ export async function updateSellerAsync(
       const row = sellerToRow(merged);
       const result = await mysqlExecute(SELLER_UPDATE_SQL, sellerUpdateParams(row));
       if (result.affectedRows > 0) {
+        try {
+          await mysqlExecute(
+            `UPDATE sellers SET
+              logo = ?, banner = ?, address = ?, contact_phone = ?,
+              bank_name = ?, bank_sheba = ?, bank_card = ?,
+              capabilities = ?, shop_settings = ?, notification_prefs = ?,
+              updated_at = ?
+             WHERE id = ?`,
+            [
+              merged.logo ?? null,
+              merged.banner ?? null,
+              merged.address ?? null,
+              merged.contactPhone ?? null,
+              merged.bankName ?? null,
+              merged.bankSheba ?? null,
+              merged.bankCard ?? null,
+              merged.capabilities ? JSON.stringify(merged.capabilities) : null,
+              merged.shopSettings ? JSON.stringify(merged.shopSettings) : null,
+              merged.notificationPrefs
+                ? JSON.stringify(merged.notificationPrefs)
+                : null,
+              now,
+              id,
+            ],
+          );
+        } catch (extErr) {
+          console.warn(
+            "[sellers] extended profile columns update skipped:",
+            extErr instanceof Error ? extErr.message : extErr,
+          );
+        }
         const saved = await mysqlQueryOne<SellerRow>(
           "SELECT * FROM sellers WHERE id = ? LIMIT 1",
           [id],
         );
         if (saved) return mapRowToSeller(saved);
+        return merged;
       }
       throw new Error("به‌روزرسانی فروشنده ناموفق بود");
     } catch (error) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/admin/ui/StatusBadge";
 import { DataTable } from "@/components/admin/ui/DataTable";
@@ -127,6 +128,13 @@ export default function SellerOrdersPage() {
               ) : null}
               <div className="mt-3 flex gap-2">
                 <AdminButton
+                  href={hajiasalPath(`/seller/orders/${r.id}`)}
+                  size="sm"
+                  className="flex-1 !bg-amber-800"
+                >
+                  جزئیات
+                </AdminButton>
+                <AdminButton
                   href={`/api/orders/${r.id}/invoice?print=1`}
                   variant="outline"
                   size="sm"
@@ -134,17 +142,7 @@ export default function SellerOrdersPage() {
                   target="_blank"
                   className="flex-1 !border-stone-300"
                 >
-                  مشاهده فاکتور
-                </AdminButton>
-                <AdminButton
-                  href={`/api/orders/${r.id}/invoice?download=1`}
-                  variant="ghost"
-                  size="sm"
-                  external
-                  download
-                  className="flex-1"
-                >
-                  دانلود
+                  فاکتور
                 </AdminButton>
               </div>
             </li>
@@ -169,9 +167,13 @@ export default function SellerOrdersPage() {
               key: "id",
               header: "شناسه",
               render: (r) => (
-                <span className="font-mono text-xs" dir="ltr">
+                <Link
+                  href={hajiasalPath(`/seller/orders/${r.id}`)}
+                  className="font-mono text-xs text-amber-900 hover:underline"
+                  dir="ltr"
+                >
                   {r.id}
-                </span>
+                </Link>
               ),
             },
             {

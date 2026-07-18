@@ -20,9 +20,15 @@ interface Kpis {
   productCount: number;
   pendingProducts?: number;
   outOfStock: number;
+  lowStockCount?: number;
   orderCount: number;
   pendingOrders: number;
   revenue: number;
+  salesToday?: number;
+  salesWeek?: number;
+  salesMonth?: number;
+  walletAvailable?: number;
+  walletPending?: number;
 }
 
 interface SellerOrderRow {
@@ -102,7 +108,34 @@ export default function SellerDashboardPage() {
       {kpis ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label="درآمد فروشنده"
+            label="فروش امروز"
+            value={`${(kpis.salesToday ?? 0).toLocaleString("fa-IR")} تومان`}
+            icon={CurrencyCircleDollar}
+            tone="amber"
+          />
+          <StatCard
+            label="فروش هفته"
+            value={`${(kpis.salesWeek ?? 0).toLocaleString("fa-IR")} تومان`}
+            hint={`ماه: ${(kpis.salesMonth ?? 0).toLocaleString("fa-IR")}`}
+            icon={CurrencyCircleDollar}
+            tone="emerald"
+          />
+          <StatCard
+            label="کیف پول"
+            value={`${(kpis.walletAvailable ?? 0).toLocaleString("fa-IR")}`}
+            hint={`در انتظار: ${(kpis.walletPending ?? 0).toLocaleString("fa-IR")}`}
+            icon={Package}
+            tone="slate"
+          />
+          <StatCard
+            label="کم‌موجود / ناموجود"
+            value={`${kpis.lowStockCount ?? kpis.outOfStock}`}
+            hint={`${kpis.outOfStock} ناموجود`}
+            icon={WarningCircle}
+            tone={(kpis.lowStockCount ?? kpis.outOfStock) > 0 ? "rose" : "slate"}
+          />
+          <StatCard
+            label="درآمد کل"
             value={`${kpis.revenue.toLocaleString("fa-IR")} تومان`}
             icon={CurrencyCircleDollar}
             tone="amber"

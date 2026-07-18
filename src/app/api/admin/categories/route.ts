@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getAllCategoriesAsync,
   upsertCategoryAsync,
@@ -18,18 +18,16 @@ const categorySchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "categories.view");
+  if (!gate.ok) return gate.response;
 
   const categories = await getAllCategoriesAsync();
   return NextResponse.json({ categories });
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "categories.manage");
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await request.json();
@@ -62,9 +60,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "categories.manage");
+  if (!gate.ok) return gate.response;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");

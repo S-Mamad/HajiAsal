@@ -7,10 +7,13 @@ import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { hajiasalPath } from "@/lib/paths";
 import type { Product } from "@/types";
 
+type InvProduct = Product & { stockQty?: number; lowStock?: boolean };
+
 export default function SellerInventoryPage() {
   const router = useRouter();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<InvProduct[]>([]);
   const [outOfStock, setOutOfStock] = useState(0);
+  const [lowStock, setLowStock] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -28,6 +31,7 @@ export default function SellerInventoryPage() {
       if (!res.ok) throw new Error(data.error ?? "خطا");
       setProducts(data.products ?? []);
       setOutOfStock(data.outOfStock ?? 0);
+      setLowStock(data.lowStock ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
@@ -39,14 +43,14 @@ export default function SellerInventoryPage() {
     void load();
   }, [load]);
 
-  const toggle = async (productId: string, inStock: boolean) => {
+  const adjust = async (productId: string, delta: number) => {
     setBusyId(productId);
     setError("");
     try {
       const res = await fetch("/api/seller/inventory", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, inStock: !inStock }),
+        body: JSON.stringify({ productId, delta, reason: "manual" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در تغییر موجودی");
@@ -62,7 +66,8 @@ export default function SellerInventoryPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-500">
-          {outOfStock.toLocaleString("fa-IR")} محصول ناموجود
+          ناموجود: {outOfStock.toLocaleString("fa-IR")} · کم‌موجود:{" "}
+          {lowStock.toLocaleString("fa-IR")}
         </p>
         <AdminButton
           type="button"
@@ -87,37 +92,43 @@ export default function SellerInventoryPage() {
           {
             key: "title",
             header: "محصول",
-            render: (p) => p.title,
+            render: (p) => (
+              <span className={p.lowStock ? "text-amber-800 font-medium" : ""}>
+                {p.title}
+              </span>
+            ),
           },
           {
-            key: "status",
-            header: "وضعیت",
-            render: (p) =>
-              p.inStock ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">
-                  موجود
-                </span>
-              ) : (
-                <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs text-red-600">
-                  ناموجود
-                </span>
-              ),
+            key: "qty",
+            header: "موجودی",
+            render: (p) => (
+              <span className="tabular-nums">{p.stockQty ?? 0}</span>
+            ),
           },
           {
             key: "action",
             header: "عملیات",
             render: (p) => (
-              <AdminButton
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busyId === p.id}
-                onClick={() => void toggle(p.id, p.inStock)}
-                className="!border-stone-300"
-                aria-label={p.inStock ? "ناموجود کردن" : "موجود کردن"}
-              >
-                {busyId === p.id ? "..." : p.inStock ? "ناموجود" : "موجود"}
-              </AdminButton>
+              <div className="flex gap-1">
+                <AdminButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busyId === p.id}
+                  onClick={() => void adjust(p.id, 1)}
+                >
+                  +۱
+                </AdminButton>
+                <AdminButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busyId === p.id}
+                  onClick={() => void adjust(p.id, -1)}
+                >
+                  −۱
+                </AdminButton>
+              </div>
             ),
           },
         ]}

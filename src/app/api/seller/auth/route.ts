@@ -11,6 +11,8 @@ import {
   verifySellerPassword,
 } from "@/lib/server/sellers";
 import { checkRateLimit, getTrustedClientIp } from "@/lib/server/rate-limit";
+import { logSellerActivity } from "@/lib/server/seller-activity";
+import { clientIpFromRequest } from "@/lib/server/seller-gate";
 
 const loginSchema = z.object({
   phone: z.string().min(10),
@@ -81,6 +83,13 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+
+    await logSellerActivity({
+      sellerId: seller.id,
+      action: "auth.login",
+      ip: clientIpFromRequest(request),
+      userAgent: request.headers.get("user-agent") ?? undefined,
+    });
 
     const response = NextResponse.json({
       success: true,

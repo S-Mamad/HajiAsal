@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { RowDataPacket } from "mysql2/promise";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { getAllProductsAsync, updateProductAsync } from "@/lib/server/products-store";
 import { isMysqlConfigured, mysqlExecute, mysqlQuery, newId } from "@/lib/server/mysql";
 import { logAdminAction } from "@/lib/server/audit-log";
@@ -13,9 +13,8 @@ const patchSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "inventory.view");
+  if (!gate.ok) return gate.response;
 
   const products = await getAllProductsAsync({ scope: "admin" });
   const lowStock = products.filter((p) => !p.inStock);
@@ -35,9 +34,8 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "inventory.edit");
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await request.json();

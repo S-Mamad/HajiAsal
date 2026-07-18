@@ -1,7 +1,7 @@
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { RowDataPacket } from "mysql2/promise";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
 import {
   isMysqlConfigured,
   mysqlExecute,
@@ -19,9 +19,8 @@ const patchSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "settings.view");
+  if (!__gate.ok) return __gate.response;
 
   let dbPing = false;
   let dbError: string | null = null;
@@ -100,9 +99,8 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "settings.edit");
+  if (!__gate.ok) return __gate.response;
 
   try {
     const body = await request.json();

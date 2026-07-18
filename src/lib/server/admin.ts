@@ -5,6 +5,10 @@ import {
   revokeAdminSession,
   validateAdminSessionToken,
 } from "./admin-sessions";
+import {
+  getAdminAuthFromToken,
+  type AdminAuthContext,
+} from "./admin-auth";
 
 export const ADMIN_COOKIE = "hajiasal_admin_session";
 
@@ -45,8 +49,12 @@ export async function isAdminAuthenticated(): Promise<boolean> {
   return validateAdminSessionToken(token);
 }
 
+export async function getAdminAuthContext(): Promise<AdminAuthContext> {
+  const token = await getAdminTokenFromCookies();
+  return getAdminAuthFromToken(token);
+}
+
 export function isAdminRequestAuthenticated(_request: Request): boolean {
-  // Deprecated: use isAdminRequestAuthenticatedAsync for real validation.
   return false;
 }
 
@@ -62,6 +70,7 @@ export async function isAdminRequestAuthenticatedAsync(
 export async function loginAdmin(meta?: {
   ipAddress?: string;
   userAgent?: string;
+  adminUserId?: string | null;
 }): Promise<string | null> {
   const result = await createAdminSession(meta);
   return result?.token ?? null;

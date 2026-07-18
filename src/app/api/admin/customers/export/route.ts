@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { getAllProfilesWithStats } from "@/lib/server/profiles";
 
 function escapeCsv(value: string): string {
@@ -10,9 +10,8 @@ function escapeCsv(value: string): string {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "reports.export");
+  if (!gate.ok) return gate.response;
 
   const customers = await getAllProfilesWithStats();
   const header = [

@@ -4,6 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { List, X } from "@phosphor-icons/react";
 import { usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { AdminAuthProvider } from "@/components/admin/auth/AdminAuthProvider";
+import { AdminToastProvider } from "@/components/admin/ui/AdminToast";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
 
@@ -12,7 +14,7 @@ interface AdminLayoutProps {
   title?: string;
 }
 
-export function AdminLayout({ children, title }: AdminLayoutProps) {
+function AdminShell({ children, title }: AdminLayoutProps) {
   const [mobileNav, setMobileNav] = useState(false);
   const pathname = usePathname();
 
@@ -33,7 +35,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
 
   return (
     <div
-      className="admin-shell flex min-h-[100dvh] bg-slate-50 text-slate-900"
+      className="admin-shell flex min-h-[100dvh] bg-[#f7f1e8] text-stone-900"
       dir="rtl"
     >
       <div className="hidden lg:flex">
@@ -44,7 +46,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/50"
+            className="absolute inset-0 bg-stone-900/50"
             aria-label="بستن منو"
             onClick={() => setMobileNav(false)}
           />
@@ -54,7 +56,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
               <button
                 type="button"
                 onClick={() => setMobileNav(false)}
-                className="absolute end-2 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700"
+                className="absolute end-2 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-800 text-stone-200 hover:bg-stone-700"
                 aria-label="بستن"
               >
                 <X size={18} />
@@ -65,11 +67,11 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-3 py-2 backdrop-blur lg:hidden">
+        <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-stone-200 bg-[#f7f1e8]/95 px-3 py-2 backdrop-blur lg:hidden">
           <button
             type="button"
             onClick={() => setMobileNav(true)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:bg-white/70 active:bg-white"
             aria-label="منو"
             aria-expanded={mobileNav}
           >
@@ -82,8 +84,18 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         <div className="hidden lg:block">
           <AdminHeader title={title} />
         </div>
-        <main className="min-w-0 flex-1 p-3 sm:p-6">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6">{children}</main>
       </div>
     </div>
+  );
+}
+
+export function AdminLayout({ children, title }: AdminLayoutProps) {
+  return (
+    <AdminAuthProvider>
+      <AdminToastProvider>
+        <AdminShell title={title}>{children}</AdminShell>
+      </AdminToastProvider>
+    </AdminAuthProvider>
   );
 }

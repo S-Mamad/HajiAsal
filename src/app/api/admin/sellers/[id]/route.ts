@@ -1,6 +1,7 @@
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+
 import { logAdminAction } from "@/lib/server/audit-log";
 import {
   deleteSellerAsync,
@@ -26,9 +27,8 @@ const updateSchema = z.object({
 });
 
 export async function GET(request: Request, { params }: Params) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "sellers.view");
+  if (!__gate.ok) return __gate.response;
 
   const { id } = await params;
   const seller = await getSellerByIdAsync(id);
@@ -58,9 +58,8 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "sellers.manage");
+  if (!__gate.ok) return __gate.response;
 
   const { id } = await params;
 
@@ -98,9 +97,8 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "sellers.manage");
+  if (!__gate.ok) return __gate.response;
 
   const { id } = await params;
 

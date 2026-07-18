@@ -19,6 +19,7 @@ export interface AdminSession {
   revokedAt?: string;
   ipAddress?: string;
   userAgent?: string;
+  adminUserId?: string | null;
 }
 
 function hashToken(token: string): string {
@@ -32,6 +33,7 @@ export function generateAdminToken(): string {
 export async function createAdminSession(meta?: {
   ipAddress?: string;
   userAgent?: string;
+  adminUserId?: string | null;
 }): Promise<{ sessionId: string; token: string } | null> {
   const sessionId = randomUUID();
   const token = generateAdminToken();
@@ -46,13 +48,14 @@ export async function createAdminSession(meta?: {
     expiresAt: expiresAt.toISOString(),
     ipAddress: meta?.ipAddress,
     userAgent: meta?.userAgent,
+    adminUserId: meta?.adminUserId ?? null,
   };
 
   if (isMysqlConfigured()) {
     try {
       await mysqlExecute(
-        `INSERT INTO admin_sessions (id, token_hash, created_at, expires_at, ip_address, user_agent)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO admin_sessions (id, token_hash, created_at, expires_at, ip_address, user_agent, admin_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           sessionId,
           tokenHash,
@@ -60,15 +63,33 @@ export async function createAdminSession(meta?: {
           expiresAt.toISOString(),
           meta?.ipAddress ?? null,
           meta?.userAgent ?? null,
+          meta?.adminUserId ?? null,
         ],
       );
       return { sessionId, token };
     } catch (error) {
-      console.error(
-        "[admin-sessions] insert failed:",
-        error instanceof Error ? error.message : error,
-      );
-      return null;
+      // Fallback if admin_user_id column not migrated yet
+      try {
+        await mysqlExecute(
+          `INSERT INTO admin_sessions (id, token_hash, created_at, expires_at, ip_address, user_agent)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            sessionId,
+            tokenHash,
+            session.createdAt,
+            expiresAt.toISOString(),
+            meta?.ipAddress ?? null,
+            meta?.userAgent ?? null,
+          ],
+        );
+        return { sessionId, token };
+      } catch (inner) {
+        console.error(
+          "[admin-sessions] insert failed:",
+          inner instanceof Error ? inner.message : inner,
+        );
+        return null;
+      }
     }
   }
 
@@ -79,17 +100,16 @@ export async function createAdminSession(meta?: {
     return { sessionId, token };
   }
 
-  // Demo / single-instance production without Supabase
   const mem = memoryGetAdminSessions();
   mem.push(session);
   memorySetAdminSessions(mem);
   return { sessionId, token };
 }
 
-export async function validateAdminSessionToken(
+export async function validateAdminSessionTokenDetailed(
   token: string,
-): Promise<boolean> {
-  if (!token) return false;
+): Promise<{ valid: boolean; adminUserId: string | null }> {
+  if (!token) return { valid: false, adminUserId: null };
   const tokenHash = hashToken(token);
 
   if (isMysqlConfigured()) {
@@ -98,15 +118,20 @@ export async function validateAdminSessionToken(
         "SELECT * FROM admin_sessions WHERE token_hash = ? AND revoked_at IS NULL LIMIT 1",
         [tokenHash],
       );
-      if (!row) return false;
-      if (new Date(toIso(row.expires_at)).getTime() < Date.now()) return false;
-      return true;
+      if (!row) return { valid: false, adminUserId: null };
+      if (new Date(toIso(row.expires_at)).getTime() < Date.now()) {
+        return { valid: false, adminUserId: null };
+      }
+      return {
+        valid: true,
+        adminUserId: row.admin_user_id ? String(row.admin_user_id) : null,
+      };
     } catch (error) {
       console.error(
         "[admin-sessions] validate failed:",
         error instanceof Error ? error.message : error,
       );
-      return false;
+      return { valid: false, adminUserId: null };
     }
   }
 
@@ -115,17 +140,28 @@ export async function validateAdminSessionToken(
     const session = sessions.find(
       (s) => s.tokenHash === tokenHash && !s.revokedAt,
     );
-    if (!session) return false;
-    if (new Date(session.expiresAt).getTime() < Date.now()) return false;
-    return true;
+    if (!session) return { valid: false, adminUserId: null };
+    if (new Date(session.expiresAt).getTime() < Date.now()) {
+      return { valid: false, adminUserId: null };
+    }
+    return { valid: true, adminUserId: session.adminUserId ?? null };
   }
 
   const session = memoryGetAdminSessions().find(
     (s) => s.tokenHash === tokenHash && !s.revokedAt,
   );
-  if (!session) return false;
-  if (new Date(session.expiresAt).getTime() < Date.now()) return false;
-  return true;
+  if (!session) return { valid: false, adminUserId: null };
+  if (new Date(session.expiresAt).getTime() < Date.now()) {
+    return { valid: false, adminUserId: null };
+  }
+  return { valid: true, adminUserId: session.adminUserId ?? null };
+}
+
+export async function validateAdminSessionToken(
+  token: string,
+): Promise<boolean> {
+  const result = await validateAdminSessionTokenDetailed(token);
+  return result.valid;
 }
 
 export async function revokeAdminSession(token: string): Promise<void> {

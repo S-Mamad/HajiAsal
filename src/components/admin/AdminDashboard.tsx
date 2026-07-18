@@ -1,229 +1,202 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { SectionHeading } from "@/components/ui/SectionHeading";
-import type { OrderStatus } from "@/lib/server/orders";
-import type { ContactMessage } from "@/lib/server/newsletter";
+import Link from "next/link";
+import { StatCard } from "@/components/admin/ui/StatCard";
+import { StatusBadge } from "@/components/admin/ui/StatusBadge";
+import { hajiasalPath } from "@/lib/paths";
 
-interface AdminOrder {
-  id: string;
-  status: OrderStatus;
-  userId?: string;
-  customer: { fullName: string; phone: string; city: string };
-  total: number;
-  createdAt: string;
-  trackingCode?: string;
+interface DashboardData {
+  kpis: {
+    totalOrders: number;
+    pendingOrders: number;
+    totalRevenue: number;
+    unreadMessages: number;
+    totalProducts: number;
+    outOfStock: number;
+    salesToday: number;
+    salesWeek: number;
+    salesMonth: number;
+    customersCount: number;
+    lowStockCount: number;
+    avgOrderValue: number;
+  };
+  recentOrders: Array<{
+    id: string;
+    total: number;
+    status: string;
+    customer: { fullName?: string };
+    createdAt: string;
+  }>;
+  recentMessages: Array<{
+    id: string;
+    name: string;
+    subject?: string;
+    createdAt: string;
+  }>;
+  recentCustomers: Array<{
+    id: string;
+    fullName?: string | null;
+    phone: string;
+  }>;
+  salesChart: Array<{ date: string; total: number }>;
+  ordersChart: Array<{ date: string; count: number }>;
 }
 
-const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
-  { value: "pending_payment", label: "در انتظار پرداخت" },
-  { value: "confirmed", label: "تأیید شده" },
-  { value: "processing", label: "در حال آماده‌سازی" },
-  { value: "shipped", label: "ارسال شده" },
-  { value: "delivered", label: "تحویل شده" },
-  { value: "cancelled", label: "لغو شده" },
-];
+function formatMoney(n: number) {
+  return new Intl.NumberFormat("fa-IR").format(n) + " تومان";
+}
 
 export function AdminDashboard() {
-  const router = useRouter();
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/orders");
-      if (res.status === 401) {
-        router.refresh();
-        return;
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? data.message ?? "خطا در بارگذاری");
-      setOrders(data.orders ?? []);
-      setMessages(data.messages ?? []);
+      const res = await fetch("/api/admin/dashboard", { credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "خطا در بارگذاری");
+      setData(json);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطای ناشناخته");
+      setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
-    let active = true;
+    void load();
+  }, [load]);
 
-    void (async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("/api/admin/orders");
-        if (!active) return;
-        if (res.status === 401) {
-          router.refresh();
-          return;
-        }
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? data.message ?? "خطا در بارگذاری");
-        setOrders(data.orders ?? []);
-        setMessages(data.messages ?? []);
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "خطای ناشناخته");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
+  if (loading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-2xl bg-white/70" />
+        ))}
+      </div>
+    );
+  }
 
-    return () => {
-      active = false;
-    };
-  }, [router]);
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        {error || "داده‌ای نیست"}
+        <button type="button" className="ms-3 underline" onClick={() => void load()}>
+          تلاش مجدد
+        </button>
+      </div>
+    );
+  }
 
-  const updateStatus = async (orderId: string, status: OrderStatus) => {
-    try {
-      const res = await fetch("/api/admin/orders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? data.message ?? "خطا در به‌روزرسانی");
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در به‌روزرسانی");
-    }
-  };
-
-  const handleLogout = async () => {
-    await fetch("/api/admin/auth", { method: "DELETE" });
-    router.refresh();
-  };
+  const { kpis } = data;
+  const maxSale = Math.max(1, ...data.salesChart.map((x) => x.total));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16 md:px-6 md:py-24">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <SectionHeading title="پنل مدیریت" subtitle="سفارش‌ها و پیام‌های تماس" />
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => void loadData()}>
-            بروزرسانی
-          </Button>
-          <Button href="/api/admin/orders/export" variant="outline">
-            خروجی CSV
-          </Button>
-          <Button type="button" variant="outline" onClick={handleLogout}>
-            خروج
-          </Button>
-        </div>
+    <div className="space-y-8">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="فروش امروز" value={formatMoney(kpis.salesToday)} />
+        <StatCard label="فروش هفته" value={formatMoney(kpis.salesWeek)} />
+        <StatCard label="فروش ماه" value={formatMoney(kpis.salesMonth)} />
+        <StatCard label="درآمد کل" value={formatMoney(kpis.totalRevenue)} />
+        <StatCard label="سفارش‌ها" value={String(kpis.totalOrders)} />
+        <StatCard label="مشتریان" value={String(kpis.customersCount)} />
+        <StatCard label="محصولات" value={String(kpis.totalProducts)} />
+        <StatCard
+          label="کم‌موجود / ناموجود"
+          value={String(kpis.lowStockCount || kpis.outOfStock)}
+        />
+        <StatCard label="میانگین سفارش" value={formatMoney(kpis.avgOrderValue)} />
+        <StatCard label="در انتظار" value={String(kpis.pendingOrders)} />
+        <StatCard label="پیام خوانده‌نشده" value={String(kpis.unreadMessages)} />
       </div>
 
-      {error ? <p className="mb-4 text-sm text-red-500">{error}</p> : null}
-      {loading ? <p className="text-muted">در حال بارگذاری...</p> : null}
-
-      <section className="mb-12">
-        <h2 className="mb-4 text-lg font-semibold text-brown">سفارش‌ها</h2>
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-cream text-start text-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">شناسه</th>
-                <th className="px-4 py-3 font-medium">مشتری</th>
-                <th className="px-4 py-3 font-medium">کاربر</th>
-                <th className="px-4 py-3 font-medium">مبلغ</th>
-                <th className="px-4 py-3 font-medium">تاریخ</th>
-                <th className="px-4 py-3 font-medium">وضعیت</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted">
-                    سفارشی ثبت نشده است
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="border-t border-border">
-                    <td className="px-4 py-3 font-mono text-xs" dir="ltr">
-                      {order.id}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-brown">{order.customer.fullName}</p>
-                      <p className="text-xs text-muted" dir="ltr">
-                        {order.customer.phone}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {order.userId ? (
-                        <p className="font-mono text-xs text-muted" dir="ltr" title={order.userId}>
-                          {order.userId.slice(0, 8)}…
-                        </p>
-                      ) : (
-                        <span className="text-xs text-muted">مهمان</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {order.total.toLocaleString("fa-IR")} تومان
-                    </td>
-                    <td className="px-4 py-3 text-muted">
-                      {new Date(order.createdAt).toLocaleDateString("fa-IR")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={order.status}
-                        onChange={(e) =>
-                          updateStatus(order.id, e.target.value as OrderStatus)
-                        }
-                        className="rounded-lg border border-border bg-surface px-2 py-1.5 text-xs"
-                        aria-label={`وضعیت سفارش ${order.id}`}
-                      >
-                        {STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-lg font-semibold text-brown">پیام‌های تماس</h2>
-        <div className="flex flex-col gap-3">
-          {messages.length === 0 ? (
-            <p className="text-muted">پیامی دریافت نشده است</p>
-          ) : (
-            messages.map((msg) => (
-              <article
-                key={msg.id}
-                className="rounded-2xl border border-border bg-surface p-4"
-              >
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium text-brown">{msg.name}</p>
-                  <time className="text-xs text-muted">
-                    {new Date(msg.createdAt).toLocaleDateString("fa-IR")}
-                  </time>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-stone-800">نمودار فروش (۱۴ روز)</h3>
+          <div className="flex h-40 items-end gap-1">
+            {data.salesChart.length === 0 ? (
+              <p className="text-sm text-stone-400">داده‌ای نیست</p>
+            ) : (
+              data.salesChart.map((p) => (
+                <div key={p.date} className="flex flex-1 flex-col items-center gap-1">
+                  <div
+                    className="w-full rounded-t bg-amber-700/80"
+                    style={{ height: `${Math.max(4, (p.total / maxSale) * 100)}%` }}
+                    title={formatMoney(p.total)}
+                  />
+                  <span className="text-[9px] text-stone-400 tabular-nums">
+                    {p.date.slice(5)}
+                  </span>
                 </div>
-                <p className="text-xs text-muted">
-                  {msg.subject} · <span dir="ltr">{msg.phone}</span> · {msg.email}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{msg.message}</p>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-stone-800">آخرین سفارش‌ها</h3>
+            <Link
+              href={hajiasalPath("/admin/orders")}
+              className="text-xs text-amber-800 hover:underline"
+            >
+              همه
+            </Link>
+          </div>
+          <ul className="divide-y divide-stone-100">
+            {data.recentOrders.map((o) => (
+              <li key={o.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-stone-800">
+                    {o.customer?.fullName ?? o.id}
+                  </p>
+                  <p className="text-xs text-stone-500 tabular-nums">
+                    {formatMoney(o.total)}
+                  </p>
+                </div>
+                <StatusBadge status={o.status} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-stone-800">آخرین پیام‌ها</h3>
+          <ul className="space-y-2 text-sm">
+            {data.recentMessages.map((m) => (
+              <li key={m.id} className="rounded-xl bg-stone-50 px-3 py-2">
+                <p className="font-medium text-stone-800">{m.name}</p>
+                <p className="text-xs text-stone-500">{m.subject || "بدون موضوع"}</p>
+              </li>
+            ))}
+            {data.recentMessages.length === 0 ? (
+              <li className="text-stone-400">پیامی نیست</li>
+            ) : null}
+          </ul>
+        </section>
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-stone-800">آخرین مشتریان</h3>
+          <ul className="space-y-2 text-sm">
+            {(data.recentCustomers ?? []).map((c) => (
+              <li key={c.id} className="flex justify-between rounded-xl bg-stone-50 px-3 py-2">
+                <span>{c.fullName || "بدون نام"}</span>
+                <span className="tabular-nums text-stone-500" dir="ltr">
+                  {c.phone}
+                </span>
+              </li>
+            ))}
+            {(data.recentCustomers ?? []).length === 0 ? (
+              <li className="text-stone-400">مشتری‌ای نیست</li>
+            ) : null}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }

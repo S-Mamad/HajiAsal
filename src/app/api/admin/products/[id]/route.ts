@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   deleteProductAsync,
   getProductByIdAsync,
@@ -39,9 +39,8 @@ const patchSchema = z.object({
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "products.view");
+  if (!gate.ok) return gate.response;
 
   const { id } = await context.params;
   // Admin must see pending/rejected seller products (public visibility hides them).
@@ -55,9 +54,8 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "products.edit");
+  if (!gate.ok) return gate.response;
 
   try {
     const { id } = await context.params;
@@ -98,9 +96,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const gate = await gateAdmin(request, "products.delete");
+  if (!gate.ok) return gate.response;
 
   const { id } = await context.params;
   const ok = await deleteProductAsync(id);

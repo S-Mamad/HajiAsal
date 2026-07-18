@@ -3,119 +3,75 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { Input } from "@/components/ui/Input";
 import { hajiasalPath } from "@/lib/paths";
-
-interface SellerProfile {
-  id: string;
-  shopName: string;
-  ownerName: string;
-  phone: string;
-  city: string;
-  status: string;
-  joinedAt: string;
-}
 
 export default function SellerSettingsPage() {
   const router = useRouter();
-  const [seller, setSeller] = useState<SellerProfile | null>(null);
+  const [workingHours, setWorkingHours] = useState("۹ تا ۱۸");
+  const [prepTimeHours, setPrepTimeHours] = useState("24");
+  const [autoMessage, setAutoMessage] = useState("");
+  const [shippingNotes, setShippingNotes] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("10");
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/seller/auth");
-      if (res.status === 401) {
-        router.push(hajiasalPath("/seller"));
-        return;
-      }
-      const data = await res.json();
-      setSeller(data.seller ?? null);
-    } catch {
-      setError("خطا در بارگذاری پروفایل");
+    const res = await fetch("/api/seller/profile");
+    if (res.status === 401) {
+      router.push(hajiasalPath("/seller"));
+      return;
     }
+    const data = await res.json();
+    const s = data.seller?.shopSettings ?? {};
+    if (s.workingHours) setWorkingHours(s.workingHours);
+    if (s.prepTimeHours != null) setPrepTimeHours(String(s.prepTimeHours));
+    if (s.autoMessage) setAutoMessage(s.autoMessage);
+    if (s.shippingNotes) setShippingNotes(s.shippingNotes);
+    if (s.lowStockThreshold != null)
+      setLowStockThreshold(String(s.lowStockThreshold));
   }, [router]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const logout = async () => {
-    await fetch("/api/seller/auth", { method: "DELETE" });
-    router.push(hajiasalPath("/seller"));
-    router.refresh();
+  const save = async () => {
+    setError("");
+    setMessage("");
+    const res = await fetch("/api/seller/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shopSettings: {
+          workingHours,
+          prepTimeHours: Number(prepTimeHours) || 24,
+          autoMessage,
+          shippingNotes,
+          lowStockThreshold: Number(lowStockThreshold) || 10,
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "خطا");
+      return;
+    }
+    setMessage("تنظیمات ذخیره شد");
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-      {seller ? (
-        <div className="rounded-2xl border border-stone-200 bg-white p-6">
-          <h3 className="mb-4 text-base font-semibold text-stone-900">
-            اطلاعات فروشگاه
-          </h3>
-          <dl className="space-y-3 text-sm">
-            <div className="flex justify-between gap-4 border-b border-stone-100 pb-2">
-              <dt className="shrink-0 text-stone-500">نام فروشگاه</dt>
-              <dd className="min-w-0 break-words text-end font-medium text-stone-900">
-                {seller.shopName}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-stone-100 pb-2">
-              <dt className="shrink-0 text-stone-500">مسئول</dt>
-              <dd className="min-w-0 break-words text-end font-medium text-stone-900">
-                {seller.ownerName}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-stone-100 pb-2">
-              <dt className="shrink-0 text-stone-500">موبایل</dt>
-              <dd className="font-medium text-stone-900" dir="ltr">
-                {seller.phone}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-stone-100 pb-2">
-              <dt className="shrink-0 text-stone-500">شهر</dt>
-              <dd className="font-medium text-stone-900">{seller.city}</dd>
-            </div>
-            <div className="flex justify-between gap-4 border-b border-stone-100 pb-2">
-              <dt className="shrink-0 text-stone-500">وضعیت</dt>
-              <dd className="font-medium text-emerald-700">
-                {seller.status === "active" ? "فعال" : seller.status}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="shrink-0 text-stone-500">عضویت</dt>
-              <dd className="font-medium text-stone-900">
-                {new Date(seller.joinedAt).toLocaleDateString("fa-IR")}
-              </dd>
-            </div>
-          </dl>
-
-          <p className="mt-6 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900/80">
-            برای تغییر اطلاعات فروشگاه با پشتیبانی حاجی عسل هماهنگ کنید. مدیریت
-            موجودی از بخش «موجودی» انجام می‌شود.
-          </p>
-
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <AdminButton
-              href={hajiasalPath("/shop")}
-              variant="outline"
-              className="w-full !border-stone-300 sm:w-auto"
-            >
-              مشاهده فروشگاه
-            </AdminButton>
-            <AdminButton
-              type="button"
-              variant="danger"
-              onClick={() => void logout()}
-              className="w-full sm:w-auto"
-            >
-              خروج از حساب
-            </AdminButton>
-          </div>
-        </div>
-      ) : (
-        <p className="text-sm text-stone-500">در حال بارگذاری...</p>
-      )}
+    <div className="mx-auto max-w-xl space-y-4">
+      {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
+      <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+        <Input label="ساعت کاری" value={workingHours} onChange={(e) => setWorkingHours(e.target.value)} />
+        <Input label="زمان آماده‌سازی (ساعت)" value={prepTimeHours} onChange={(e) => setPrepTimeHours(e.target.value)} type="number" />
+        <Input label="آستانه موجودی کم" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(e.target.value)} type="number" />
+        <Input label="پیام خودکار" value={autoMessage} onChange={(e) => setAutoMessage(e.target.value)} />
+        <Input label="تنظیمات ارسال" value={shippingNotes} onChange={(e) => setShippingNotes(e.target.value)} />
+      </div>
+      <AdminButton onClick={() => void save()}>ذخیره تنظیمات</AdminButton>
     </div>
   );
 }

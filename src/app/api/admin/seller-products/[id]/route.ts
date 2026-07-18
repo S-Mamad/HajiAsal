@@ -1,6 +1,7 @@
+import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+
 import { logAdminAction } from "@/lib/server/audit-log";
 import {
   getProductByIdAsync,
@@ -15,9 +16,8 @@ const approvalSchema = z.object({
 });
 
 export async function PATCH(request: Request, { params }: Params) {
-  if (!(await isAdminRequestAuthenticatedAsync(request))) {
-    return NextResponse.json({ error: "دسترسی غیرمجاز" }, { status: 401 });
-  }
+  const __gate = await gateAdmin(request, "sellers.manage");
+  if (!__gate.ok) return __gate.response;
 
   const { id } = await params;
 
