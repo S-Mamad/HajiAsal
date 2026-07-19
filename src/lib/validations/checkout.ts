@@ -36,7 +36,7 @@ export const checkoutApiSchema = z.object({
           grams: z.number(),
           price: z.number(),
         }),
-        quantity: z.number().min(1).max(99),
+        quantity: z.number().min(1).max(20),
       }),
     )
     .min(1, "سبد خرید خالی است"),

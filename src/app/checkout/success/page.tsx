@@ -1,15 +1,21 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { hajiasalPath } from "@/lib/paths";
+import { useCartStore } from "@/store/cart";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId") ?? "نامشخص";
   const trackingCode = searchParams.get("tracking") ?? "";
+  const clearCart = useCartStore((s) => s.clearCart);
+
+  useEffect(() => {
+    clearCart();
+  }, [clearCart]);
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-20 text-center">

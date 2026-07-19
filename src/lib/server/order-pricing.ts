@@ -61,13 +61,27 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
       };
     }
 
-    const quantity = Math.min(
-      20,
-      Math.max(1, Math.round(Number(raw.quantity) || 0)),
-    );
-    if (!Number.isFinite(quantity) || quantity < 1) {
+    const requestedQty = Math.round(Number(raw.quantity) || 0);
+    if (!Number.isFinite(requestedQty) || requestedQty < 1) {
       return { ok: false, message: "تعداد محصول نامعتبر است" };
     }
+    if (requestedQty > 20) {
+      return {
+        ok: false,
+        message: `حداکثر تعداد خرید برای «${product.title}» ۲۰ عدد است`,
+      };
+    }
+
+    const stockQty =
+      typeof product.stockQty === "number" ? product.stockQty : null;
+    if (stockQty != null && requestedQty > stockQty) {
+      return {
+        ok: false,
+        message: `موجودی «${product.title}» کافی نیست (باقی‌مانده: ${stockQty})`,
+      };
+    }
+
+    const quantity = requestedQty;
 
     const unitPrice = getEffectiveWeightPrice(product, weight);
 

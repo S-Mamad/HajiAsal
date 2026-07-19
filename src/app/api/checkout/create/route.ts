@@ -20,12 +20,15 @@ export async function POST(request: Request) {
 
   const merchantId = process.env.ZARINPAL_MERCHANT_ID;
   if (!merchantId || merchantId === "your_merchant_id") {
-    return NextResponse.json({
-      success: false,
-      available: false,
-      message:
-        "درگاه زرین‌پال پیکربندی نشده است. از پرداخت در محل یا کارت‌به‌کارت استفاده کنید.",
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        available: false,
+        message:
+          "درگاه زرین‌پال پیکربندی نشده است. از پرداخت در محل یا کارت‌به‌کارت استفاده کنید.",
+      },
+      { status: 503 },
+    );
   }
 
   try {
@@ -64,6 +67,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (order.status !== "pending_payment") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "این سفارش برای پرداخت آنلاین در دسترس نیست",
+        },
+        { status: 400 },
+      );
+    }
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     const callbackUrl = `${siteUrl}/api/checkout/verify?orderId=${encodeURIComponent(order.id)}`;
     const amountRial = Math.round(order.total * 10);
@@ -87,10 +100,13 @@ export async function POST(request: Request) {
     const authority = zarinData.data?.authority;
 
     if (zarinData.data?.code !== 100 || !authority) {
-      return NextResponse.json({
-        success: false,
-        message: zarinData.errors?.message ?? "خطا در اتصال به زرین‌پال",
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: zarinData.errors?.message ?? "خطا در اتصال به زرین‌پال",
+        },
+        { status: 502 },
+      );
     }
 
     await updateOrderStatus(order.id, "pending_payment");

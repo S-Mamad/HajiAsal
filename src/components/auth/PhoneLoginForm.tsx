@@ -9,7 +9,7 @@ import { OtpInput } from "@/components/auth/OtpInput";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
 import { useOtpTimer } from "@/hooks/useOtpTimer";
-import { syncWishlistToServer } from "@/lib/client/wishlist-sync";
+import { syncWishlistBidirectional } from "@/lib/client/wishlist-sync";
 import { useAuth } from "@/hooks/useAuth";
 import {
   formatPhoneInput,
@@ -115,7 +115,7 @@ export function PhoneLoginForm({
       await refresh();
 
       if (mode === "register" && !data.isNewUser) {
-        await syncWishlistToServer();
+        await syncWishlistBidirectional();
         router.push(redirect);
         router.refresh();
         return;
@@ -126,7 +126,7 @@ export function PhoneLoginForm({
         return;
       }
 
-      await syncWishlistToServer();
+      await syncWishlistBidirectional();
       router.push(redirect);
       router.refresh();
     } catch {

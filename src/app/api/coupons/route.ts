@@ -33,9 +33,10 @@ export async function GET() {
   const coupons = await getActiveCouponsAsync();
   return NextResponse.json({
     coupons: coupons.map((c) => ({
-      code: c.code,
       label: c.label,
       minOrder: c.minOrder,
+      type: c.type,
+      // Codes are not listed publicly — apply via POST with known code
     })),
   });
 }

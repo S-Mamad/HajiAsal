@@ -18,9 +18,22 @@ export function AccountWishlistClient() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/products");
-        const data = await res.json();
-        if (!cancelled) setCatalog(data.products ?? []);
+        const [productsRes, wishRes] = await Promise.all([
+          fetch("/api/products"),
+          fetch("/api/account/wishlist"),
+        ]);
+        const productsData = await productsRes.json();
+        if (wishRes.ok) {
+          const wishData = (await wishRes.json()) as { productIds?: string[] };
+          const remote = wishData.productIds ?? [];
+          if (remote.length > 0) {
+            const local = useWishlistStore.getState().ids;
+            useWishlistStore.setState({
+              ids: Array.from(new Set([...local, ...remote])),
+            });
+          }
+        }
+        if (!cancelled) setCatalog(productsData.products ?? []);
       } catch {
         if (!cancelled) setCatalog([]);
       } finally {

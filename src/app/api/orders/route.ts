@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { checkoutApiSchema } from "@/lib/validations/checkout";
-import { createOrder } from "@/lib/server/orders";
-import { validateCouponAsync } from "@/lib/server/coupons";
+import { createOrder, computeOrderTotal } from "@/lib/server/orders";
+import {
+  validateCouponAsync,
+  incrementSellerDiscountUsage,
+} from "@/lib/server/coupons";
 import {
   rebuildOrderItems,
   calcShippingCost,
@@ -9,6 +12,7 @@ import {
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { getProductByIdAsync } from "@/lib/server/products-store";
 
 export async function POST(request: Request) {
   try {
@@ -93,9 +97,18 @@ export async function POST(request: Request) {
     const subtotal = rebuilt.subtotal;
     const shipping = await calcShippingCost(shippingMethod, subtotal);
 
+    const sellerIdsInCart: string[] = [];
+    for (const line of rebuilt.items) {
+      const product = await getProductByIdAsync(line.productId);
+      if (product?.sellerId) sellerIdsInCart.push(product.sellerId);
+    }
+
     let discount = 0;
+    let appliedCouponSellerId: string | undefined;
     if (couponCode) {
-      const couponResult = await validateCouponAsync(couponCode, subtotal);
+      const couponResult = await validateCouponAsync(couponCode, subtotal, {
+        sellerIdsInCart,
+      });
       if (!couponResult.valid) {
         return NextResponse.json(
           { success: false, message: couponResult.message },
@@ -103,9 +116,10 @@ export async function POST(request: Request) {
         );
       }
       discount = couponResult.discount;
+      appliedCouponSellerId = couponResult.coupon?.sellerId;
     }
 
-    const total = Math.max(0, subtotal + shipping - discount);
+    const total = computeOrderTotal(subtotal, shipping, discount);
 
     const order = await createOrder({
       customer: { ...customer, phone: customerPhone },
@@ -118,6 +132,10 @@ export async function POST(request: Request) {
       shippingMethod,
       userId: session?.userId,
     });
+
+    if (appliedCouponSellerId && couponCode) {
+      await incrementSellerDiscountUsage(couponCode);
+    }
 
     return NextResponse.json({
       success: true,

@@ -34,6 +34,15 @@ interface SellerOrderRow {
   customer: { fullName: string; phone: string };
 }
 
+interface WithdrawalRow {
+  id: string;
+  amount: number;
+  status: string;
+  note?: string;
+  adminNote?: string;
+  createdAt: string;
+}
+
 const STATUS_LABELS: Record<SellerStatus, string> = {
   pending: "در انتظار تأیید",
   active: "فعال",
@@ -53,6 +62,7 @@ export default function AdminSellerDetailPage() {
   const [seller, setSeller] = useState<SellerDetail | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<SellerOrderRow[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
   const [stats, setStats] = useState({
     productCount: 0,
     pendingProductCount: 0,
@@ -62,6 +72,7 @@ export default function AdminSellerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [withdrawBusy, setWithdrawBusy] = useState<string | null>(null);
 
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -104,6 +115,20 @@ export default function AdminSellerDetailPage() {
       setNotes(s.notes ?? "");
       setStatus(s.status);
       setReviewNote(s.reviewNote ?? "");
+
+      try {
+        const wRes = await fetch(
+          `/api/admin/sellers/${params.id}/withdrawals`,
+        );
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          setWithdrawals(wData.withdrawals ?? []);
+        } else {
+          setWithdrawals([]);
+        }
+      } catch {
+        setWithdrawals([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
       setSeller(null);
@@ -210,6 +235,29 @@ export default function AdminSellerDetailPage() {
       return;
     }
     router.push(hajiasalPath("/admin/sellers"));
+  };
+
+  const reviewWithdrawal = async (
+    withdrawalId: string,
+    status: "approved" | "rejected",
+  ) => {
+    setWithdrawBusy(withdrawalId);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/sellers/${params.id}/withdrawals`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawalId, status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError((data as { error?: string }).error ?? "بررسی ناموفق");
+        return;
+      }
+      await load();
+    } finally {
+      setWithdrawBusy(null);
+    }
   };
 
   if (loading) {
@@ -452,6 +500,69 @@ export default function AdminSellerDetailPage() {
                   ) : null}
                 </div>
               ),
+            },
+          ]}
+        />
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-slate-800">
+          درخواست‌های برداشت
+        </h3>
+        <DataTable
+          data={withdrawals}
+          rowKey={(w) => w.id}
+          emptyMessage="درخواستی نیست"
+          columns={[
+            {
+              key: "amount",
+              header: "مبلغ",
+              render: (w) =>
+                `${Number(w.amount).toLocaleString("fa-IR")} تومان`,
+            },
+            {
+              key: "status",
+              header: "وضعیت",
+              render: (w) => w.status,
+            },
+            {
+              key: "note",
+              header: "یادداشت",
+              render: (w) => w.note || "-",
+            },
+            {
+              key: "date",
+              header: "تاریخ",
+              render: (w) =>
+                new Date(w.createdAt).toLocaleDateString("fa-IR"),
+            },
+            {
+              key: "actions",
+              header: "",
+              render: (w) =>
+                w.status === "pending" ? (
+                  <div className="flex flex-wrap gap-1">
+                    <AdminButton
+                      size="sm"
+                      disabled={withdrawBusy === w.id}
+                      onClick={() => void reviewWithdrawal(w.id, "approved")}
+                    >
+                      تأیید
+                    </AdminButton>
+                    <AdminButton
+                      size="sm"
+                      variant="ghost"
+                      disabled={withdrawBusy === w.id}
+                      onClick={() => void reviewWithdrawal(w.id, "rejected")}
+                    >
+                      رد
+                    </AdminButton>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400">
+                    {w.adminNote || "-"}
+                  </span>
+                ),
             },
           ]}
         />

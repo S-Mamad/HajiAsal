@@ -79,6 +79,8 @@ export type SellerOrderView = {
   trackingCode?: string;
   createdAt: string;
   updatedAt: string;
+  /** True when every line item in the parent order belongs to this seller. */
+  soleOwner: boolean;
 };
 
 export interface SellerSession {
@@ -296,6 +298,7 @@ export async function getSellerOrders(
       trackingCode: order.trackingCode,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
+      soleOwner: sellerItems.length === order.items.length,
     });
   }
 

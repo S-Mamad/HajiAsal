@@ -7,6 +7,7 @@ import {
 
 const PROTECTED_PREFIXES = ["/account"];
 const ADMIN_COOKIE = "hajiasal_admin_session";
+const SELLER_COOKIE = "hajiasal_seller_session";
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
@@ -19,8 +20,21 @@ function isAdminPanelPath(pathname: string): boolean {
   return pathname.startsWith("/admin/");
 }
 
+function isSellerPanelPath(pathname: string): boolean {
+  if (pathname === "/seller" || pathname === "/seller/") return false;
+  return pathname.startsWith("/seller/");
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isSellerPanelPath(pathname)) {
+    const token = request.cookies.get(SELLER_COOKIE)?.value;
+    if (!token) {
+      return NextResponse.redirect(new URL("/seller", request.url));
+    }
+    return NextResponse.next();
+  }
 
   if (pathname.startsWith("/seller")) {
     return NextResponse.next();

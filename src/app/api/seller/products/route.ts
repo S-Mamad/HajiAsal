@@ -37,7 +37,8 @@ const createSchema = z.object({
 });
 
 const updateSchema = z.object({
-  productId: z.string().min(1),
+  productId: z.string().min(1).optional(),
+  productIds: z.array(z.string()).optional(),
   title: z.string().min(2).max(200).optional(),
   shortDescription: z.string().max(500).optional(),
   longDescription: z.string().max(5000).optional(),
@@ -50,6 +51,7 @@ const updateSchema = z.object({
   status: z.enum(["active", "draft", "archived", "disabled"]).optional(),
   ingredients: z.string().max(1000).optional(),
   shippingInfo: z.string().max(1000).optional(),
+  bulkStatus: z.enum(["active", "draft", "archived", "disabled"]).optional(),
 });
 
 function slugify(input: string): string {
@@ -191,6 +193,34 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "اطلاعات نامعتبر است" }, { status: 400 });
     }
 
+    // Bulk status change
+    if (parsed.data.bulkStatus && parsed.data.productIds?.length) {
+      let updatedCount = 0;
+      for (const id of parsed.data.productIds) {
+        const existing = await getProductByIdAsync(id, { allowHidden: true });
+        if (!existing || existing.sellerId !== gated.ctx.seller.id) continue;
+        const product = await updateProductAsync(id, {
+          status: parsed.data.bulkStatus,
+        });
+        if (product) {
+          updatedCount += 1;
+          await logSellerActivity({
+            sellerId: gated.ctx.seller.id,
+            action: "product.bulk_status",
+            entityType: "product",
+            entityId: id,
+            meta: { status: parsed.data.bulkStatus },
+            ip: clientIpFromRequest(request),
+          });
+        }
+      }
+      return NextResponse.json({ success: true, updated: updatedCount });
+    }
+
+    if (!parsed.data.productId) {
+      return NextResponse.json({ error: "productId لازم است" }, { status: 400 });
+    }
+
     const existing = await getProductByIdAsync(parsed.data.productId, {
       allowHidden: true,
     });
@@ -198,7 +228,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
     }
 
-    const { productId, ...rest } = parsed.data;
+    const { productId, productIds: _ids, bulkStatus: _bulk, ...rest } =
+      parsed.data;
     const contentChanged =
       rest.title !== undefined ||
       rest.shortDescription !== undefined ||

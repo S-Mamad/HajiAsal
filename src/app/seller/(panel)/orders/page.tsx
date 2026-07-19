@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/admin/ui/StatusBadge";
-import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import {
+  SellerDataTable,
+  SellerEmpty,
+} from "@/components/seller/ui/SellerDataTable";
+import { SellerSavedFiltersBar } from "@/components/seller/ui/SellerSavedFiltersBar";
+import { SellerEntityHistory } from "@/components/seller/ui/SellerEntityHistory";
+import { exportToCsv, exportToJson, printHtml } from "@/lib/admin/export";
 import { hajiasalPath } from "@/lib/paths";
 import type { OrderStatus } from "@/lib/server/orders";
 
@@ -28,7 +34,10 @@ export default function SellerOrdersPage() {
   const [orders, setOrders] = useState<SellerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [historyId, setHistoryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,115 +62,186 @@ export default function SellerOrdersPage() {
     void load();
   }, [load]);
 
+  const filtered = useMemo(() => {
+    if (statusFilter === "all") return orders;
+    return orders.filter((o) => o.status === statusFilter);
+  }, [orders, statusFilter]);
+
+  const selectedRows = filtered.filter((o) => selected.includes(o.id));
+
+  const bulkAction = async (action: "bulkConfirm" | "bulkPrepare") => {
+    if (!selected.length) return;
+    setMessage("");
+    const res = await fetch("/api/seller/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderIds: selected, action }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "خطا");
+      return;
+    }
+    setMessage(`${data.updated ?? 0} سفارش به‌روز شد`);
+    setSelected([]);
+    await load();
+  };
+
+  const exportSelected = (format: "csv" | "json") => {
+    if (!selectedRows.length) {
+      setError("حداقل یک ردیف انتخاب کنید");
+      return;
+    }
+    const rows = selectedRows.map((o) => ({
+      id: o.id,
+      customer: o.customer.fullName,
+      city: o.customer.city,
+      status: o.status,
+      amount: o.sellerSubtotal,
+      date: o.createdAt,
+      tracking: o.trackingCode ?? "",
+    }));
+    if (format === "csv") exportToCsv("seller-orders-selected.csv", rows);
+    else exportToJson("seller-orders-selected.json", rows);
+  };
+
+  const printSelected = () => {
+    if (!selectedRows.length) {
+      setError("حداقل یک ردیف انتخاب کنید");
+      return;
+    }
+    const body = selectedRows
+      .map(
+        (o) =>
+          `<div style="margin-bottom:16px;border-bottom:1px solid #ddd;padding-bottom:8px">
+            <strong>${o.id}</strong> · ${o.customer.fullName} · ${o.customer.city}<br/>
+            مبلغ: ${o.sellerSubtotal.toLocaleString("fa-IR")} تومان · وضعیت: ${o.status}<br/>
+            ${o.sellerItems.map((i) => `${i.title} × ${i.quantity}`).join(" · ")}
+          </div>`,
+      )
+      .join("");
+    printHtml("سفارش‌های انتخاب‌شده", body);
+  };
+
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-500">
           فقط سفارش‌هایی که شامل محصولات شما هستند
         </p>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <AdminButton
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void load()}
-            className="w-full !border-stone-300 sm:w-auto"
-          >
+        <div className="flex flex-wrap gap-2">
+          <AdminButton variant="outline" onClick={() => void load()}>
             بروزرسانی
           </AdminButton>
           <AdminButton
             href="/api/seller/orders/export"
             variant="outline"
-            size="sm"
             external
             download
-            className="w-full !border-stone-300 sm:w-auto"
           >
-            خروجی CSV
+            خروجی CSV همه
           </AdminButton>
         </div>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      {loading ? (
-        <p className="text-sm text-stone-500">در حال بارگذاری...</p>
+
+      {error ? (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          {message}
+        </p>
       ) : null}
 
-      <ul className="space-y-3 md:hidden">
-        {orders.map((r) => {
-          const open = expanded === r.id;
-          return (
-            <li
-              key={r.id}
-              className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
-            >
-              <button
-                type="button"
-                className="w-full text-start"
-                onClick={() => setExpanded(open ? null : r.id)}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-mono text-xs text-stone-500" dir="ltr">
-                    {r.id}
-                  </span>
-                  <StatusBadge status={r.status} />
-                </div>
-                <p className="mt-2 font-medium text-stone-900">
-                  {r.customer.fullName}
-                </p>
-                <p className="mt-0.5 text-xs text-stone-500">
-                  {r.customer.city} ·{" "}
-                  {new Date(r.createdAt).toLocaleDateString("fa-IR")}
-                </p>
-                <p className="mt-2 text-sm font-semibold">
-                  {r.sellerSubtotal.toLocaleString("fa-IR")} تومان
-                </p>
-              </button>
-              {open ? (
-                <ul className="mt-3 space-y-1 border-t border-stone-100 pt-3 text-xs text-stone-600">
-                  {r.sellerItems.map((item, i) => (
-                    <li key={`${r.id}-${i}`}>
-                      {item.title} · {item.weight.label} ×{" "}
-                      {item.quantity.toLocaleString("fa-IR")}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="mt-3 flex gap-2">
-                <AdminButton
-                  href={hajiasalPath(`/seller/orders/${r.id}`)}
-                  size="sm"
-                  className="flex-1 !bg-amber-800"
-                >
-                  جزئیات
-                </AdminButton>
-                <AdminButton
-                  href={`/api/orders/${r.id}/invoice?print=1`}
-                  variant="outline"
-                  size="sm"
-                  external
-                  target="_blank"
-                  className="flex-1 !border-stone-300"
-                >
-                  فاکتور
-                </AdminButton>
-              </div>
-            </li>
-          );
-        })}
-        {!loading && orders.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-stone-200 py-10 text-center text-sm text-stone-400">
-            سفارشی یافت نشد
-          </li>
-        ) : null}
-      </ul>
+      <div className="flex flex-wrap gap-2 rounded-xl border border-stone-200 bg-white p-3 text-sm">
+        <label className="flex items-center gap-1.5">
+          وضعیت
+          <select
+            className="rounded-md border border-stone-200 px-2 py-1"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="all">همه</option>
+            <option value="pending">در انتظار</option>
+            <option value="confirmed">تأیید شده</option>
+            <option value="processing">در حال آماده‌سازی</option>
+            <option value="shipped">ارسال شده</option>
+            <option value="delivered">تحویل شده</option>
+            <option value="cancelled">لغو شده</option>
+          </select>
+        </label>
+      </div>
 
-      <div className="hidden md:block">
-        <DataTable
-          data={orders}
-          rowKey={(r) => r.id}
-          emptyMessage="سفارشی یافت نشد"
-          minWidth={880}
-          className="!border-stone-200"
+      <SellerSavedFiltersBar
+        moduleKey="orders"
+        currentPayload={{ statusFilter }}
+        onApply={(payload) => {
+          if (typeof payload.statusFilter === "string") {
+            setStatusFilter(payload.statusFilter);
+          }
+        }}
+      />
+
+      {selected.length > 0 ? (
+        <div className="flex flex-wrap gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <span className="text-sm text-amber-900">
+            {selected.length} انتخاب‌شده
+          </span>
+          <AdminButton
+            size="sm"
+            variant="outline"
+            onClick={() => void bulkAction("bulkConfirm")}
+          >
+            تأیید گروهی
+          </AdminButton>
+          <AdminButton
+            size="sm"
+            variant="outline"
+            onClick={() => void bulkAction("bulkPrepare")}
+          >
+            آماده‌سازی گروهی
+          </AdminButton>
+          <AdminButton
+            size="sm"
+            variant="outline"
+            onClick={() => exportSelected("csv")}
+          >
+            CSV
+          </AdminButton>
+          <AdminButton
+            size="sm"
+            variant="outline"
+            onClick={() => exportSelected("json")}
+          >
+            JSON
+          </AdminButton>
+          <AdminButton size="sm" variant="outline" onClick={printSelected}>
+            چاپ
+          </AdminButton>
+        </div>
+      ) : null}
+
+      {!loading && filtered.length === 0 ? (
+        <SellerEmpty
+          title="سفارشی نیست"
+          description="هنوز سفارشی با محصولات شما ثبت نشده یا فیلتر خالی است"
+        />
+      ) : (
+        <SellerDataTable
+          storageKey="seller.orders.grid.v2"
+          loading={loading}
+          error={error || null}
+          onRetry={() => void load()}
+          searchable
+          searchPlaceholder="جستجوی شناسه، مشتری، شهر..."
+          searchKeys={(o) =>
+            `${o.id} ${o.customer.fullName} ${o.customer.phone} ${o.customer.city} ${o.trackingCode ?? ""}`
+          }
+          selectable
+          selectedKeys={selected}
+          onSelectionChange={setSelected}
           columns={[
             {
               key: "id",
@@ -218,35 +298,49 @@ export default function SellerOrdersPage() {
                 new Date(r.createdAt).toLocaleDateString("fa-IR"),
             },
             {
-              key: "invoice",
-              header: "فاکتور",
+              key: "actions",
+              header: "عملیات",
               render: (r) => (
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap gap-1">
                   <AdminButton
-                    href={`/api/orders/${r.id}/invoice?print=1`}
-                    variant="outline"
                     size="sm"
-                    external
-                    target="_blank"
-                    className="!border-stone-300"
+                    variant="ghost"
+                    href={hajiasalPath(`/seller/orders/${r.id}`)}
                   >
-                    پرینت
+                    جزئیات
                   </AdminButton>
                   <AdminButton
-                    href={`/api/orders/${r.id}/invoice?download=1`}
-                    variant="ghost"
                     size="sm"
+                    variant="ghost"
+                    href={`/api/orders/${r.id}/invoice?print=1`}
                     external
-                    download
+                    target="_blank"
                   >
-                    دانلود
+                    فاکتور
+                  </AdminButton>
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setHistoryId(r.id)}
+                  >
+                    تاریخچه
                   </AdminButton>
                 </div>
               ),
             },
           ]}
+          data={filtered}
+          rowKey={(r) => r.id}
+          emptyMessage="سفارشی با این فیلتر نیست"
         />
-      </div>
+      )}
+
+      <SellerEntityHistory
+        entityType="order"
+        entityId={historyId ?? ""}
+        open={Boolean(historyId)}
+        onClose={() => setHistoryId(null)}
+      />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { hajiasalPath } from "@/lib/paths";
 import { useAuth } from "@/hooks/useAuth";
-import { syncWishlistToServer } from "@/lib/client/wishlist-sync";
+import { syncWishlistBidirectional } from "@/lib/client/wishlist-sync";
 import { safeInternalRedirect } from "@/lib/safe-redirect";
 
 interface RegisterFormProps {
@@ -48,7 +48,7 @@ export function RegisterForm({ phone }: RegisterFormProps) {
         setError(data.message ?? "خطا در ثبت‌نام");
         return;
       }
-      await syncWishlistToServer();
+      await syncWishlistBidirectional();
       await refresh();
       router.push(redirect);
     } catch {

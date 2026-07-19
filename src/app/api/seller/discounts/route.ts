@@ -42,15 +42,25 @@ export async function GET(request: Request) {
   }
 }
 
-const createSchema = z.object({
-  code: z.string().min(2).max(64),
-  type: z.enum(["percent", "fixed"]),
-  value: z.number().positive(),
-  maxUses: z.number().int().positive().optional(),
-  minOrder: z.number().int().positive().optional(),
-  startsAt: z.string().optional(),
-  endsAt: z.string().optional(),
-});
+const createSchema = z
+  .object({
+    code: z.string().min(2).max(64),
+    type: z.enum(["percent", "fixed"]),
+    value: z.number().positive(),
+    maxUses: z.number().int().positive().optional(),
+    minOrder: z.number().int().positive().optional(),
+    startsAt: z.string().optional(),
+    endsAt: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "percent" && data.value > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "درصد تخفیف نمی‌تواند بیش از ۱۰۰ باشد",
+        path: ["value"],
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   const gated = await gateSeller(request, "discounts.manage");

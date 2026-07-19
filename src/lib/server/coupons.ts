@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import couponsData from "@/data/coupons.json";
-import { isMysqlConfigured, mysqlQuery, toBool } from "./mysql";
+import { isMysqlConfigured, mysqlExecute, mysqlQuery, toBool, toIso } from "./mysql";
+import { computeDiscountAmount } from "@/lib/commerce/money";
 
 export interface Coupon {
   code: string;
@@ -10,7 +11,10 @@ export interface Coupon {
   maxDiscount?: number;
   active: boolean;
   label: string;
+  sellerId?: string;
 }
+
+export { computeDiscountAmount } from "@/lib/commerce/money";
 
 const staticCoupons = couponsData as Coupon[];
 
@@ -22,7 +26,7 @@ function mapCouponRow(row: Record<string, unknown>): Coupon {
     minOrder: Number(row.min_order),
     maxDiscount: row.max_discount ? Number(row.max_discount) : undefined,
     active: toBool(row.active),
-    label: (row.label as string) ?? row.code as string,
+    label: (row.label as string) ?? (row.code as string),
   };
 }
 
@@ -42,19 +46,71 @@ export async function getAllCouponsAsync(): Promise<Coupon[]> {
 }
 
 function computeDiscount(coupon: Coupon, subtotal: number): number {
-  if (coupon.type === "percent") {
-    let discount = Math.floor((subtotal * coupon.value) / 100);
-    if (coupon.maxDiscount) {
-      discount = Math.min(discount, coupon.maxDiscount);
+  return computeDiscountAmount(coupon, subtotal);
+}
+
+async function validateSellerDiscount(
+  code: string,
+  subtotal: number,
+): Promise<{
+  valid: boolean;
+  coupon?: Coupon;
+  discount: number;
+  message: string;
+} | null> {
+  if (!isMysqlConfigured()) return null;
+  try {
+    const rows = await mysqlQuery<RowDataPacket>(
+      `SELECT * FROM seller_discounts
+       WHERE UPPER(code) = ? AND active = 1
+       ORDER BY created_at DESC LIMIT 1`,
+      [code],
+    );
+    if (!rows.length) return null;
+    const row = rows[0];
+    const now = Date.now();
+    if (row.starts_at && new Date(toIso(row.starts_at)).getTime() > now) {
+      return { valid: false, discount: 0, message: "کد تخفیف هنوز فعال نیست" };
     }
-    return discount;
+    if (row.ends_at && new Date(toIso(row.ends_at)).getTime() < now) {
+      return { valid: false, discount: 0, message: "کد تخفیف منقضی شده" };
+    }
+    const maxUses = row.max_uses != null ? Number(row.max_uses) : null;
+    const usedCount = Number(row.used_count ?? 0);
+    if (maxUses != null && usedCount >= maxUses) {
+      return { valid: false, discount: 0, message: "سقف استفاده از کد پر شده" };
+    }
+    const coupon: Coupon = {
+      code: String(row.code),
+      type: row.type === "percent" ? "percent" : "fixed",
+      value: Number(row.value),
+      minOrder: Number(row.min_order ?? 0),
+      active: true,
+      label: `تخفیف فروشنده ${String(row.code)}`,
+      sellerId: String(row.seller_id),
+    };
+    if (subtotal < coupon.minOrder) {
+      return {
+        valid: false,
+        discount: 0,
+        message: `حداقل مبلغ سفارش ${coupon.minOrder.toLocaleString("fa-IR")} تومان است`,
+      };
+    }
+    return {
+      valid: true,
+      coupon,
+      discount: computeDiscount(coupon, subtotal),
+      message: coupon.label,
+    };
+  } catch {
+    return null;
   }
-  return coupon.value;
 }
 
 export async function validateCouponAsync(
   code: string,
   subtotal: number,
+  options?: { sellerIdsInCart?: string[] },
 ): Promise<{
   valid: boolean;
   coupon?: Coupon;
@@ -68,6 +124,25 @@ export async function validateCouponAsync(
   );
 
   if (!coupon) {
+    const sellerResult = await validateSellerDiscount(normalized, subtotal);
+    if (sellerResult) {
+      if (
+        sellerResult.valid &&
+        sellerResult.coupon?.sellerId &&
+        options?.sellerIdsInCart &&
+        options.sellerIdsInCart.some(
+          (id) => id !== sellerResult.coupon!.sellerId,
+        )
+      ) {
+        return {
+          valid: false,
+          discount: 0,
+          message:
+            "این کد تخفیف فقط برای محصولات همان فروشنده قابل استفاده است",
+        };
+      }
+      return sellerResult;
+    }
     return { valid: false, discount: 0, message: "کد تخفیف نامعتبر است" };
   }
 
@@ -86,6 +161,26 @@ export async function validateCouponAsync(
     discount,
     message: coupon.label,
   };
+}
+
+/** Increment seller discount usage after a successful order. */
+export async function incrementSellerDiscountUsage(
+  code: string,
+): Promise<void> {
+  if (!isMysqlConfigured() || !code.trim()) return;
+  try {
+    await mysqlExecute(
+      `UPDATE seller_discounts
+       SET used_count = COALESCE(used_count, 0) + 1
+       WHERE UPPER(code) = ? AND active = 1`,
+      [code.trim().toUpperCase()],
+    );
+  } catch (error) {
+    console.error(
+      "[coupons] used_count increment failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
 }
 
 export function validateCoupon(

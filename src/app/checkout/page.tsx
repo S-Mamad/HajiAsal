@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check } from "@phosphor-icons/react";
@@ -32,8 +32,9 @@ const steps = [
   { id: 3, title: "بررسی و پرداخت" },
 ];
 
-export default function CheckoutPage() {
+function CheckoutPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +46,7 @@ export default function CheckoutPage() {
   const [shippingMethod, setShippingMethod] =
     useState<ShippingMethod>("standard");
   const [prefilled, setPrefilled] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore((s) => s.getSubtotal());
@@ -52,6 +54,27 @@ export default function CheckoutPage() {
   const baseShippingCost = useCartStore((s) => s.shippingConfig.shippingCost);
 
   const loginHref = `${hajiasalPath("/login")}?redirect=${encodeURIComponent(hajiasalPath("/checkout"))}`;
+
+  useEffect(() => {
+    const payment = searchParams.get("payment");
+    const orderId =
+      searchParams.get("orderId") ?? searchParams.get("order");
+    if (payment === "failed") {
+      setError(
+        orderId
+          ? `پرداخت سفارش ${orderId} ناموفق بود. می‌توانید دوباره تلاش کنید یا روش دیگری انتخاب کنید.`
+          : "پرداخت ناموفق بود. لطفاً دوباره تلاش کنید یا روش دیگری انتخاب کنید.",
+      );
+      if (orderId) setPendingOrderId(orderId);
+    } else if (payment === "cancelled") {
+      setError(
+        orderId
+          ? `پرداخت سفارش ${orderId} لغو شد. سبد شما محفوظ است.`
+          : "پرداخت لغو شد. سبد شما محفوظ است.",
+      );
+      if (orderId) setPendingOrderId(orderId);
+    }
+  }, [searchParams]);
 
   const shippingOptions: ShippingOption[] = useMemo(
     () => [
@@ -234,10 +257,11 @@ export default function CheckoutPage() {
         });
         const pay = await payRes.json();
         if (payRes.ok && pay.redirectUrl) {
-          clearCart();
+          // Keep cart until success page (Zarinpal cancel/fail must restore UX)
           window.location.href = pay.redirectUrl as string;
           return;
         }
+        setPendingOrderId(result.orderId as string);
         throw new Error(
           pay.message ||
             "انتقال به درگاه پرداخت ممکن نشد. روش دیگری انتخاب کنید.",
@@ -256,6 +280,54 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   };
+
+  const resumeOnlinePayment = async () => {
+    if (!pendingOrderId) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const payRes = await fetch("/api/checkout/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: pendingOrderId }),
+      });
+      const pay = await payRes.json();
+      if (payRes.ok && pay.redirectUrl) {
+        window.location.href = pay.redirectUrl as string;
+        return;
+      }
+      throw new Error(pay.message || "انتقال به درگاه ممکن نشد");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطای ناشناخته");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (discount > 0 && couponCode.trim()) {
+      void (async () => {
+        try {
+          const res = await fetch("/api/coupons", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: couponCode, subtotal }),
+          });
+          const data = await res.json();
+          if (data.valid) {
+            setDiscount(data.discount);
+            setCouponMessage(data.message);
+          } else {
+            setDiscount(0);
+            setCouponMessage(data.message);
+          }
+        } catch {
+          /* keep previous */
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- revalidate when cart value changes
+  }, [subtotal]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-14">
@@ -409,6 +481,17 @@ export default function CheckoutPage() {
             ) : null}
             <CartSummary shippingOverride={shipping} discount={discount} />
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            {pendingOrderId && paymentMethod === "online" ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => void resumeOnlinePayment()}
+                className="w-full"
+              >
+                ادامه پرداخت سفارش {pendingOrderId}
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
@@ -438,5 +521,19 @@ export default function CheckoutPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center text-secondary">
+          در حال بارگذاری...
+        </div>
+      }
+    >
+      <CheckoutPageInner />
+    </Suspense>
   );
 }

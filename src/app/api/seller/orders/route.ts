@@ -53,8 +53,9 @@ export async function GET(request: Request) {
 }
 
 const patchSchema = z.object({
-  orderId: z.string().min(1),
-  action: z.enum(["confirm", "prepare", "tracking", "note"]),
+  orderId: z.string().min(1).optional(),
+  orderIds: z.array(z.string()).optional(),
+  action: z.enum(["confirm", "prepare", "tracking", "note", "bulkConfirm", "bulkPrepare"]),
   trackingCode: z.string().max(64).optional(),
   note: z.string().max(2000).optional(),
   tags: z.array(z.string()).optional(),
@@ -71,16 +72,72 @@ export async function PATCH(request: Request) {
   }
 
   const orders = await getSellerOrders(gated.ctx.seller.id);
+
+  if (
+    (parsed.data.action === "bulkConfirm" ||
+      parsed.data.action === "bulkPrepare") &&
+    parsed.data.orderIds?.length
+  ) {
+    const nextStatus =
+      parsed.data.action === "bulkConfirm" ? "confirmed" : "processing";
+    let updated = 0;
+    for (const id of parsed.data.orderIds) {
+      const order = orders.find((o) => o.id === id);
+      if (!order || !order.soleOwner) continue;
+      await updateOrderAdmin(id, { status: nextStatus });
+      updated += 1;
+      await logSellerActivity({
+        sellerId: gated.ctx.seller.id,
+        action: `order.${parsed.data.action}`,
+        entityType: "order",
+        entityId: id,
+        ip: clientIpFromRequest(request),
+      });
+    }
+    return NextResponse.json({ success: true, updated });
+  }
+
+  if (!parsed.data.orderId) {
+    return NextResponse.json({ error: "orderId لازم است" }, { status: 400 });
+  }
+
   const order = orders.find((o) => o.id === parsed.data.orderId);
   if (!order) {
     return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
   }
 
   if (parsed.data.action === "confirm") {
+    if (!order.soleOwner) {
+      return NextResponse.json(
+        {
+          error:
+            "تغییر وضعیت سفارش چندفروشنده‌ای فقط توسط مدیر مجاز است. می‌توانید یادداشت ثبت کنید.",
+        },
+        { status: 403 },
+      );
+    }
     await updateOrderAdmin(parsed.data.orderId, { status: "confirmed" });
   } else if (parsed.data.action === "prepare") {
+    if (!order.soleOwner) {
+      return NextResponse.json(
+        {
+          error:
+            "تغییر وضعیت سفارش چندفروشنده‌ای فقط توسط مدیر مجاز است. می‌توانید یادداشت ثبت کنید.",
+        },
+        { status: 403 },
+      );
+    }
     await updateOrderAdmin(parsed.data.orderId, { status: "processing" });
   } else if (parsed.data.action === "tracking") {
+    if (!order.soleOwner) {
+      return NextResponse.json(
+        {
+          error:
+            "ثبت کد رهگیری برای سفارش چندفروشنده‌ای فقط توسط مدیر مجاز است.",
+        },
+        { status: 403 },
+      );
+    }
     if (!parsed.data.trackingCode) {
       return NextResponse.json({ error: "کد رهگیری لازم است" }, { status: 400 });
     }

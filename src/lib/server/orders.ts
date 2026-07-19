@@ -17,6 +17,9 @@ import {
   parseJsonField,
   toIso,
 } from "./mysql";
+import { computeOrderTotal } from "@/lib/commerce/money";
+
+export { computeOrderTotal } from "@/lib/commerce/money";
 
 export type OrderStatus =
   | "pending_payment"
@@ -95,7 +98,7 @@ export async function createOrder(input: {
   shippingMethod?: string;
   userId?: string;
 }): Promise<StoredOrder> {
-  const discount = input.discount ?? 0;
+  const discount = Math.max(0, input.discount ?? 0);
   const now = new Date().toISOString();
   const paymentMethod = input.paymentMethod ?? "cod";
   const order: StoredOrder = {
@@ -107,7 +110,7 @@ export async function createOrder(input: {
     subtotal: input.subtotal,
     shipping: input.shipping,
     discount,
-    total: input.subtotal + input.shipping - discount,
+    total: computeOrderTotal(input.subtotal, input.shipping, discount),
     couponCode: input.couponCode,
     shippingMethod: input.shippingMethod,
     createdAt: now,

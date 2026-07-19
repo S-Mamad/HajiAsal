@@ -14,13 +14,8 @@ export function CartDrawer() {
   const isOpen = useCartStore((s) => s.isOpen);
   const closeCart = useCartStore((s) => s.closeCart);
   const itemCount = useCartStore((s) => s.getItemCount());
-  const setHasHydrated = useCartStore((s) => s.setHasHydrated);
 
   useBodyScrollLock(isOpen);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, [setHasHydrated]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -45,9 +40,9 @@ export function CartDrawer() {
             aria-hidden
           />
           <motion.aside
-            initial={{ x: "-100%" }}
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
+            exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
             className="fixed inset-y-0 end-0 z-[90] flex w-full max-w-md flex-col border-s border-border bg-surface shadow-2xl"
             role="dialog"

@@ -32,6 +32,7 @@ export function getMysqlPool(): Pool | null {
       database: process.env.MYSQL_DATABASE!,
       waitForConnections: true,
       connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 10),
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 3000),
       timezone: "Z",
       dateStrings: false,
       charset: "utf8mb4",

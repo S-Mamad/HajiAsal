@@ -20,15 +20,22 @@ const SITE_SETTINGS_KEY = "hajiasal";
 
 export async function getSiteSettings(): Promise<SiteConfig> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT value FROM site_settings WHERE `key` = ? LIMIT 1",
-      [SITE_SETTINGS_KEY],
-    );
-    if (row?.value) {
-      return {
-        ...(site as SiteConfig),
-        ...parseJsonField<Partial<SiteConfig>>(row.value, {}),
-      };
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT value FROM site_settings WHERE `key` = ? LIMIT 1",
+        [SITE_SETTINGS_KEY],
+      );
+      if (row?.value) {
+        return {
+          ...(site as SiteConfig),
+          ...parseJsonField<Partial<SiteConfig>>(row.value, {}),
+        };
+      }
+    } catch (error) {
+      console.error(
+        "[site-settings] mysql unavailable, falling back:",
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 
