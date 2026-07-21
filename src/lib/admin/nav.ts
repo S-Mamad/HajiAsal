@@ -66,6 +66,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: "products.view",
       },
       {
+        href: hajiasalPath("/admin/product-fields"),
+        label: "فیلدهای سفارشی",
+        icon: FileText,
+        permission: "products.manage_fields",
+      },
+      {
         href: hajiasalPath("/admin/categories"),
         label: "دسته‌بندی‌ها",
         icon: Tag,

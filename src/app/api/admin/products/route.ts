@@ -1,41 +1,33 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { randomUUID } from "crypto";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getAllProductsAsync,
   createProductAsync,
 } from "@/lib/server/products-store";
+import { productCreateSchema } from "@/lib/server/product-schemas";
 import type { Product, ProductCategory } from "@/types";
 import { logAdminAction } from "@/lib/server/audit-log";
-
-const createSchema = z.object({
-  id: z.string().min(1),
-  slug: z.string().min(1),
-  title: z.string().min(1),
-  shortDescription: z.string().default(""),
-  longDescription: z.string().default(""),
-  category: z.string(),
-  categoryLabel: z.string().default(""),
-  images: z.array(z.string()).default([]),
-  weightOptions: z
-    .array(
-      z.object({
-        label: z.string(),
-        grams: z.number(),
-        price: z.number(),
-      }),
-    )
-    .min(1),
-  inStock: z.boolean().default(true),
-  rating: z.number().default(0),
-  reviewCount: z.number().default(0),
-});
 
 export async function GET(request: Request) {
   const gate = await gateAdmin(request, "products.view");
   if (!gate.ok) return gate.response;
 
-  const products = await getAllProductsAsync({ scope: "admin" });
+  const url = new URL(request.url);
+  const trash = url.searchParams.get("trash") === "1";
+  const status = url.searchParams.get("status") as
+    | "active"
+    | "draft"
+    | "archived"
+    | "disabled"
+    | "all"
+    | null;
+
+  const products = await getAllProductsAsync({
+    scope: "admin",
+    includeTrash: trash,
+    status: status ?? "all",
+  });
   return NextResponse.json({ products });
 }
 
@@ -45,17 +37,44 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const parsed = createSchema.safeParse(body);
+    const parsed = productCreateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "اطلاعات نامعتبر است" },
+        { error: "اطلاعات نامعتبر است", details: parsed.error.flatten() },
         { status: 400 },
       );
     }
 
+    if (parsed.data.status === "active") {
+      const pub = await gateAdmin(request, "products.publish");
+      if (!pub.ok) return pub.response;
+    }
+
+    const data = parsed.data;
     const product: Product = {
-      ...parsed.data,
-      category: parsed.data.category as ProductCategory,
+      id: data.id ?? `p_${randomUUID().slice(0, 8)}`,
+      slug: data.slug,
+      title: data.title,
+      shortDescription: data.shortDescription,
+      longDescription: data.longDescription,
+      category: data.category as ProductCategory,
+      categoryLabel: data.categoryLabel || data.category,
+      images: data.images,
+      weightOptions: data.weightOptions,
+      discountPrice: data.discountPrice,
+      inStock: data.inStock,
+      stockQty: data.stockQty,
+      isBestseller: data.isBestseller,
+      isNew: data.isNew,
+      ingredients: data.ingredients,
+      shippingInfo: data.shippingInfo,
+      rating: data.rating,
+      reviewCount: data.reviewCount,
+      status: data.status,
+      sku: data.sku,
+      brandId: data.brandId,
+      seo: data.seo,
+      customFields: data.customFields ?? {},
       createdAt: new Date().toISOString().split("T")[0],
     };
 
@@ -68,6 +87,7 @@ export async function POST(request: Request) {
       action: "product.create",
       entityType: "product",
       entityId: created.id,
+      adminUserId: gate.ctx.user?.id,
     });
 
     return NextResponse.json({ success: true, product: created });

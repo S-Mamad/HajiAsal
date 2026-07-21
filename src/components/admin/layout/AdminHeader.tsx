@@ -11,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/admin/dashboard")]: "داشبورد",
   [hajiasalPath("/admin/orders")]: "سفارش‌ها",
   [hajiasalPath("/admin/products")]: "محصولات",
+  [hajiasalPath("/admin/product-fields")]: "فیلدهای سفارشی",
   [hajiasalPath("/admin/brands")]: "برندها",
   [hajiasalPath("/admin/sellers")]: "فروشندگان",
   [hajiasalPath("/admin/categories")]: "دسته‌بندی‌ها",
@@ -84,40 +85,46 @@ export function AdminHeader({ title, compact = false }: AdminHeaderProps) {
 
   if (compact) {
     return (
-      <h2 className="truncate text-sm font-semibold text-stone-900">
+      <h2 className="truncate text-sm font-semibold text-zinc-900">
         {pageTitle}
       </h2>
     );
   }
 
   return (
-    <header className="border-b border-stone-200/80 bg-white/80 px-4 py-4 backdrop-blur sm:px-6">
-      <nav
-        className={cn(
-          "mb-2 flex flex-wrap items-center gap-1.5 text-xs text-stone-500",
-        )}
-      >
-        {breadcrumbs.map((crumb, index) => (
-          <span
-            key={`${crumb.label}-${index}`}
-            className="flex items-center gap-1.5"
-          >
-            {index > 0 ? (
-              <Icon icon={CaretLeft} size={12} className="text-stone-400" />
-            ) : null}
-            {crumb.href ? (
-              <Link href={crumb.href} className="hover:text-stone-700">
-                {crumb.label}
-              </Link>
-            ) : (
-              <span className="text-stone-700">{crumb.label}</span>
-            )}
-          </span>
-        ))}
-      </nav>
-      <h2 className="text-lg font-semibold text-stone-900 sm:text-xl">
-        {pageTitle}
-      </h2>
+    <header className="border-b border-[var(--panel-border)] bg-[var(--panel-surface)]/90 px-4 py-3.5 backdrop-blur sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-1">
+        <nav
+          className={cn(
+            "flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500",
+          )}
+          aria-label="مسیر صفحه"
+        >
+          {breadcrumbs.map((crumb, index) => (
+            <span
+              key={`${crumb.label}-${index}`}
+              className="flex items-center gap-1.5"
+            >
+              {index > 0 ? (
+                <Icon icon={CaretLeft} size={11} className="text-zinc-400" />
+              ) : null}
+              {crumb.href ? (
+                <Link
+                  href={crumb.href}
+                  className="transition hover:text-zinc-800"
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span className="text-zinc-700">{crumb.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
+        <h2 className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
+          {pageTitle}
+        </h2>
+      </div>
     </header>
   );
 }

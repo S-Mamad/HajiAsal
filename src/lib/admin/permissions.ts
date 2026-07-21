@@ -9,8 +9,12 @@ export type AdminPermission =
   | "products.view"
   | "products.create"
   | "products.edit"
+  | "products.edit_price"
+  | "products.publish"
   | "products.delete"
   | "products.bulk"
+  | "products.import_export"
+  | "products.manage_fields"
   | "categories.view"
   | "categories.manage"
   | "brands.view"
@@ -62,8 +66,12 @@ const ALL_PERMISSIONS: AdminPermission[] = [
   "products.view",
   "products.create",
   "products.edit",
+  "products.edit_price",
+  "products.publish",
   "products.delete",
   "products.bulk",
+  "products.import_export",
+  "products.manage_fields",
   "categories.view",
   "categories.manage",
   "brands.view",
@@ -135,6 +143,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[] | "*"> = {
     "dashboard.view",
     "products.view",
     "products.edit",
+    "products.bulk",
     "inventory.view",
     "inventory.edit",
     "orders.view",
@@ -161,6 +170,8 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[] | "*"> = {
     "content.manage",
     "reviews.view",
     "products.view",
+    "products.edit",
+    "products.manage_fields",
   ],
 };
 

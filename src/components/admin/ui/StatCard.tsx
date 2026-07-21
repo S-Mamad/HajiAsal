@@ -14,24 +14,20 @@ interface StatCardProps {
 
 const TONE = {
   slate: {
-    card: "border-slate-200 bg-white",
-    icon: "bg-slate-100 text-slate-600",
-    value: "text-slate-900",
+    icon: "bg-zinc-100 text-zinc-600",
+    accent: "border-s-zinc-300",
   },
   amber: {
-    card: "border-amber-200/70 bg-gradient-to-br from-white to-amber-50/40",
-    icon: "bg-amber-100 text-amber-800",
-    value: "text-stone-900",
+    icon: "bg-amber-50 text-amber-800",
+    accent: "border-s-[var(--panel-accent)]",
   },
   emerald: {
-    card: "border-emerald-200/70 bg-gradient-to-br from-white to-emerald-50/30",
-    icon: "bg-emerald-100 text-emerald-700",
-    value: "text-slate-900",
+    icon: "bg-emerald-50 text-emerald-700",
+    accent: "border-s-emerald-500",
   },
   rose: {
-    card: "border-rose-200/70 bg-gradient-to-br from-white to-rose-50/30",
-    icon: "bg-rose-100 text-rose-700",
-    value: "text-slate-900",
+    icon: "bg-rose-50 text-rose-700",
+    accent: "border-s-rose-500",
   },
 } as const;
 
@@ -47,32 +43,31 @@ export function StatCard({
   return (
     <article
       className={cn(
-        "rounded-2xl border p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
-        t.card,
+        "panel-card border-s-[3px] p-4 transition-shadow duration-200 hover:shadow-md",
+        t.accent,
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-slate-500 sm:text-sm">{label}</p>
-          <p
-            className={cn(
-              "mt-1 truncate text-xl font-semibold tabular-nums sm:text-2xl",
-              t.value,
-            )}
-          >
+          <p className="text-xs text-[var(--panel-muted)] sm:text-[13px]">
+            {label}
+          </p>
+          <p className="mt-1.5 truncate text-xl font-semibold tracking-tight tabular-nums text-zinc-900 sm:text-2xl">
             {typeof value === "number" ? value.toLocaleString("fa-IR") : value}
           </p>
-          {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+          {hint ? (
+            <p className="mt-1 text-[11px] text-[var(--panel-faint)]">{hint}</p>
+          ) : null}
         </div>
         {icon ? (
           <span
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl",
+              "flex size-9 shrink-0 items-center justify-center rounded-[var(--panel-radius-sm)]",
               t.icon,
             )}
           >
-            <Icon icon={icon} size={20} />
+            <Icon icon={icon} size={18} />
           </span>
         ) : null}
       </div>
@@ -88,23 +83,24 @@ export function PanelSkeleton({
   rows?: number;
 }) {
   return (
-    <div className="space-y-6 animate-pulse" aria-busy aria-label="در حال بارگذاری">
-      <div
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        style={{ gridTemplateColumns: undefined }}
-      >
+    <div
+      className="space-y-6 animate-pulse"
+      aria-busy
+      aria-label="در حال بارگذاری"
+    >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: cards }).map((_, i) => (
           <div
             key={i}
-            className="h-24 rounded-2xl border border-slate-200 bg-slate-100/80"
+            className="h-24 rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-zinc-100/80"
           />
         ))}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white">
         {Array.from({ length: rows }).map((_, i) => (
           <div
             key={i}
-            className="h-12 border-t border-slate-100 first:border-0 bg-slate-50/50"
+            className="h-12 border-t border-zinc-100 bg-zinc-50/50 first:border-0"
           />
         ))}
       </div>
@@ -122,10 +118,10 @@ export function PanelEmpty({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-      <p className="text-base font-medium text-slate-800">{title}</p>
+    <div className="rounded-[var(--panel-radius)] border border-dashed border-zinc-300 bg-white px-6 py-14 text-center">
+      <p className="text-base font-medium text-zinc-800">{title}</p>
       {description ? (
-        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+        <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500">
           {description}
         </p>
       ) : null}

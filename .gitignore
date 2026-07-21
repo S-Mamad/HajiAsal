@@ -21,6 +21,10 @@ out/
 
 # production
 build
+*.zip
+_linux_build_out/
+_hajiasal_upload_stage/
+_hajiasal_host_stage/
 
 # misc
 .DS_Store

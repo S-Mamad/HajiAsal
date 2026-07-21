@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
 import {
   ShoppingBag,
   Minus,
@@ -53,7 +52,7 @@ export function ProductDetailClient({
     product.weightOptions[0],
   );
   const [quantity, setQuantity] = useState(1);
-  const [cartPulse, setCartPulse] = useState(false);
+  const [addedFlash, setAddedFlash] = useState(false);
 
   const listPrice = selectedWeight.price;
   const salePrice = getEffectiveWeightPrice(product, selectedWeight);
@@ -72,8 +71,8 @@ export function ProductDetailClient({
       },
       quantity,
     );
-    setCartPulse(true);
-    window.setTimeout(() => setCartPulse(false), 300);
+    setAddedFlash(true);
+    window.setTimeout(() => setAddedFlash(false), 1200);
   };
 
   const accordionItems = [
@@ -184,22 +183,23 @@ export function ProductDetailClient({
               </button>
             </div>
 
-            <motion.div
-              animate={cartPulse ? { scale: [1, 1.03, 1] } : { scale: 1 }}
-              transition={{ duration: 0.3 }}
-              className="flex-1"
-            >
+            <div className="min-w-0 flex-1">
               <Button
                 size="lg"
-                magnetic
                 disabled={!product.inStock}
                 onClick={handleAddToCart}
-                className="w-full"
+                className="w-full min-w-[12rem]"
               >
-                <ShoppingBag size={18} />
-                {product.inStock ? "افزودن به سبد خرید" : "ناموجود"}
+                <ShoppingBag size={18} className="shrink-0" />
+                <span className="truncate">
+                  {!product.inStock
+                    ? "ناموجود"
+                    : addedFlash
+                      ? "به سبد اضافه شد"
+                      : "افزودن به سبد خرید"}
+                </span>
               </Button>
-            </motion.div>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-6 border-t border-border pt-4 text-xs text-secondary">

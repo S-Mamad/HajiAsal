@@ -6,6 +6,7 @@ import { useWishlistStore } from "@/store/wishlist";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { hajiasalPath } from "@/lib/paths";
 
 export function AccountWishlistClient() {
@@ -80,9 +81,13 @@ export function AccountWishlistClient() {
       ) : products.length > 0 ? (
         <ProductGrid products={products} />
       ) : (
-        <div className="py-12 text-center">
-          <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
-        </div>
+        <EmptyState
+          title="لیست علاقه‌مندی خالی است"
+          description="محصولات مورد علاقه را با قلب ذخیره کنید تا بعداً سریع پیدا شوند."
+          action={
+            <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
+          }
+        />
       )}
     </div>
   );

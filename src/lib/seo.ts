@@ -1,8 +1,6 @@
 import type { Product, SiteConfig } from "@/types";
 import { hajiasalAbsoluteUrl } from "@/lib/paths";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
 export function buildOrganizationJsonLd(site: SiteConfig) {
   return {
     "@context": "https://schema.org",
@@ -27,18 +25,19 @@ export function buildOrganizationJsonLd(site: SiteConfig) {
 
 export function buildProductJsonLd(product: Product) {
   const prices = product.weightOptions.map((w) => w.price);
-  const minPrice = Math.min(...prices);
+  const minPrice = Math.min(...(prices.length ? prices : [0]));
   const lowPrice =
     product.discountPrice && product.discountPrice < minPrice
       ? product.discountPrice
       : minPrice;
+  const seo = product.seo;
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: product.title,
-    description: product.shortDescription,
-    image: product.images,
-    sku: product.id,
+    name: seo?.title || product.title,
+    description: seo?.description || product.shortDescription,
+    image: seo?.ogImage ? [seo.ogImage, ...product.images] : product.images,
+    sku: product.sku || product.id,
     brand: {
       "@type": "Brand",
       name: "حاجی عسل",
@@ -47,11 +46,11 @@ export function buildProductJsonLd(product: Product) {
       "@type": "AggregateOffer",
       priceCurrency: "IRR",
       lowPrice,
-      highPrice: Math.max(...prices),
+      highPrice: Math.max(...(prices.length ? prices : [0])),
       availability: product.inStock
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-      url: hajiasalAbsoluteUrl(`/product/${product.slug}`),
+      url: seo?.canonical || hajiasalAbsoluteUrl(`/product/${product.slug}`),
     },
   };
 
@@ -64,6 +63,25 @@ export function buildProductJsonLd(product: Product) {
   }
 
   return jsonLd;
+}
+
+export function buildProductSeoBundle(product: Product) {
+  const faq = product.seo?.faq?.length
+    ? buildFaqJsonLd(product.seo.faq)
+    : null;
+  return {
+    product: buildProductJsonLd(product),
+    breadcrumb: buildBreadcrumbJsonLd([
+      { name: "خانه", href: "/" },
+      { name: "فروشگاه", href: "/shop" },
+      {
+        name: product.categoryLabel,
+        href: `/shop?category=${product.category}`,
+      },
+      { name: product.title, href: `/product/${product.slug}` },
+    ]),
+    faq,
+  };
 }
 
 export function buildBreadcrumbJsonLd(

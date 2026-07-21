@@ -5,6 +5,7 @@ import type { UserAddress } from "@/types/auth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { EmptyState } from "@/components/ui/EmptyState";
 import iranLocations from "@/data/iran-locations.json";
 
 type LocationEntry = { province: string; cities: string[] };
@@ -110,6 +111,17 @@ export function AddressesPageClient() {
       ) : null}
 
       <ul className="flex flex-col gap-3">
+        {addresses.length === 0 && !showForm ? (
+          <EmptyState
+            title="آدرسی ذخیره نشده"
+            description="آدرس ارسال را اضافه کنید تا در خرید بعدی خودکار پر شود."
+            action={
+              <Button type="button" size="sm" onClick={() => setShowForm(true)}>
+                افزودن آدرس
+              </Button>
+            }
+          />
+        ) : null}
         {addresses.map((a) => (
           <li key={a.id} className="rounded-2xl border border-border bg-surface p-4">
             {a.label ? <p className="text-xs font-medium text-amber">{a.label}</p> : null}

@@ -47,16 +47,21 @@ export function AdminLogin() {
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#1c1917] px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(184,134,46,0.22),_transparent_55%)]" />
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#f7f1e8] p-6 shadow-2xl sm:p-8">
+    <div
+      className="panel-shell relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-zinc-950 px-4 py-16"
+      dir="rtl"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(180,83,9,0.22),_transparent_55%)]" />
+      <div className="relative w-full max-w-md rounded-[12px] border border-white/10 bg-white p-6 shadow-2xl sm:p-8">
         <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1c1917] text-amber-400 shadow-lg">
-            <ShieldCheck size={24} weight="fill" />
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-950 text-amber-400">
+            <ShieldCheck size={22} weight="fill" />
           </span>
           <div>
-            <h1 className="text-xl font-semibold text-stone-900">پنل مدیریت</h1>
-            <p className="text-sm text-stone-500">حاجی عسل · کنترل کامل فروشگاه</p>
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-900">
+              پنل مدیریت
+            </h1>
+            <p className="text-sm text-zinc-500">حاجی عسل · کنترل فروشگاه</p>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -86,13 +91,13 @@ export function AdminLogin() {
           <AdminButton
             type="submit"
             disabled={loading || !password}
-            className="h-12 w-full"
+            className="h-11 w-full"
           >
             {loading ? "در حال ورود..." : "ورود به پنل"}
           </AdminButton>
         </form>
-        <p className="mt-6 text-center text-xs text-stone-400">
-          <Link href={hajiasalPath("/")} className="hover:text-stone-600">
+        <p className="mt-6 text-center text-xs text-zinc-400">
+          <Link href={hajiasalPath("/")} className="hover:text-zinc-600">
             بازگشت به فروشگاه
           </Link>
         </p>

@@ -1,40 +1,40 @@
 @import "tailwindcss" source(none);
 @source "../**/*.{js,ts,jsx,tsx}";
 
-/* Default = day / light, honey warm editorial */
+/* Default = day / light — honey accent on clear off-white (stronger contrast) */
 :root,
 .hajiasal-root,
 .hajiasal-root[data-theme="light"] {
-  --void: #f7f1e8;
-  --surface: #fffdf9;
-  --surface-elevated: #f3ebe0;
-  --surface-muted: #ebe0d2;
-  --text-primary: #2a2118;
-  --text-secondary: #6b5a48;
-  --text-dim: #8a7763;
-  --gold: #b8862e;
-  --gold-bright: #c9983a;
-  --gold-dim: rgba(184, 134, 46, 0.14);
-  --gold-glow: rgba(184, 134, 46, 0.28);
-  --success: #2f9e5d;
-  --border: rgba(42, 33, 24, 0.08);
-  --border-bright: rgba(42, 33, 24, 0.14);
-  --header-bg: rgba(255, 253, 249, 0.92);
-  --overlay-scrim: rgba(42, 33, 24, 0.35);
-  --hero-wash-top: rgba(247, 241, 232, 0.55);
-  --hero-wash-mid: rgba(247, 241, 232, 0.2);
-  --hero-wash-bottom: rgba(247, 241, 232, 0.92);
-  --hero-wash-dark-top: rgba(247, 241, 232, 0.45);
-  --hero-wash-dark-mid: rgba(247, 241, 232, 0.55);
-  --hero-wash-dark-bottom: #f7f1e8;
-  --mesh-a: rgba(184, 134, 46, 0.1);
-  --mesh-b: rgba(184, 134, 46, 0.07);
-  --mesh-c: rgba(184, 134, 46, 0.05);
-  --grain-opacity: 0.04;
-  --aura-a: rgba(184, 134, 46, 0.1);
-  --aura-b: rgba(184, 134, 46, 0.06);
-  --star-empty: rgba(42, 33, 24, 0.18);
-  --ink-on-gold: #2a2118;
+  --void: #f3f1ec;
+  --surface: #ffffff;
+  --surface-elevated: #f7f5f1;
+  --surface-muted: #ebe8e1;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-dim: #78716c;
+  --gold: #a16207;
+  --gold-bright: #b45309;
+  --gold-dim: rgba(161, 98, 7, 0.12);
+  --gold-glow: rgba(161, 98, 7, 0.22);
+  --success: #15803d;
+  --border: rgba(28, 25, 23, 0.12);
+  --border-bright: rgba(28, 25, 23, 0.2);
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --overlay-scrim: rgba(28, 25, 23, 0.45);
+  --hero-wash-top: rgba(243, 241, 236, 0.72);
+  --hero-wash-mid: rgba(243, 241, 236, 0.35);
+  --hero-wash-bottom: rgba(243, 241, 236, 0.95);
+  --hero-wash-dark-top: rgba(243, 241, 236, 0.55);
+  --hero-wash-dark-mid: rgba(243, 241, 236, 0.7);
+  --hero-wash-dark-bottom: #f3f1ec;
+  --mesh-a: rgba(161, 98, 7, 0.06);
+  --mesh-b: rgba(161, 98, 7, 0.04);
+  --mesh-c: rgba(161, 98, 7, 0.03);
+  --grain-opacity: 0.02;
+  --aura-a: rgba(161, 98, 7, 0.05);
+  --aura-b: rgba(161, 98, 7, 0.03);
+  --star-empty: rgba(28, 25, 23, 0.22);
+  --ink-on-gold: #fffbeb;
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -219,4 +219,104 @@ html {
   .animate-float {
     animation: none;
   }
+}
+
+/* ─── Ops panel system (admin + seller) ───
+   Cool zinc cockpit; storefront cream stays on marketing surfaces only. */
+.panel-shell {
+  --panel-bg: #f4f4f5;
+  --panel-surface: #ffffff;
+  --panel-surface-2: #fafafa;
+  --panel-sidebar: #09090b;
+  --panel-sidebar-hover: #18181b;
+  --panel-sidebar-border: rgba(255, 255, 255, 0.06);
+  --panel-text: #18181b;
+  --panel-muted: #71717a;
+  --panel-faint: #a1a1aa;
+  --panel-border: #e4e4e7;
+  --panel-border-strong: #d4d4d8;
+  --panel-accent: #b45309;
+  --panel-accent-soft: rgba(180, 83, 9, 0.12);
+  --panel-accent-text: #fef3c7;
+  --panel-danger: #dc2626;
+  --panel-success: #059669;
+  --panel-info: #0284c8;
+  --panel-radius: 10px;
+  --panel-radius-sm: 6px;
+  --panel-shadow: 0 1px 2px rgba(24, 24, 27, 0.04),
+    0 4px 16px -4px rgba(24, 24, 27, 0.06);
+  --panel-ring: 0 0 0 2px rgba(180, 83, 9, 0.18);
+  --panel-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  isolation: isolate;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  font-family: var(--font-vazirmatn), system-ui, sans-serif;
+}
+
+.hajiasal-root:has(.panel-shell)::before,
+.hajiasal-root:has(.panel-shell)::after {
+  opacity: 0;
+  content: none;
+}
+
+.panel-shell .panel-card {
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  background: var(--panel-surface);
+  box-shadow: var(--panel-shadow);
+}
+
+.panel-shell .panel-input {
+  height: 2.5rem;
+  width: 100%;
+  border-radius: var(--panel-radius-sm);
+  border: 1px solid var(--panel-border);
+  background: var(--panel-surface);
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--panel-text);
+  outline: none;
+  transition: border-color 0.2s var(--panel-ease), box-shadow 0.2s var(--panel-ease);
+}
+
+.panel-shell .panel-input:focus {
+  border-color: color-mix(in srgb, var(--panel-accent) 55%, var(--panel-border));
+  box-shadow: var(--panel-ring);
+}
+
+.panel-shell .panel-input:disabled {
+  background: var(--panel-surface-2);
+  color: var(--panel-faint);
+}
+
+.panel-shell .panel-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: var(--panel-radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: #a1a1aa;
+  transition: background-color 0.15s var(--panel-ease), color 0.15s var(--panel-ease);
+}
+
+.panel-shell .panel-nav-item:hover {
+  background: var(--panel-sidebar-hover);
+  color: #fafafa;
+}
+
+.panel-shell .panel-nav-item[data-active="true"] {
+  background: var(--panel-accent-soft);
+  color: var(--panel-accent-text);
+  font-weight: 500;
+}
+
+.panel-shell .panel-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.panel-shell .panel-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
 }

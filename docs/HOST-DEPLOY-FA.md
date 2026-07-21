@@ -48,33 +48,19 @@ npm run seed:site-settings
 
 ---
 
-## مرحله ۳: آپلود زیپ
+## مرحله ۳: آپلود زیپ (روش پیشنهادی)
 
-1. `hajiasal-host-upload.zip` را آپلود و Extract کنید
-2. ساختار:
+از فایل **`hajiasal-host-upload.zip`** استفاده کنید (سورس لینوکس‌سازگار).  
+زیپهایی که روی ویندوز بیلد شده‌اند (مثل `hajiasal-host.zip` با پوشه `.next`) روی هاست لینوکس معمولاً بالا نمی‌آیند.
 
-```
-hajiasal/
-  server.js
-  package.json
-  .env
-  public/
-  .next/
-  node_modules/
-  data/
-  mysql-migrations/
-  README-UPLOAD-FA.md
-  DATABASE-SQL-FA.md
-  CREDENTIALS.txt
-```
+جزئیات کامل استخراج و بیلد روی سرور: **`README-UPLOAD-FA.md`**
 
-3. `.env` را باز کنید و فقط این‌ها را با اطلاعات MySQL هاست پر کنید:
-   - `MYSQL_HOST` (معمولاً `localhost`)
-   - `MYSQL_DATABASE`
-   - `MYSQL_USER`
-   - `MYSQL_PASSWORD`
-
-دامنه و رمز ادمین/فروشنده از قبل برای `hajiasal.ir` آماده است (`CREDENTIALS.txt`).
+خلاصه:
+1. داخل `/home/uabkxfzi/hajiasal` استخراج کنید (فایل‌ها مستقیم کنار هم، نه داخل پوشه تو در تو)
+2. Show Hidden Files را روشن کنید
+3. `.env` را بسازید/پر کنید
+4. در Setup Node.js App → Run NPM Install
+5. در Terminal: `npm run build` سپس `touch tmp/restart.txt`
 
 ---
 

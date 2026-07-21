@@ -138,7 +138,7 @@ export function DataTable<T>({
     return (
       <div
         className={cn(
-          "overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm",
+          "overflow-hidden rounded-[var(--panel-radius,10px)] border border-zinc-200 bg-white shadow-sm",
           className,
         )}
         aria-busy
@@ -146,7 +146,7 @@ export function DataTable<T>({
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="h-12 animate-pulse border-t border-stone-100 bg-stone-50/70 first:border-0"
+            className="h-12 animate-pulse border-t border-zinc-100 bg-zinc-50/70 first:border-0"
           />
         ))}
       </div>
@@ -155,13 +155,13 @@ export function DataTable<T>({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-10 text-center">
+      <div className="rounded-[var(--panel-radius,10px)] border border-red-200 bg-red-50 px-4 py-10 text-center">
         <p className="text-sm text-red-700">{error}</p>
         {onRetry ? (
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-sm text-white"
+            className="mt-3 rounded-lg bg-red-700 px-4 py-2 text-sm text-white transition hover:bg-red-600 active:scale-[0.98]"
           >
             تلاش مجدد
           </button>
@@ -178,7 +178,7 @@ export function DataTable<T>({
             <label className="relative min-w-[12rem] flex-1 sm:max-w-xs">
               <MagnifyingGlass
                 size={16}
-                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-stone-400"
+                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-zinc-400"
               />
               <input
                 value={query}
@@ -187,7 +187,7 @@ export function DataTable<T>({
                   setPage(1);
                 }}
                 placeholder={searchPlaceholder}
-                className="h-10 w-full rounded-xl border border-stone-200 bg-white pe-3 ps-9 text-sm outline-none focus:border-amber-700/40 focus:ring-2 focus:ring-amber-700/10"
+                className="h-10 w-full rounded-lg border border-zinc-200 bg-white pe-3 ps-9 text-sm outline-none transition focus:border-amber-700/40 focus:ring-2 focus:ring-amber-700/15"
               />
             </label>
           ) : null}
@@ -196,21 +196,21 @@ export function DataTable<T>({
         <div className="flex flex-wrap items-center gap-2">
           {selectable && selectedKeys.length > 0 ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-500">
+              <span className="text-xs text-zinc-500">
                 {selectedKeys.length} انتخاب‌شده
               </span>
               {bulkActions}
             </div>
           ) : null}
           <details className="relative">
-            <summary className="cursor-pointer list-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-600 hover:bg-stone-50">
+            <summary className="cursor-pointer list-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 transition hover:bg-zinc-50">
               ستون‌ها
             </summary>
-            <div className="absolute end-0 z-20 mt-1 w-48 rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
+            <div className="absolute end-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
               {columns.map((col) => (
                 <label
                   key={col.key}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-stone-50"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-zinc-50"
                 >
                   <input
                     type="checkbox"
@@ -227,7 +227,7 @@ export function DataTable<T>({
         </div>
       </div>
 
-      <div className="overflow-x-auto overscroll-x-contain rounded-2xl border border-stone-200 bg-white shadow-sm [-webkit-overflow-scrolling:touch]">
+      <div className="overflow-x-auto overscroll-x-contain rounded-[var(--panel-radius,10px)] border border-zinc-200 bg-white shadow-sm [-webkit-overflow-scrolling:touch]">
         <table
           className="w-full text-sm"
           style={
@@ -236,10 +236,10 @@ export function DataTable<T>({
               : { minWidth: typeof minWidth === "number" ? minWidth : 640 }
           }
         >
-          <thead className="sticky top-0 z-[1] bg-stone-50/95 text-start text-stone-500 backdrop-blur">
+          <thead className="sticky top-0 z-[1] bg-zinc-50/95 text-start text-zinc-500 backdrop-blur">
             <tr>
               {selectable ? (
-                <th className="w-10 px-3 py-3.5">
+                <th className="w-10 px-3 py-3">
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -252,7 +252,7 @@ export function DataTable<T>({
                 <th
                   key={col.key}
                   className={cn(
-                    "whitespace-nowrap px-3 py-3.5 font-medium sm:px-4",
+                    "whitespace-nowrap px-3 py-3 text-[11px] font-medium uppercase tracking-wide sm:px-4",
                     col.hideOnMobile && "hidden md:table-cell",
                     col.className,
                   )}
@@ -261,7 +261,7 @@ export function DataTable<T>({
                     <button
                       type="button"
                       onClick={() => toggleSort(col.key)}
-                      className="inline-flex items-center gap-1 hover:text-stone-800"
+                      className="inline-flex items-center gap-1 hover:text-zinc-800"
                     >
                       {col.header}
                       {sort?.key === col.key ? (
@@ -286,7 +286,7 @@ export function DataTable<T>({
               <tr>
                 <td
                   colSpan={visibleColumns.length + (selectable ? 1 : 0)}
-                  className="px-4 py-14 text-center text-stone-400"
+                  className="px-4 py-14 text-center text-zinc-400"
                 >
                   {emptyMessage}
                 </td>
@@ -297,7 +297,7 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
-                    className="border-t border-stone-100 transition-colors hover:bg-amber-50/40"
+                    className="border-t border-zinc-100 transition-colors hover:bg-zinc-50/80"
                   >
                     {selectable ? (
                       <td className="px-3 py-3">
@@ -329,9 +329,11 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div className="flex items-center justify-between gap-3 text-xs text-stone-500">
-        <span>
-          {total} مورد · صفحه {currentPage} از {pageCount}
+      <div className="flex items-center justify-between gap-3 text-xs text-zinc-500">
+        <span className="tabular-nums">
+          {total.toLocaleString("fa-IR")} مورد · صفحه{" "}
+          {currentPage.toLocaleString("fa-IR")} از{" "}
+          {pageCount.toLocaleString("fa-IR")}
         </span>
         <div className="flex gap-2">
           <button
@@ -342,7 +344,7 @@ export function DataTable<T>({
                 ? serverPagination.onPageChange(currentPage - 1)
                 : setPage((p) => Math.max(1, p - 1))
             }
-            className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 disabled:opacity-40"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 transition hover:bg-zinc-50 disabled:opacity-40"
           >
             قبلی
           </button>
@@ -354,7 +356,7 @@ export function DataTable<T>({
                 ? serverPagination.onPageChange(currentPage + 1)
                 : setPage((p) => Math.min(pageCount, p + 1))
             }
-            className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 disabled:opacity-40"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 transition hover:bg-zinc-50 disabled:opacity-40"
           >
             بعدی
           </button>

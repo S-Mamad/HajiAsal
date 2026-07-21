@@ -74,7 +74,7 @@ export function UserMenu({ className, compact = false }: UserMenuProps) {
             {user?.fullName?.split(" ")[0] ?? "حساب"}
           </span>
         ) : null}
-        <Icon icon={CaretDown} size={12} className="hidden sm:block" />
+        <Icon icon={CaretDown} size={12} className={cn(!compact && "hidden sm:block", compact && "hidden")} />
       </button>
       {open ? (
         <div

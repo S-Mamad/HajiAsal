@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { gateAdmin } from "@/lib/server/admin-gate";
-import { getDashboardStats } from "@/lib/server/admin-platform-store";
+import {
+  getDashboardStats,
+  listQuestions,
+  listTickets,
+} from "@/lib/server/admin-platform-store";
 import { getContactMessagesBySource } from "@/lib/server/newsletter";
 import { getAllOrders } from "@/lib/server/orders";
 import { getAllProductsAsync } from "@/lib/server/products-store";
@@ -10,10 +14,12 @@ export async function GET(request: Request) {
   if (!gate.ok) return gate.response;
 
   const stats = await getDashboardStats();
-  const [orders, messages, products] = await Promise.all([
+  const [orders, messages, products, tickets, questions] = await Promise.all([
     getAllOrders(),
     getContactMessagesBySource("hajiasal"),
     getAllProductsAsync({ scope: "admin" }),
+    listTickets().catch(() => []),
+    listQuestions().catch(() => []),
   ]);
 
   const activeOrders = orders.filter((o) => o.status !== "cancelled");
@@ -22,6 +28,12 @@ export async function GET(request: Request) {
   );
   const unreadMessages = messages.filter((m) => !m.readAt);
   const outOfStock = products.filter((p) => !p.inStock);
+  const openTickets = tickets.filter(
+    (t) => t.status === "open" || t.status === "new" || t.status === "pending",
+  );
+  const openQa = questions.filter(
+    (q) => q.status === "pending" || q.status === "open" || !q.answer,
+  );
 
   return NextResponse.json({
     kpis: {
@@ -43,6 +55,11 @@ export async function GET(request: Request) {
             )
           : 0
       ),
+    },
+    navBadges: {
+      messages: unreadMessages.length,
+      tickets: openTickets.length,
+      qa: openQa.length,
     },
     recentOrders: orders.slice(0, 8),
     recentMessages: messages.slice(0, 6),

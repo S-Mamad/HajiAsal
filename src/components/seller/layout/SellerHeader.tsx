@@ -17,24 +17,26 @@ export function SellerHeader({ compact = false }: SellerHeaderProps) {
   const title = resolveSellerPageTitle(pathname ?? "");
 
   const actions = (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <button
         type="button"
         onClick={() =>
           window.dispatchEvent(new Event("seller:open-search"))
         }
-        className="flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-sm text-stone-600 hover:bg-stone-100"
+        className="flex h-10 items-center gap-1.5 rounded-[var(--panel-radius-sm)] px-2.5 text-sm text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
         aria-label="جستجو"
       >
         <Icon icon={MagnifyingGlass} size={18} />
         {!compact ? (
-          <span className="hidden sm:inline text-xs text-stone-400">Ctrl+K</span>
+          <span className="hidden text-[11px] text-zinc-400 sm:inline">
+            Ctrl+K
+          </span>
         ) : null}
       </button>
       <button
         type="button"
         onClick={() => window.dispatchEvent(new Event("seller:open-help"))}
-        className="flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100"
+        className="flex h-10 w-10 items-center justify-center rounded-[var(--panel-radius-sm)] text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
         aria-label="میانبرها"
       >
         <Icon icon={Keyboard} size={18} />
@@ -46,27 +48,30 @@ export function SellerHeader({ compact = false }: SellerHeaderProps) {
   if (compact) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <h2 className="truncate text-sm font-semibold text-stone-900">{title}</h2>
+        <h2 className="truncate text-sm font-semibold text-zinc-900">{title}</h2>
         {actions}
       </div>
     );
   }
 
   return (
-    <header className="border-b border-stone-200 bg-white/90 px-4 py-4 backdrop-blur sm:px-6">
-      <div className="flex items-start justify-between gap-3">
+    <header className="border-b border-[var(--panel-border)] bg-[var(--panel-surface)]/90 px-4 py-3.5 backdrop-blur sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1440px] items-start justify-between gap-3">
         <div className="min-w-0">
-          <nav className="mb-1 flex items-center gap-1.5 text-xs text-stone-500">
+          <nav
+            className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-500"
+            aria-label="مسیر صفحه"
+          >
             <Link
               href={hajiasalPath("/seller/dashboard")}
-              className="hover:text-stone-800"
+              className="transition hover:text-zinc-800"
             >
               فروشنده
             </Link>
-            <Icon icon={CaretLeft} size={12} className="text-stone-400" />
-            <span className="text-stone-700">{title}</span>
+            <Icon icon={CaretLeft} size={11} className="text-zinc-400" />
+            <span className="text-zinc-700">{title}</span>
           </nav>
-          <h2 className="text-lg font-semibold text-stone-900 sm:text-xl">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
             {title}
           </h2>
         </div>

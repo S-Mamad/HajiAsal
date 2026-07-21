@@ -86,7 +86,7 @@ export function Button({
         ref={ref}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
-        className="inline-block"
+        className={cn("inline-block", className?.includes("w-full") && "w-full")}
       >
         <button
           type={type}

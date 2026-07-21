@@ -59,12 +59,12 @@ export function NotificationCenter() {
           setOpen((v) => !v);
           void load();
         }}
-        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100"
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
         aria-label="اعلان‌ها"
       >
         <Icon icon={Bell} size={20} />
         {unread > 0 ? (
-          <span className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
+          <span className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-md bg-rose-600 px-1 text-[10px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
@@ -77,9 +77,9 @@ export function NotificationCenter() {
             aria-label="بستن"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2">
-              <span className="text-sm font-semibold">اعلان‌ها</span>
+          <div className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-[10px] border border-zinc-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2">
+              <span className="text-sm font-semibold text-zinc-900">اعلان‌ها</span>
               <button
                 type="button"
                 className="text-xs text-amber-800 hover:underline"
@@ -90,7 +90,7 @@ export function NotificationCenter() {
             </div>
             <ul className="max-h-72 overflow-y-auto">
               {rows.length === 0 ? (
-                <li className="px-3 py-8 text-center text-sm text-stone-500">
+                <li className="px-3 py-8 text-center text-sm text-zinc-500">
                   اعلانی نیست
                 </li>
               ) : (
@@ -99,8 +99,8 @@ export function NotificationCenter() {
                     <button
                       type="button"
                       className={cn(
-                        "flex w-full flex-col gap-0.5 px-3 py-2.5 text-start hover:bg-stone-50",
-                        !n.readAt && "bg-amber-50/50",
+                        "flex w-full flex-col gap-0.5 px-3 py-2.5 text-start transition hover:bg-zinc-50",
+                        !n.readAt && "bg-amber-50/40",
                       )}
                       onClick={() => {
                         if (!n.readAt) void mark({ ids: [n.id] });
@@ -108,11 +108,11 @@ export function NotificationCenter() {
                         if (n.href) window.location.href = n.href;
                       }}
                     >
-                      <span className="text-sm font-medium text-stone-900">
+                      <span className="text-sm font-medium text-zinc-900">
                         {n.title}
                       </span>
                       {n.body ? (
-                        <span className="line-clamp-2 text-xs text-stone-500">
+                        <span className="line-clamp-2 text-xs text-zinc-500">
                           {n.body}
                         </span>
                       ) : null}
@@ -124,7 +124,7 @@ export function NotificationCenter() {
             <Link
               href={hajiasalPath("/seller/notifications")}
               onClick={() => setOpen(false)}
-              className="block border-t border-stone-100 px-3 py-2 text-center text-xs font-medium text-amber-900 hover:bg-stone-50"
+              className="block border-t border-zinc-100 px-3 py-2 text-center text-xs font-medium text-amber-900 transition hover:bg-zinc-50"
             >
               مشاهده همه
             </Link>

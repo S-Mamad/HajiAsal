@@ -166,6 +166,13 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
 
             <div className="mt-auto space-y-1 border-t border-border px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <Link
+                href={hajiasalPath("/wishlist")}
+                onClick={onClose}
+                className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold"
+              >
+                علاقه‌مندی‌ها
+              </Link>
+              <Link
                 href={hajiasalPath("/faq")}
                 onClick={onClose}
                 className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold"

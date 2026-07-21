@@ -22,6 +22,7 @@ export interface Review {
   comment: string;
   date: string;
   verified: boolean;
+  adminReply?: string | null;
 }
 
 const staticReviews = reviewsData as Review[];
@@ -47,6 +48,7 @@ function mapReviewRow(row: Record<string, unknown>): Review {
     comment: String(row.comment ?? "").trim(),
     date: createdAt.includes("T") ? createdAt.split("T")[0]! : createdAt || new Date().toISOString().slice(0, 10),
     verified,
+    adminReply: row.admin_reply != null ? String(row.admin_reply).trim() || null : null,
   };
 }
 

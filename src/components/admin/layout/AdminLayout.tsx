@@ -35,7 +35,7 @@ function AdminShell({ children, title }: AdminLayoutProps) {
 
   return (
     <div
-      className="admin-shell flex min-h-[100dvh] bg-[#f7f1e8] text-stone-900"
+      className="panel-shell admin-shell flex min-h-[100dvh] text-[var(--panel-text)]"
       dir="rtl"
     >
       <div className="hidden lg:flex">
@@ -46,17 +46,17 @@ function AdminShell({ children, title }: AdminLayoutProps) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-stone-900/50"
+            className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[2px]"
             aria-label="بستن منو"
             onClick={() => setMobileNav(false)}
           />
-          <div className="absolute inset-y-0 start-0 flex max-w-[85vw] shadow-2xl">
+          <div className="absolute inset-y-0 start-0 flex max-w-[min(20rem,88vw)] shadow-2xl">
             <div className="relative flex h-full">
               <AdminSidebar onNavigate={() => setMobileNav(false)} />
               <button
                 type="button"
                 onClick={() => setMobileNav(false)}
-                className="absolute end-2 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-lg bg-stone-800 text-stone-200 hover:bg-stone-700"
+                className="absolute end-2 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-[var(--panel-radius-sm)] bg-white/10 text-zinc-200 transition hover:bg-white/15"
                 aria-label="بستن"
               >
                 <X size={18} />
@@ -67,11 +67,11 @@ function AdminShell({ children, title }: AdminLayoutProps) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-stone-200 bg-[#f7f1e8]/95 px-3 py-2 backdrop-blur lg:hidden">
+        <div className="sticky top-0 z-40 flex items-center gap-2 border-b border-[var(--panel-border)] bg-[var(--panel-surface)]/95 px-3 py-2 backdrop-blur lg:hidden">
           <button
             type="button"
             onClick={() => setMobileNav(true)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-600 hover:bg-white/70 active:bg-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--panel-radius-sm)] text-zinc-600 transition hover:bg-zinc-100 active:scale-[0.98]"
             aria-label="منو"
             aria-expanded={mobileNav}
           >
@@ -84,7 +84,9 @@ function AdminShell({ children, title }: AdminLayoutProps) {
         <div className="hidden lg:block">
           <AdminHeader title={title} />
         </div>
-        <main className="flex-1 px-4 py-5 sm:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6 lg:px-8">
+          {children}
+        </main>
       </div>
     </div>
   );

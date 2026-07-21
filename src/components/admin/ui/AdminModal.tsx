@@ -39,7 +39,7 @@ export function AdminModal({
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-stone-900/50"
+        className="absolute inset-0 bg-zinc-950/55 backdrop-blur-[1px]"
         aria-label="بستن"
         onClick={onClose}
       />
@@ -48,18 +48,18 @@ export function AdminModal({
         aria-modal
         aria-label={title}
         className={cn(
-          "relative z-10 flex max-h-[90dvh] w-full flex-col rounded-t-2xl border border-stone-200 bg-white shadow-2xl sm:rounded-2xl",
+          "relative z-10 flex max-h-[90dvh] w-full flex-col rounded-t-[12px] border border-zinc-200 bg-white shadow-2xl sm:rounded-[12px]",
           size === "sm" && "sm:max-w-md",
           size === "md" && "sm:max-w-lg",
           size === "lg" && "sm:max-w-2xl",
         )}
       >
-        <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-          <h3 className="text-base font-semibold text-stone-900">{title}</h3>
+        <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+          <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"
+            className="rounded-lg p-2 text-zinc-500 transition hover:bg-zinc-100"
             aria-label="بستن"
           >
             <X size={16} />
@@ -67,7 +67,7 @@ export function AdminModal({
         </div>
         <div className="overflow-y-auto px-4 py-4">{children}</div>
         {footer ? (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-stone-100 px-4 py-3">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-100 px-4 py-3">
             {footer}
           </div>
         ) : null}
@@ -106,7 +106,7 @@ export function ConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-stone-200 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50"
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
           >
             انصراف
           </button>
@@ -115,8 +115,8 @@ export function ConfirmModal({
             disabled={loading}
             onClick={onConfirm}
             className={cn(
-              "rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-60",
-              danger ? "bg-red-700 hover:bg-red-800" : "bg-stone-900 hover:bg-stone-800",
+              "rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60 active:scale-[0.98]",
+              danger ? "bg-red-700 hover:bg-red-800" : "bg-zinc-900 hover:bg-zinc-800",
             )}
           >
             {loading ? "در حال انجام..." : confirmLabel}
@@ -125,7 +125,7 @@ export function ConfirmModal({
       }
     >
       {description ? (
-        <p className="text-sm leading-6 text-stone-600">{description}</p>
+        <p className="text-sm leading-6 text-zinc-600">{description}</p>
       ) : null}
     </AdminModal>
   );

@@ -558,8 +558,10 @@ export async function buildSellerDashboard(sellerId: string) {
     title: string;
     createdAt: string;
   }> = [];
+  let unreadNotifications = 0;
   try {
     const n = await listSellerNotifications({ sellerId, limit: 5 });
+    unreadNotifications = n.unreadCount;
     recentNotifications = n.rows.map((r) => ({
       id: r.id,
       title: r.title,
@@ -575,8 +577,19 @@ export async function buildSellerDashboard(sellerId: string) {
     status: string;
     updatedAt: string;
   }> = [];
+  let openTicketsCount = 0;
   if (isMysqlConfigured()) {
     try {
+      const openRow = await mysqlQuery<{
+        c: number;
+      } & import("mysql2/promise").RowDataPacket>(
+        `SELECT COUNT(*) AS c FROM seller_tickets
+         WHERE seller_id = ?
+           AND status IN ('open', 'pending', 'new', 'waiting')`,
+        [sellerId],
+      );
+      openTicketsCount = Number(openRow[0]?.c ?? 0);
+
       const rows = await mysqlQuery<{
         id: string;
         subject: string;
@@ -613,6 +626,13 @@ export async function buildSellerDashboard(sellerId: string) {
       revenueTotal,
       walletAvailable,
       walletPending,
+    },
+    navBadges: {
+      orders: pending.length,
+      inventory: lowStockCount,
+      products: pendingProducts.length,
+      tickets: openTicketsCount,
+      notifications: unreadNotifications,
     },
     salesByDay,
     recentOrders: orders.slice(0, 8),

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { CartItemRow } from "@/components/cart/CartItem";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
 import type { PaymentMethod } from "@/components/checkout/PaymentMethodSelector";
 import {
@@ -166,8 +167,6 @@ function CheckoutPageInner() {
         setPrefilled(true);
       }
     })();
-
-    setPrefilled(true);
   }, [authLoading, user, prefilled, setValue]);
 
   if (authLoading || !isLoggedIn) {
@@ -180,9 +179,12 @@ function CheckoutPageInner() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="mb-6 text-secondary">سبد خرید شما خالی است.</p>
-        <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
+      <div className="mx-auto max-w-lg px-4 py-20">
+        <EmptyState
+          title="سبد خرید خالی است"
+          description="برای ادامه سفارش، ابتدا محصولی به سبد اضافه کنید."
+          action={<Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>}
+        />
       </div>
     );
   }
@@ -339,38 +341,49 @@ function CheckoutPageInner() {
         می‌شود.
       </p>
 
-      <div className="mb-6 flex items-center justify-between md:mb-8">
-        {steps.map((s, i) => (
-          <div key={s.id} className="flex flex-1 items-center">
-            <div className="flex flex-col items-center gap-1">
-              <div
+      <div className="mb-6 md:mb-8">
+        <ol className="flex items-stretch gap-2 sm:gap-3" aria-label="مراحل سفارش">
+          {steps.map((s) => {
+            const done = step > s.id;
+            const current = step === s.id;
+            return (
+              <li
+                key={s.id}
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
-                  step >= s.id
-                    ? "bg-gold text-ink-on-gold"
-                    : "bg-surface-elevated text-secondary",
+                  "flex min-w-0 flex-1 flex-col items-center gap-2 rounded-xl border px-2 py-3 sm:px-3",
+                  current
+                    ? "border-gold/50 bg-gold-dim"
+                    : done
+                      ? "border-border bg-surface"
+                      : "border-border/60 bg-surface-elevated/50",
                 )}
               >
-                {step > s.id ? (
-                  <Check size={16} weight="bold" />
-                ) : (
-                  s.id.toLocaleString("fa-IR")
-                )}
-              </div>
-              <span className="hidden text-xs text-secondary sm:block">
-                {s.title}
-              </span>
-            </div>
-            {i < steps.length - 1 ? (
-              <div
-                className={cn(
-                  "mx-2 h-px flex-1",
-                  step > s.id ? "bg-gold" : "bg-border-bright",
-                )}
-              />
-            ) : null}
-          </div>
-        ))}
+                <span
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
+                    current || done
+                      ? "bg-gold text-ink-on-gold"
+                      : "bg-surface text-secondary",
+                  )}
+                >
+                  {done ? (
+                    <Check size={16} weight="bold" />
+                  ) : (
+                    s.id.toLocaleString("fa-IR")
+                  )}
+                </span>
+                <span
+                  className={cn(
+                    "text-center text-[10px] leading-tight sm:text-xs",
+                    current ? "font-medium text-primary" : "text-secondary",
+                  )}
+                >
+                  {s.title}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
 
       <form

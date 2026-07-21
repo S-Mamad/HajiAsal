@@ -73,12 +73,12 @@ export default function SellerDashboardPage() {
   }, [load]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm text-stone-500">خلاصه عملکرد فروشگاه شما</p>
+          <p className="text-sm text-zinc-500">خلاصه عملکرد فروشگاه شما</p>
           {shopName ? (
-            <p className="mt-0.5 text-base font-medium text-stone-800">
+            <p className="mt-0.5 text-base font-semibold tracking-tight text-zinc-900">
               {shopName}
             </p>
           ) : null}
@@ -87,7 +87,6 @@ export default function SellerDashboardPage() {
           type="button"
           variant="outline"
           onClick={() => void load()}
-          className="!border-stone-300 !text-stone-800"
         >
           بروزرسانی
         </AdminButton>
@@ -96,17 +95,20 @@ export default function SellerDashboardPage() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {loading && !kpis ? (
         <div className="space-y-6 animate-pulse" aria-busy>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-2xl bg-stone-200/70" />
+              <div
+                key={i}
+                className="h-24 rounded-[var(--panel-radius,10px)] bg-zinc-200/70"
+              />
             ))}
           </div>
-          <div className="h-48 rounded-2xl bg-stone-200/70" />
+          <div className="h-48 rounded-[var(--panel-radius,10px)] bg-zinc-200/70" />
         </div>
       ) : null}
 
       {kpis ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="فروش امروز"
             value={`${(kpis.salesToday ?? 0).toLocaleString("fa-IR")} تومان`}
@@ -170,12 +172,12 @@ export default function SellerDashboardPage() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-stone-900">
+          <h3 className="text-sm font-semibold text-zinc-900">
             سفارش‌های اخیر
           </h3>
           <Link
             href={hajiasalPath("/seller/orders")}
-            className="text-sm text-stone-600 hover:text-stone-900"
+            className="text-xs text-zinc-500 transition hover:text-zinc-900"
           >
             همه سفارش‌ها
           </Link>

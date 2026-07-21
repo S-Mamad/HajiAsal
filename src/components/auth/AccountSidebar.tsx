@@ -19,7 +19,7 @@ const links = [
   { href: hajiasalPath("/account"), label: "خلاصه", icon: House },
   { href: hajiasalPath("/account/orders"), label: "سفارش‌ها", icon: Package },
   { href: hajiasalPath("/account/addresses"), label: "آدرس‌ها", icon: MapPin },
-  { href: hajiasalPath("/account/wishlist"), label: "علاقه‌مندی‌ها", icon: Heart },
+  { href: hajiasalPath("/account/wishlist"), label: "علاقه‌مندی", icon: Heart },
   { href: hajiasalPath("/account/profile"), label: "پروفایل", icon: User },
 ];
 
@@ -38,8 +38,8 @@ export function AccountSidebar() {
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm transition-colors",
                   pathname === link.href
-                    ? "bg-gold-dim font-medium text-brown"
-                    : "text-muted hover:bg-cream-dark hover:text-brown",
+                    ? "bg-gold-dim font-medium text-primary"
+                    : "text-secondary hover:bg-surface-muted hover:text-primary",
                 )}
               >
                 <Icon icon={link.icon} size={18} />
@@ -51,7 +51,7 @@ export function AccountSidebar() {
             <button
               type="button"
               onClick={() => void logout()}
-              className="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-muted hover:bg-cream-dark hover:text-brown"
+              className="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-secondary hover:bg-surface-muted hover:text-primary"
             >
               <Icon icon={SignOut} size={18} />
               خروج
@@ -60,19 +60,19 @@ export function AccountSidebar() {
         </ul>
       </nav>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface px-2 py-2 lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-1 py-1 backdrop-blur lg:hidden pb-[max(0.25rem,env(safe-area-inset-bottom))]">
         <ul className="flex justify-around">
-          {links.slice(0, 4).map((link) => (
-            <li key={link.href}>
+          {links.map((link) => (
+            <li key={link.href} className="min-w-0 flex-1">
               <Link
                 href={link.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px]",
-                  pathname === link.href ? "text-amber" : "text-muted",
+                  "flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[10px] touch-manipulation",
+                  pathname === link.href ? "text-gold" : "text-secondary",
                 )}
               >
                 <Icon icon={link.icon} size={20} />
-                {link.label}
+                <span className="truncate">{link.label}</span>
               </Link>
             </li>
           ))}

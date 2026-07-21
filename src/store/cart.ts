@@ -76,13 +76,13 @@ export const useCartStore = create<CartStore>()(
                   ? { ...i, quantity: i.quantity + quantity }
                   : i,
               ),
-              isOpen: true,
+              isOpen: false,
               announcement,
             };
           }
           return {
             items: [...state.items, { ...item, quantity }],
-            isOpen: true,
+            isOpen: false,
             announcement,
           };
         });

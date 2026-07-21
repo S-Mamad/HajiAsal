@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/Button";
 import { CartItemRow } from "@/components/cart/CartItem";
 import { CartSummary } from "@/components/cart/CartSummary";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useCartStore } from "@/store/cart";
+import { hajiasalPath } from "@/lib/paths";
 
 export default function CartPage() {
   const itemCount = useCartStore((s) => s.getItemCount());
@@ -32,20 +34,27 @@ export default function CartPage() {
             <div className="mt-8 flex flex-col gap-6 border-t border-border pt-6">
               <CartSummary />
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button href="/checkout" className="flex-1">
+                <Button href={hajiasalPath("/checkout")} className="flex-1">
                   تکمیل خرید
                 </Button>
-                <Button href="/shop" variant="outline" className="flex-1">
+                <Button
+                  href={hajiasalPath("/shop")}
+                  variant="outline"
+                  className="flex-1"
+                >
                   ادامه خرید
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="mb-4 text-sm text-secondary">سبد خرید خالی است</p>
-            <Button href="/shop">رفتن به فروشگاه</Button>
-          </div>
+          <EmptyState
+            title="سبد خرید خالی است"
+            description="محصولات مورد علاقه را از فروشگاه انتخاب کنید."
+            action={
+              <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
+            }
+          />
         )}
       </div>
     </div>

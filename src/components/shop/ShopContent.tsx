@@ -17,6 +17,7 @@ import { ProductGrid } from "@/components/product/ProductGrid";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Pagination } from "@/components/ui/Pagination";
 import { ShopEmptyState } from "@/components/shop/ShopEmptyState";
+import { ErrorState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
 import { hajiasalPath } from "@/lib/paths";
 
@@ -262,7 +263,13 @@ function ShopContentInner() {
         </button>
       </div>
 
-      {error ? <p className="mb-4 text-sm text-red-500">{error}</p> : null}
+      {error ? (
+        <ErrorState
+          className="mb-6"
+          title="بارگذاری فروشگاه ناموفق بود"
+          description={error}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-8 lg:flex-row">
         <aside className="hidden w-64 shrink-0 lg:block">

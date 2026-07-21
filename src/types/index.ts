@@ -18,6 +18,62 @@ export interface WeightOption {
 
 export type ProductApprovalStatus = "pending" | "approved" | "rejected";
 
+export type ProductStatus = "active" | "draft" | "archived" | "disabled";
+
+export type CustomFieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "select"
+  | "image"
+  | "table"
+  | "repeater";
+
+export interface ProductSeo {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+  robots?: string;
+  focusKeyword?: string;
+  faq?: Array<{ question: string; answer: string }>;
+}
+
+export interface ProductFieldDefinition {
+  id: string;
+  key: string;
+  label: string;
+  type: CustomFieldType;
+  options?: { choices?: string[]; columns?: string[] };
+  validation?: {
+    min?: number;
+    max?: number;
+    maxLength?: number;
+    pattern?: string;
+  };
+  scope: "product" | "category";
+  categoryId?: string | null;
+  sortOrder: number;
+  isRequired: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductRevision {
+  id: string;
+  productId: string;
+  actor?: string | null;
+  snapshot: Product;
+  diff?: Record<string, unknown> | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -31,7 +87,9 @@ export interface Product {
   discountPrice?: number;
   inStock: boolean;
   stockQty?: number;
-  status?: "active" | "draft" | "archived" | "disabled";
+  status?: ProductStatus;
+  sku?: string;
+  brandId?: string | null;
   rating: number;
   reviewCount: number;
   isBestseller?: boolean;
@@ -45,6 +103,10 @@ export interface Product {
   reviewNote?: string;
   submittedAt?: string;
   reviewedAt?: string;
+  deletedAt?: string | null;
+  publishedAt?: string | null;
+  seo?: ProductSeo;
+  customFields?: Record<string, unknown>;
 }
 
 export interface CartItem {

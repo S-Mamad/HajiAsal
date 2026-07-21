@@ -20,11 +20,11 @@ interface AdminButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<AdminButtonVariant, string> = {
   primary:
-    "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400",
+    "bg-zinc-900 text-white hover:bg-zinc-800 disabled:bg-zinc-400 active:scale-[0.98]",
   outline:
-    "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-50",
-  ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-  danger: "bg-red-600 text-white hover:bg-red-500",
+    "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 disabled:opacity-50 active:scale-[0.98]",
+  ghost: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 active:scale-[0.98]",
+  danger: "bg-red-600 text-white hover:bg-red-500 active:scale-[0.98]",
 };
 
 const sizes: Record<AdminButtonSize, string> = {
@@ -46,8 +46,8 @@ export function AdminButton({
   ...props
 }: AdminButtonProps) {
   const styles = cn(
-    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2",
+    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700/30 focus-visible:ring-offset-2",
     "disabled:pointer-events-none",
     sizes[size],
     variants[variant],

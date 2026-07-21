@@ -9,13 +9,21 @@ import {
 import { hasPurchasedByPhone } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { getSessionFromRequest } from "@/lib/auth/session";
+
+const BUYER_ONLY_MESSAGE =
+  "ثبت نظر فقط برای خریداران امکان‌پذیر است. وارد حساب شوید یا شماره موبایل سفارش را وارد کنید.";
 
 const reviewSchema = z.object({
   productId: z.string().min(1).max(64).optional(),
   author: z.string().min(2).max(60),
-  phone: z.string().min(10).max(20),
+  phone: z.string().min(10).max(20).optional(),
   rating: z.coerce.number().int().min(1).max(5),
-  comment: z.string().min(10).max(500),
+  comment: z
+    .string()
+    .min(10)
+    .max(500)
+    .transform((s) => s.replace(/<[^>]*>/g, "").trim()),
   /** Honeypot — bots fill this; humans leave empty */
   website: z.string().optional(),
 });
@@ -70,29 +78,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const phone = normalizePhone(parsed.data.phone);
+    const session = getSessionFromRequest(request);
+    const phoneRaw = session?.phone ?? parsed.data.phone ?? "";
+    const phone = normalizePhone(phoneRaw);
+
     if (!phone) {
       return NextResponse.json(
-        { success: false, message: "شماره موبایل نامعتبر است" },
-        { status: 400 },
+        { success: false, message: BUYER_ONLY_MESSAGE },
+        { status: 403 },
       );
     }
 
     const isBuyer = await hasPurchasedByPhone(phone);
     if (!isBuyer) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "فقط خریداران می‌توانند نظر ثبت کنند. شماره موبایل باید همان شماره سفارش باشد.",
-        },
+        { success: false, message: BUYER_ONLY_MESSAGE },
         { status: 403 },
       );
     }
 
+    const author =
+      parsed.data.author.trim() ||
+      session?.fullName?.trim() ||
+      "خریدار";
+
     const review = await createReview({
       productId: parsed.data.productId ?? GENERAL_REVIEW_PRODUCT_ID,
-      author: parsed.data.author,
+      author,
       rating: parsed.data.rating,
       comment: parsed.data.comment,
     });

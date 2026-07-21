@@ -84,7 +84,10 @@ export function Header() {
             onClick={() => setMobileOpen(false)}
             aria-label={siteData.brand.name}
           >
-            <BrandLogo name={siteData.brand.name} />
+            <BrandLogo
+              name={siteData.brand.name}
+              className="[&>span:last-child]:hidden lg:[&>span:last-child]:inline"
+            />
           </Link>
 
           <nav className="hidden items-center gap-6 lg:flex">
@@ -107,7 +110,39 @@ export function Header() {
             })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          {/* Mobile: search + cart + menu only */}
+          <div className="flex shrink-0 items-center gap-0.5 lg:hidden">
+            <button
+              type="button"
+              onClick={openSearch}
+              className={iconBtn}
+              aria-label="جستجو"
+            >
+              <Icon icon={MagnifyingGlass} size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenCart}
+              className={cn("relative", iconBtn)}
+              aria-label="سبد خرید"
+            >
+              <Icon icon={ShoppingBag} size={18} />
+              {hasHydrated ? <CountBadge count={itemCount} /> : null}
+            </button>
+            <button
+              type="button"
+              onClick={toggleMobile}
+              className={iconBtn}
+              aria-label={mobileOpen ? "بستن منو" : "منو"}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
+            >
+              <Icon icon={mobileOpen ? X : List} size={20} />
+            </button>
+          </div>
+
+          {/* Desktop actions */}
+          <div className="hidden shrink-0 items-center gap-1 lg:flex">
             <ThemeToggle />
             <button
               type="button"
@@ -121,7 +156,6 @@ export function Header() {
               href={hajiasalPath("/wishlist")}
               className={cn("relative", iconBtn)}
               aria-label="علاقه‌مندی‌ها"
-              onClick={() => setMobileOpen(false)}
             >
               <Icon icon={Heart} size={18} />
               {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
@@ -135,16 +169,6 @@ export function Header() {
             >
               <Icon icon={ShoppingBag} size={18} />
               {hasHydrated ? <CountBadge count={itemCount} /> : null}
-            </button>
-            <button
-              type="button"
-              onClick={toggleMobile}
-              className={cn(iconBtn, "lg:hidden")}
-              aria-label={mobileOpen ? "بستن منو" : "منو"}
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-nav"
-            >
-              <Icon icon={mobileOpen ? X : List} size={20} />
             </button>
           </div>
         </div>

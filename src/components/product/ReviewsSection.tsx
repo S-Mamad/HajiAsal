@@ -163,6 +163,12 @@ export function ReviewsSection({
               <p className="text-sm leading-relaxed text-secondary">
                 {review.comment}
               </p>
+              {review.adminReply ? (
+                <div className="mt-3 rounded-xl bg-surface-muted/80 px-3 py-2.5 text-xs leading-relaxed text-secondary">
+                  <p className="mb-1 font-medium text-primary">پاسخ فروشگاه</p>
+                  <p>{review.adminReply}</p>
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-primary">
                   {review.author}

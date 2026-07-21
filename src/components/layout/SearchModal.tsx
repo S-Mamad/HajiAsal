@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { getMinPrice } from "@/lib/products";
 import { hajiasalPath } from "@/lib/paths";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
 
 interface SearchModalProps {
   open: boolean;
@@ -147,50 +148,81 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                   </p>
                 </div>
               ) : loading ? (
-                <p className="py-12 text-center text-sm text-secondary">
-                  در حال جستجو...
-                </p>
-              ) : error ? (
-                <p className="py-12 text-center text-sm text-red-400">{error}</p>
-              ) : results.length > 0 ? (
-                <ul className="flex flex-col gap-0.5 py-2">
-                  {results.map((product) => (
-                    <li key={product.id}>
-                      <Link
-                        href={hajiasalPath(`/product/${product.slug}`)}
-                        onClick={handleClose}
-                        className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-muted active:bg-surface-elevated"
-                      >
-                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
-                          <ProductImage
-                            src={product.images[0]}
-                            alt={product.title}
-                            fill
-                            sizes="56px"
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-primary">
-                            {product.title}
-                          </p>
-                          <p className="mt-0.5 text-xs text-secondary">
-                            {product.categoryLabel}
-                            <span className="mx-1.5 text-dim">·</span>
-                            <span className="text-gold tabular-nums">
-                              {formatPrice(getMinPrice(product))}
-                            </span>
-                          </p>
-                        </div>
-                        <ArrowLeft size={16} className="shrink-0 text-dim" />
-                      </Link>
+                <ul className="flex flex-col gap-2 py-3" aria-busy>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <li
+                      key={i}
+                      className="flex animate-pulse items-center gap-3 rounded-xl p-2.5"
+                    >
+                      <div className="h-14 w-14 rounded-lg bg-surface-muted" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-3 w-2/3 rounded bg-surface-muted" />
+                        <div className="h-3 w-1/3 rounded bg-surface-muted" />
+                      </div>
                     </li>
                   ))}
                 </ul>
+              ) : error ? (
+                <ErrorState
+                  className="my-4 border-0 bg-transparent dark:bg-transparent"
+                  title="جستجو انجام نشد"
+                  description={error}
+                  onRetry={() => void search(query)}
+                />
+              ) : results.length > 0 ? (
+                <>
+                  <ul className="flex flex-col gap-0.5 py-2">
+                    {results.map((product) => (
+                      <li key={product.id}>
+                        <Link
+                          href={hajiasalPath(`/product/${product.slug}`)}
+                          onClick={handleClose}
+                          className="flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-muted active:bg-surface-elevated"
+                        >
+                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
+                            <ProductImage
+                              src={product.images[0]}
+                              alt={product.title}
+                              fill
+                              sizes="56px"
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-primary">
+                              {product.title}
+                            </p>
+                            <p className="mt-0.5 text-xs text-secondary">
+                              {product.categoryLabel}
+                              <span className="mx-1.5 text-dim">-</span>
+                              <span className="text-gold tabular-nums">
+                                {formatPrice(getMinPrice(product))}
+                              </span>
+                            </p>
+                          </div>
+                          <ArrowLeft size={16} className="shrink-0 text-dim" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border-t border-border px-3 py-3">
+                    <Link
+                      href={hajiasalPath(
+                        `/shop?q=${encodeURIComponent(query.trim())}`,
+                      )}
+                      onClick={handleClose}
+                      className="block rounded-xl bg-surface-muted py-2.5 text-center text-sm font-medium text-gold hover:bg-gold-dim"
+                    >
+                      مشاهده همه نتایج در فروشگاه
+                    </Link>
+                  </div>
+                </>
               ) : (
-                <p className="py-12 text-center text-sm text-secondary">
-                  نتیجه‌ای برای «{query.trim()}» یافت نشد
-                </p>
+                <EmptyState
+                  className="my-4 border-0 bg-transparent"
+                  title="نتیجه‌ای یافت نشد"
+                  description={`برای «${query.trim()}» محصولی پیدا نشد. عبارت دیگری امتحان کنید.`}
+                />
               )}
             </div>
           </motion.div>

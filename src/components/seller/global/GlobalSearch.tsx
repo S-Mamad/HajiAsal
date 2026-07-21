@@ -84,22 +84,22 @@ export function GlobalSearch({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-stone-900/40 p-4 pt-[12vh]" dir="rtl">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-zinc-950/50 p-4 pt-[12vh] backdrop-blur-[1px]" dir="rtl">
       <button
         type="button"
         className="absolute inset-0 cursor-default"
         aria-label="بستن"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-stone-100 px-4 py-3">
-          <Icon icon={MagnifyingGlass} size={18} className="text-stone-400" />
+      <div className="relative w-full max-w-xl overflow-hidden rounded-[12px] border border-zinc-200 bg-white shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+          <Icon icon={MagnifyingGlass} size={18} className="text-zinc-400" />
           <input
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="جستجو در پنل فروشنده..."
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-stone-400"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-400"
           />
           {loading ? (
             <Icon icon={SpinnerGap} size={18} className="animate-spin text-amber-700" />
@@ -107,7 +107,7 @@ export function GlobalSearch({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="rounded-md p-1 text-stone-400 hover:bg-stone-100"
+              className="rounded-md p-1 text-zinc-400 transition hover:bg-zinc-100"
               aria-label="بستن"
             >
               <Icon icon={X} size={16} />
@@ -116,11 +116,11 @@ export function GlobalSearch({
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-2">
           {query.trim().length < 2 ? (
-            <p className="px-3 py-6 text-center text-sm text-stone-500">
+            <p className="px-3 py-6 text-center text-sm text-zinc-500">
               حداقل ۲ کاراکتر وارد کنید
             </p>
           ) : results.length === 0 && !loading ? (
-            <p className="px-3 py-6 text-center text-sm text-stone-500">
+            <p className="px-3 py-6 text-center text-sm text-zinc-500">
               چیزی پیدا نشد
             </p>
           ) : (
@@ -129,7 +129,7 @@ export function GlobalSearch({
               if (!items.length) return null;
               return (
                 <div key={type} className="mb-2">
-                  <p className="px-3 py-1 text-[11px] font-medium tracking-wide text-stone-400">
+                  <p className="px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-400">
                     {labels[type]}
                   </p>
                   <ul>
@@ -139,14 +139,14 @@ export function GlobalSearch({
                           type="button"
                           onClick={() => go(item.href)}
                           className={cn(
-                            "flex w-full flex-col rounded-lg px-3 py-2 text-start hover:bg-amber-50",
+                            "flex w-full flex-col rounded-lg px-3 py-2 text-start transition hover:bg-zinc-50",
                           )}
                         >
-                          <span className="text-sm font-medium text-stone-900">
+                          <span className="text-sm font-medium text-zinc-900">
                             {item.title}
                           </span>
                           {item.subtitle ? (
-                            <span className="text-xs text-stone-500">
+                            <span className="text-xs text-zinc-500">
                               {item.subtitle}
                             </span>
                           ) : null}

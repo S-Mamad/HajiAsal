@@ -19,37 +19,51 @@ interface ProductPageProps {
 }
 
 export async function generateStaticParams() {
-  const slugs = await getAllSlugsAsync();
-  return slugs.map((slug) => ({ slug }));
+  try {
+    const slugs = await getAllSlugsAsync();
+    return slugs.map((slug) => ({ slug }));
+  } catch {
+    // Offline / DB-down builds: skip SSG for product pages
+    return [];
+  }
 }
 
 export async function generateMetadata({
   params,
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductBySlugAsync(slug);
-  if (!product) return { title: "محصول یافت نشد" };
+  try {
+    const product = await getProductBySlugAsync(slug);
+    if (!product) return { title: "محصول یافت نشد" };
 
-  return {
-    title: product.title,
-    description: product.shortDescription,
-    openGraph: {
+    return {
       title: product.title,
       description: product.shortDescription,
-      images: product.images,
-    },
-    alternates: { canonical: hajiasalCanonical(`/product/${slug}`) },
-  };
+      openGraph: {
+        title: product.title,
+        description: product.shortDescription,
+        images: product.images,
+      },
+      alternates: { canonical: hajiasalCanonical(`/product/${slug}`) },
+    };
+  } catch {
+    return { title: "محصول" };
+  }
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  const product = await getProductBySlugAsync(slug);
+  let product;
+  try {
+    product = await getProductBySlugAsync(slug);
+  } catch {
+    notFound();
+  }
   if (!product) notFound();
 
   const [relatedProducts, initialReviews] = await Promise.all([
-    getRelatedProductsAsync(product),
-    getReviewsByProduct(product.id),
+    getRelatedProductsAsync(product).catch(() => []),
+    getReviewsByProduct(product.id).catch(() => []),
   ]);
 
   const productJsonLd = buildProductJsonLd(product);
