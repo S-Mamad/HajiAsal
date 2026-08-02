@@ -37,17 +37,17 @@ export function SupportMessengerButtons({
   if (buttons.length === 0) return null;
 
   return (
-    <div className={cn("flex flex-col gap-3 sm:flex-row", className)}>
+    <div className={cn("grid grid-cols-1 gap-2.5 sm:grid-cols-2", className)}>
       {buttons.map(({ href, label, Icon }) => (
         <a
           key={label}
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-primary transition-colors hover:border-gold/40 hover:text-gold"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-primary transition-colors hover:border-gold/40 hover:bg-gold/[0.06] hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
         >
-          <Icon size={18} weight="duotone" className="text-gold" />
-          {label}
+          <Icon size={18} weight="duotone" className="shrink-0 text-gold" />
+          <span className="truncate">{label}</span>
         </a>
       ))}
     </div>

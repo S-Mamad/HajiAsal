@@ -108,7 +108,7 @@ export function Footer() {
         <SocialFollowSection
           social={siteData.social}
           compact
-          className="mt-8"
+          className="mx-auto mt-8 max-w-sm"
         />
 
         <div className="mt-8 flex justify-center">
@@ -192,7 +192,7 @@ export function Footer() {
             <SocialFollowSection
               social={siteData.social}
               compact
-              className="mt-6"
+              className="mt-6 max-w-full"
             />
             <div className="mt-6">
               <EnamadSeal />
