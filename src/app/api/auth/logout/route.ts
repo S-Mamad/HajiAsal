@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
-import { CUSTOMER_COOKIE } from "@/lib/auth/session";
+import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 
-export async function POST() {
+export async function POST(request: Request) {
   const response = NextResponse.json({ success: true });
-  response.cookies.set(CUSTOMER_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  await clearAllAuthSessions(request, response);
   return response;
 }

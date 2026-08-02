@@ -90,7 +90,7 @@ export async function countAdminUsers(): Promise<number> {
       );
       return Number(row?.c ?? 0);
     } catch {
-      return 0;
+      /* fall through */
     }
   }
   if (canUseFilesystemPersistence()) {
@@ -106,9 +106,9 @@ export async function findAdminUserById(id: string): Promise<AdminUser | null> {
         "SELECT * FROM admin_users WHERE id = ? LIMIT 1",
         [id],
       );
-      return row ? mapUserRow(row) : null;
+      if (row) return mapUserRow(row);
     } catch {
-      return null;
+      /* fall through */
     }
   }
   if (canUseFilesystemPersistence()) {
@@ -132,9 +132,9 @@ export async function findAdminUserByLogin(
          LIMIT 1`,
         [normalized, login.trim()],
       );
-      return row ? mapUserRow(row) : null;
+      if (row) return mapUserRow(row);
     } catch {
-      return null;
+      /* fall through */
     }
   }
   if (canUseFilesystemPersistence()) {
@@ -158,7 +158,7 @@ export async function listAdminUsers(): Promise<AdminUser[]> {
       );
       return rows.map(mapUserRow);
     } catch {
-      return [];
+      /* fall through */
     }
   }
   if (canUseFilesystemPersistence()) {
@@ -189,22 +189,29 @@ export async function createAdminUser(input: {
   };
 
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `INSERT INTO admin_users
+    try {
+      await mysqlExecute(
+        `INSERT INTO admin_users
         (id, full_name, email, phone, password_hash, role, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-      [
-        user.id,
-        user.fullName,
-        user.email,
-        user.phone,
-        user.passwordHash,
-        user.role,
-        now,
-        now,
-      ],
-    );
-    return user;
+        [
+          user.id,
+          user.fullName,
+          user.email,
+          user.phone,
+          user.passwordHash,
+          user.role,
+          now,
+          now,
+        ],
+      );
+      return user;
+    } catch (error) {
+      console.error(
+        "[admin-auth] createAdminUser mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   if (canUseFilesystemPersistence()) {
@@ -349,8 +356,16 @@ export async function authenticateAdminCredentials(input: {
   const envPassword = process.env.ADMIN_PASSWORD;
   if (envPassword && verifyPasswordHash(password, hashPassword(envPassword))) {
     if (userCount === 0) {
-      const created = await ensureBootstrapSuperAdmin(password);
-      return { user: created, legacy: !created };
+      try {
+        const created = await ensureBootstrapSuperAdmin(password);
+        return { user: created, legacy: !created };
+      } catch (error) {
+        console.error(
+          "[admin-auth] bootstrap failed, using legacy session:",
+          error instanceof Error ? error.message : error,
+        );
+        return { user: null, legacy: true };
+      }
     }
     // Prefer first super_admin
     const users = await listAdminUsers();

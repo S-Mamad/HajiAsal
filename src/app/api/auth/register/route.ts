@@ -6,6 +6,7 @@ import {
   updateProfile,
 } from "@/lib/server/profiles";
 import { getSessionFromRequest, createSessionToken, sessionCookieOptions } from "@/lib/auth/session";
+import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 
 export async function POST(request: Request) {
   try {
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
     });
 
     const cookie = sessionCookieOptions(token);
+    await clearAllAuthSessions(request, response);
     response.cookies.set(cookie.name, cookie.value, {
       httpOnly: cookie.httpOnly,
       secure: cookie.secure,

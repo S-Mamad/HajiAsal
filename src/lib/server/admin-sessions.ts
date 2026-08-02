@@ -85,10 +85,10 @@ export async function createAdminSession(meta?: {
         return { sessionId, token };
       } catch (inner) {
         console.error(
-          "[admin-sessions] insert failed:",
+          "[admin-sessions] mysql insert failed, falling back:",
           inner instanceof Error ? inner.message : inner,
         );
-        return null;
+        // Fall through to filesystem / memory when MySQL is unreachable
       }
     }
   }
@@ -118,20 +118,21 @@ export async function validateAdminSessionTokenDetailed(
         "SELECT * FROM admin_sessions WHERE token_hash = ? AND revoked_at IS NULL LIMIT 1",
         [tokenHash],
       );
-      if (!row) return { valid: false, adminUserId: null };
-      if (new Date(toIso(row.expires_at)).getTime() < Date.now()) {
-        return { valid: false, adminUserId: null };
+      if (row) {
+        if (new Date(toIso(row.expires_at)).getTime() < Date.now()) {
+          return { valid: false, adminUserId: null };
+        }
+        return {
+          valid: true,
+          adminUserId: row.admin_user_id ? String(row.admin_user_id) : null,
+        };
       }
-      return {
-        valid: true,
-        adminUserId: row.admin_user_id ? String(row.admin_user_id) : null,
-      };
+      // Not in MySQL — may be a local FS/memory session while MySQL is up or recovering
     } catch (error) {
       console.error(
-        "[admin-sessions] validate failed:",
+        "[admin-sessions] validate mysql failed, falling back:",
         error instanceof Error ? error.message : error,
       );
-      return { valid: false, adminUserId: null };
     }
   }
 
@@ -140,11 +141,13 @@ export async function validateAdminSessionTokenDetailed(
     const session = sessions.find(
       (s) => s.tokenHash === tokenHash && !s.revokedAt,
     );
-    if (!session) return { valid: false, adminUserId: null };
-    if (new Date(session.expiresAt).getTime() < Date.now()) {
+    if (!session) {
+      // continue to memory
+    } else if (new Date(session.expiresAt).getTime() < Date.now()) {
       return { valid: false, adminUserId: null };
+    } else {
+      return { valid: true, adminUserId: session.adminUserId ?? null };
     }
-    return { valid: true, adminUserId: session.adminUserId ?? null };
   }
 
   const session = memoryGetAdminSessions().find(
@@ -175,11 +178,10 @@ export async function revokeAdminSession(token: string): Promise<void> {
       );
     } catch (error) {
       console.error(
-        "[admin-sessions] revoke failed:",
+        "[admin-sessions] revoke mysql failed, falling back:",
         error instanceof Error ? error.message : error,
       );
     }
-    return;
   }
 
   if (canUseFilesystemPersistence()) {
@@ -190,7 +192,6 @@ export async function revokeAdminSession(token: string): Promise<void> {
         : s,
     );
     await writeJsonFile(SESSIONS_FILE, updated);
-    return;
   }
 
   memorySetAdminSessions(

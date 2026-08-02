@@ -4,15 +4,14 @@ import {
   createSellerSession,
   getSellerByPhoneAsync,
   getSellerFromRequest,
-  revokeSellerSession,
   sellerCookieOptions,
-  SELLER_COOKIE,
   toPublicSeller,
   verifySellerPassword,
 } from "@/lib/server/sellers";
 import { checkRateLimit, getTrustedClientIp } from "@/lib/server/rate-limit";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import { clientIpFromRequest } from "@/lib/server/seller-gate";
+import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 
 const loginSchema = z.object({
   phone: z.string().min(10),
@@ -95,6 +94,7 @@ export async function POST(request: Request) {
       success: true,
       seller: toPublicSeller(seller),
     });
+    await clearAllAuthSessions(request, response);
     response.cookies.set(sellerCookieOptions(session.token));
     return response;
   } catch {
@@ -117,20 +117,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(new RegExp(`${SELLER_COOKIE}=([^;]+)`));
-  const token = match?.[1] ? decodeURIComponent(match[1]) : null;
-  if (token) await revokeSellerSession(token);
-
   const response = NextResponse.json({ success: true });
-  response.cookies.set({
-    name: SELLER_COOKIE,
-    value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  await clearAllAuthSessions(request, response);
   return response;
 }

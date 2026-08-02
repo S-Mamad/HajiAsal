@@ -79,7 +79,12 @@ export function CartItemRow() {
                       item.quantity + 1,
                     )
                   }
-                  className="flex h-8 w-8 items-center justify-center text-secondary hover:text-primary"
+                  disabled={
+                    item.inStock === false ||
+                    (typeof item.stockQty === "number" &&
+                      item.quantity >= item.stockQty)
+                  }
+                  className="flex h-8 w-8 items-center justify-center text-secondary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="افزایش"
                 >
                   <Plus size={14} />

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  ADMIN_COOKIE,
   adminCookieOptions,
   loginAdmin,
-  logoutAdmin,
 } from "@/lib/server/admin";
 import {
   authenticateAdminCredentials,
@@ -15,6 +13,7 @@ import {
 } from "@/lib/server/admin-rate-limit";
 import { getTrustedClientIp } from "@/lib/server/client-ip";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 
 export async function POST(request: Request) {
   try {
@@ -85,6 +84,14 @@ export async function POST(request: Request) {
         : null,
     });
     const cookie = adminCookieOptions(token);
+    try {
+      await clearAllAuthSessions(request, response);
+    } catch (error) {
+      console.error(
+        "[admin/auth] clear sibling sessions failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
     response.cookies.set(cookie.name, cookie.value, {
       httpOnly: cookie.httpOnly,
       secure: cookie.secure,
@@ -99,9 +106,20 @@ export async function POST(request: Request) {
       /* ignore */
     }
     return response;
-  } catch {
+  } catch (error) {
+    console.error(
+      "[admin/auth] POST failed:",
+      error instanceof Error ? error.stack ?? error.message : error,
+    );
     return NextResponse.json(
-      { success: false, message: "خطای سرور" },
+      {
+        success: false,
+        message: "خطای سرور",
+        detail:
+          process.env.NODE_ENV !== "production" && error instanceof Error
+            ? error.message
+            : undefined,
+      },
       { status: 500 },
     );
   }
@@ -133,14 +151,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  await logoutAdmin(request);
   const response = NextResponse.json({ success: true });
-  response.cookies.set(ADMIN_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  await clearAllAuthSessions(request, response);
   return response;
 }

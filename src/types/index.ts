@@ -116,6 +116,9 @@ export interface CartItem {
   image: string;
   weight: WeightOption;
   quantity: number;
+  /** Snapshot for client-side stock guards */
+  inStock?: boolean;
+  stockQty?: number;
 }
 
 export interface NavItem {
@@ -161,6 +164,16 @@ export interface TrustPageContent {
 
 export interface SocialLinks {
   instagram?: string;
+  eitaa?: string;
+  telegram?: string;
+  rubika?: string;
+  bale?: string;
+  soroush?: string;
+  /** پیام پشتیبانی ایتا (جایگزین واتساپ) */
+  supportEitaa?: string;
+  /** پیام پشتیبانی تلگرام (جایگزین واتساپ) */
+  supportTelegram?: string;
+  /** @deprecated حذف شده؛ فقط برای سازگاری داده قدیمی */
   whatsapp?: string;
 }
 
@@ -170,6 +183,7 @@ export interface SiteConfig {
     tagline: string;
     description: string;
   };
+  /** @deprecated حذف شده؛ فقط برای سازگاری داده قدیمی */
   whatsappNumber?: string;
   social?: SocialLinks;
   nav: NavItem[];

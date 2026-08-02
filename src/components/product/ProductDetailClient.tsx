@@ -16,6 +16,10 @@ import {
 import type { Product, WeightOption } from "@/types";
 import type { Review } from "@/lib/server/reviews";
 import { getEffectiveWeightPrice } from "@/lib/products";
+import {
+  isProductPurchasable,
+  maxPurchasableQty,
+} from "@/lib/product-availability";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { WeightSelector } from "@/components/product/WeightSelector";
 import { ProductAccordion } from "@/components/product/ProductAccordion";
@@ -48,31 +52,68 @@ export function ProductDetailClient({
 }: ProductDetailClientProps) {
   const siteData = useSiteSettings();
   const addItem = useCartStore((s) => s.addItem);
+  const setAnnouncement = useCartStore((s) => s.setAnnouncement);
   const [selectedWeight, setSelectedWeight] = useState<WeightOption>(
     product.weightOptions[0],
   );
   const [quantity, setQuantity] = useState(1);
   const [addedFlash, setAddedFlash] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const listPrice = selectedWeight.price;
   const salePrice = getEffectiveWeightPrice(product, selectedWeight);
+  const purchasable = isProductPurchasable(product);
+  const maxQty = maxPurchasableQty(product);
 
-  const handleAddToCart = () => {
-    addItem(
-      {
-        productId: product.id,
-        slug: product.slug,
-        title: product.title,
-        image: product.images[0],
-        weight: {
-          ...selectedWeight,
-          price: salePrice,
+  const handleAddToCart = async () => {
+    if (!purchasable || adding) return;
+    setAdding(true);
+    try {
+      const res = await fetch("/api/cart/validate-add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          quantity,
+        }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        message?: string;
+        stockQty?: number;
+      };
+
+      if (!res.ok || !data.success) {
+        setAnnouncement(data.message ?? "امکان افزودن به سبد وجود ندارد");
+        return;
+      }
+
+      const ok = addItem(
+        {
+          productId: product.id,
+          slug: product.slug,
+          title: product.title,
+          image: product.images[0],
+          weight: {
+            ...selectedWeight,
+            price: salePrice,
+          },
+          inStock: true,
+          stockQty:
+            typeof data.stockQty === "number"
+              ? data.stockQty
+              : product.stockQty,
         },
-      },
-      quantity,
-    );
-    setAddedFlash(true);
-    window.setTimeout(() => setAddedFlash(false), 1200);
+        quantity,
+      );
+      if (!ok) return;
+      setAddedFlash(true);
+      window.setTimeout(() => setAddedFlash(false), 1200);
+    } catch {
+      setAnnouncement("خطا در بررسی موجودی محصول");
+    } finally {
+      setAdding(false);
+    }
   };
 
   const accordionItems = [
@@ -110,7 +151,7 @@ export function ProductDetailClient({
             {product.isNew && !product.isBestseller ? (
               <span className="text-primary/75">جدید</span>
             ) : null}
-            {!product.inStock ? (
+            {!purchasable ? (
               <span className="text-red-400/90">ناموجود</span>
             ) : null}
           </div>
@@ -147,7 +188,7 @@ export function ProductDetailClient({
             size="lg"
           />
 
-          {product.inStock ? (
+          {purchasable ? (
             <div className="flex items-center gap-2 text-sm text-success">
               <Check size={16} weight="bold" />
               <span>موجود در انبار</span>
@@ -165,7 +206,8 @@ export function ProductDetailClient({
               <button
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="flex h-11 w-11 items-center justify-center text-secondary hover:text-primary"
+                disabled={!purchasable}
+                className="flex h-11 w-11 items-center justify-center text-secondary hover:text-primary disabled:opacity-40"
                 aria-label="کاهش"
               >
                 <Minus size={16} />
@@ -175,8 +217,11 @@ export function ProductDetailClient({
               </span>
               <button
                 type="button"
-                onClick={() => setQuantity(quantity + 1)}
-                className="flex h-11 w-11 items-center justify-center text-secondary hover:text-primary"
+                onClick={() =>
+                  setQuantity((q) => Math.min(maxQty || 1, q + 1))
+                }
+                disabled={!purchasable || quantity >= maxQty}
+                className="flex h-11 w-11 items-center justify-center text-secondary hover:text-primary disabled:opacity-40"
                 aria-label="افزایش"
               >
                 <Plus size={16} />
@@ -186,17 +231,19 @@ export function ProductDetailClient({
             <div className="min-w-0 flex-1">
               <Button
                 size="lg"
-                disabled={!product.inStock}
-                onClick={handleAddToCart}
-                className="w-full min-w-[12rem]"
+                disabled={!purchasable || adding}
+                onClick={() => void handleAddToCart()}
+                className="w-full min-w-[12rem] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ShoppingBag size={18} className="shrink-0" />
                 <span className="truncate">
-                  {!product.inStock
+                  {!purchasable
                     ? "ناموجود"
-                    : addedFlash
-                      ? "به سبد اضافه شد"
-                      : "افزودن به سبد خرید"}
+                    : adding
+                      ? "در حال بررسی..."
+                      : addedFlash
+                        ? "به سبد اضافه شد"
+                        : "افزودن به سبد خرید"}
                 </span>
               </Button>
             </div>
@@ -235,8 +282,8 @@ export function ProductDetailClient({
         title={product.title}
         price={listPrice}
         discountPrice={salePrice < listPrice ? salePrice : undefined}
-        inStock={product.inStock}
-        onAddToCart={handleAddToCart}
+        inStock={purchasable}
+        onAddToCart={() => void handleAddToCart()}
       />
     </div>
   );

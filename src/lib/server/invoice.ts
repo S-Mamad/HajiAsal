@@ -47,9 +47,9 @@ function formatDateTime(iso: string): string {
 }
 
 function paymentLabel(method: StoredOrder["paymentMethod"]): string {
-  if (method === "cod") return "پرداخت در محل";
-  if (method === "online") return "پرداخت آنلاین";
-  return "کارت به کارت";
+  if (method === "snappay") return "خرید اقساطی اسنپ‌پی";
+  if (method === "online") return "پرداخت آنلاین (زرین‌پال)";
+  return "پرداخت آنلاین";
 }
 
 function statusLabel(status: StoredOrder["status"]): string {

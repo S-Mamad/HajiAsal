@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
+import { SocialFollowSection } from "@/components/social/SocialFollowSection";
+import { getSiteSettings } from "@/lib/server/site-settings";
 
-const siteData = site as SiteConfig;
+export async function generateMetadata(): Promise<Metadata> {
+  const siteData = await getSiteSettings();
+  return {
+    title: "درباره ما",
+    description: siteData.brand.description,
+  };
+}
 
-export const metadata: Metadata = {
-  title: "درباره ما",
-  description: siteData.brand.description,
-};
+export default async function AboutPage() {
+  const siteData = await getSiteSettings();
 
-export default function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 md:px-8 md:py-24">
       <Reveal>
@@ -28,6 +31,12 @@ export default function AboutPage() {
           </Reveal>
         ))}
       </div>
+      <Reveal delay={0.4}>
+        <SocialFollowSection
+          social={siteData.social}
+          className="mt-12 border-t border-border pt-10"
+        />
+      </Reveal>
     </div>
   );
 }

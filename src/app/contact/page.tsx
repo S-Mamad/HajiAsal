@@ -4,20 +4,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Phone,
-  Envelope,
-  MapPin,
-  WhatsappLogo,
-} from "@phosphor-icons/react";
+import { Phone, Envelope, MapPin } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
-
-const siteData = site as SiteConfig;
+import { SocialFollowSection } from "@/components/social/SocialFollowSection";
+import { SupportMessengerButtons } from "@/components/social/SupportMessengerButtons";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 const schema = z.object({
   name: z.string().min(2, "نام الزامی است"),
@@ -30,6 +24,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function ContactPage() {
+  const siteData = useSiteSettings();
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -86,17 +81,6 @@ export default function ContactPage() {
       label: "آدرس",
       value: siteData.footer.address,
     },
-    ...(siteData.social?.whatsapp
-      ? [
-          {
-            icon: WhatsappLogo,
-            label: "واتساپ",
-            value: "پیام در واتساپ",
-            href: siteData.social.whatsapp,
-            external: true,
-          },
-        ]
-      : []),
   ];
 
   return (
@@ -138,12 +122,6 @@ export default function ContactPage() {
                   <a
                     key={card.label}
                     href={card.href}
-                    target={"external" in card && card.external ? "_blank" : undefined}
-                    rel={
-                      "external" in card && card.external
-                        ? "noopener noreferrer"
-                        : undefined
-                    }
                     className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-4 py-4 transition-colors hover:border-gold/30"
                   >
                     {inner}
@@ -160,6 +138,11 @@ export default function ContactPage() {
                 </div>
               );
             })}
+
+            <SupportMessengerButtons
+              social={siteData.social}
+              className="mt-2"
+            />
           </div>
         </Reveal>
 
@@ -182,6 +165,7 @@ export default function ContactPage() {
               <Input
                 label="موبایل"
                 dir="ltr"
+                placeholder="09967891973"
                 {...register("phone")}
                 error={errors.phone?.message}
               />
@@ -215,6 +199,13 @@ export default function ContactPage() {
           </form>
         </Reveal>
       </div>
+
+      <Reveal delay={0.12}>
+        <SocialFollowSection
+          social={siteData.social}
+          className="mt-12 border-t border-border pt-10"
+        />
+      </Reveal>
     </div>
   );
 }

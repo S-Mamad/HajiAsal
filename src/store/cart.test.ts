@@ -76,4 +76,37 @@ describe("cart store", () => {
     useCartStore.getState().updateQuantity("p1", 500, 0);
     expect(useCartStore.getState().items).toHaveLength(0);
   });
+
+  it("rejects out-of-stock products", () => {
+    const ok = useCartStore.getState().addItem(
+      {
+        productId: "p-oos",
+        slug: "oos",
+        title: "ناموجود",
+        image: "/x.webp",
+        weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+        inStock: false,
+        stockQty: 0,
+      },
+      1,
+    );
+    expect(ok).toBe(false);
+    expect(useCartStore.getState().items).toHaveLength(0);
+    expect(useCartStore.getState().announcement).toContain("ناموجود");
+  });
+
+  it("caps quantity by stockQty", () => {
+    const item = {
+      productId: "p2",
+      slug: "honey2",
+      title: "عسل محدود",
+      image: "/x.webp",
+      weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+      inStock: true,
+      stockQty: 2,
+    };
+    expect(useCartStore.getState().addItem(item, 2)).toBe(true);
+    expect(useCartStore.getState().addItem(item, 1)).toBe(false);
+    expect(useCartStore.getState().items[0]?.quantity).toBe(2);
+  });
 });

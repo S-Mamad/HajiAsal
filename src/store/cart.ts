@@ -5,12 +5,19 @@ import { persist } from "zustand/middleware";
 import type { CartItem, WeightOption } from "@/types";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
+import {
+  CART_MAX_QTY,
+  isProductPurchasable,
+  maxPurchasableQty,
+} from "@/lib/product-availability";
 
 const defaultSite = site as SiteConfig;
 
 interface ShippingConfig {
   shippingCost: number;
 }
+
+type AddItemInput = Omit<CartItem, "quantity">;
 
 interface CartStore {
   items: CartItem[];
@@ -24,7 +31,7 @@ interface CartStore {
   setAppliedCouponCode: (code: string | null) => void;
   setAnnouncement: (message: string) => void;
   clearAnnouncement: () => void;
-  addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
+  addItem: (item: AddItemInput, quantity?: number) => boolean;
   removeItem: (productId: string, weightGrams: number) => void;
   updateQuantity: (
     productId: string,
@@ -39,6 +46,13 @@ interface CartStore {
   getItemCount: () => number;
   getShippingCost: () => number;
   getTotal: () => number;
+}
+
+function stockSnapshot(item: AddItemInput | CartItem) {
+  return {
+    inStock: item.inStock !== false,
+    stockQty: item.stockQty,
+  };
 }
 
 export const useCartStore = create<CartStore>()(
@@ -59,33 +73,66 @@ export const useCartStore = create<CartStore>()(
       clearAnnouncement: () => set({ announcement: "" }),
 
       addItem: (item, quantity = 1) => {
+        const stock = stockSnapshot(item);
+        if (!isProductPurchasable(stock) || item.inStock === false) {
+          set({
+            announcement: `محصول «${item.title}» ناموجود است و به سبد اضافه نشد`,
+          });
+          return false;
+        }
+
+        const maxQty = maxPurchasableQty(stock);
+        const existing = get().items.find(
+          (i) =>
+            i.productId === item.productId &&
+            i.weight.grams === item.weight.grams,
+        );
+        const currentQty = existing?.quantity ?? 0;
+        const nextQty = Math.min(currentQty + quantity, maxQty);
+
+        if (nextQty <= currentQty) {
+          set({
+            announcement:
+              maxQty <= 0
+                ? `محصول «${item.title}» ناموجود است`
+                : `موجودی «${item.title}» کافی نیست (حداکثر ${maxQty})`,
+          });
+          return false;
+        }
+
         set((state) => {
-          const existing = state.items.find(
-            (i) =>
-              i.productId === item.productId &&
-              i.weight.grams === item.weight.grams,
-          );
-          const announcement = existing
-            ? `تعداد ${item.title} در سبد به‌روزرسانی شد`
-            : `${item.title} به سبد خرید اضافه شد`;
           if (existing) {
             return {
               items: state.items.map((i) =>
                 i.productId === item.productId &&
                 i.weight.grams === item.weight.grams
-                  ? { ...i, quantity: i.quantity + quantity }
+                  ? {
+                      ...i,
+                      quantity: nextQty,
+                      inStock: true,
+                      stockQty: item.stockQty ?? i.stockQty,
+                    }
                   : i,
               ),
               isOpen: false,
-              announcement,
+              announcement: `تعداد ${item.title} در سبد به‌روزرسانی شد`,
             };
           }
           return {
-            items: [...state.items, { ...item, quantity }],
+            items: [
+              ...state.items,
+              {
+                ...item,
+                quantity: nextQty,
+                inStock: true,
+                stockQty: item.stockQty,
+              },
+            ],
             isOpen: false,
-            announcement,
+            announcement: `${item.title} به سبد خرید اضافه شد`,
           };
         });
+        return true;
       },
 
       removeItem: (productId, weightGrams) => {
@@ -104,13 +151,54 @@ export const useCartStore = create<CartStore>()(
           get().removeItem(productId, weightGrams);
           return;
         }
-        set((state) => ({
-          items: state.items.map((i) =>
-            i.productId === productId && i.weight.grams === weightGrams
-              ? { ...i, quantity }
-              : i,
-          ),
-        }));
+        set((state) => {
+          const target = state.items.find(
+            (i) =>
+              i.productId === productId && i.weight.grams === weightGrams,
+          );
+          if (!target) return state;
+
+          if (target.inStock === false) {
+            return {
+              announcement: `محصول «${target.title}» ناموجود است`,
+            };
+          }
+
+          const maxQty = maxPurchasableQty({
+            inStock: true,
+            stockQty: target.stockQty,
+          });
+
+          if (maxQty <= 0 && typeof target.stockQty === "number") {
+            return {
+              announcement: `محصول «${target.title}» ناموجود است`,
+            };
+          }
+
+          const capped = Math.min(
+            quantity,
+            typeof target.stockQty === "number" ? maxQty : CART_MAX_QTY,
+          );
+
+          if (capped < quantity) {
+            return {
+              items: state.items.map((i) =>
+                i.productId === productId && i.weight.grams === weightGrams
+                  ? { ...i, quantity: capped }
+                  : i,
+              ),
+              announcement: `موجودی «${target.title}» کافی نیست (حداکثر ${capped})`,
+            };
+          }
+
+          return {
+            items: state.items.map((i) =>
+              i.productId === productId && i.weight.grams === weightGrams
+                ? { ...i, quantity: capped }
+                : i,
+            ),
+          };
+        });
       },
 
       clearCart: () => set({ items: [], appliedCouponCode: null }),

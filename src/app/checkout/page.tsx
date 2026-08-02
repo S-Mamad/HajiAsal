@@ -43,7 +43,10 @@ function CheckoutPageInner() {
   const [couponCode, setCouponCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(
+    null,
+  );
+  const [snappayAccepted, setSnappayAccepted] = useState(false);
   const [shippingMethod, setShippingMethod] =
     useState<ShippingMethod>("standard");
   const [prefilled, setPrefilled] = useState(false);
@@ -226,6 +229,15 @@ function CheckoutPageInner() {
   };
 
   const onSubmit = async (data: CheckoutSchemaType) => {
+    if (!paymentMethod) {
+      setError("لطفاً روش پرداخت خود را انتخاب کنید.");
+      return;
+    }
+    if (paymentMethod === "snappay" && !snappayAccepted) {
+      setError("برای خرید اقساطی باید قوانین اسنپ‌پی را بپذیرید.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -259,7 +271,6 @@ function CheckoutPageInner() {
         });
         const pay = await payRes.json();
         if (payRes.ok && pay.redirectUrl) {
-          // Keep cart until success page (Zarinpal cancel/fail must restore UX)
           window.location.href = pay.redirectUrl as string;
           return;
         }
@@ -267,6 +278,24 @@ function CheckoutPageInner() {
         throw new Error(
           pay.message ||
             "انتقال به درگاه پرداخت ممکن نشد. روش دیگری انتخاب کنید.",
+        );
+      }
+
+      if (paymentMethod === "snappay" && result.orderId) {
+        const payRes = await fetch("/api/checkout/snappay/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: result.orderId }),
+        });
+        const pay = await payRes.json();
+        if (payRes.ok && pay.redirectUrl) {
+          window.location.href = pay.redirectUrl as string;
+          return;
+        }
+        setPendingOrderId(result.orderId as string);
+        throw new Error(
+          pay.message ||
+            "انتقال به درگاه اسنپ‌پی ممکن نشد. روش دیگری انتخاب کنید.",
         );
       }
 
@@ -284,11 +313,15 @@ function CheckoutPageInner() {
   };
 
   const resumeOnlinePayment = async () => {
-    if (!pendingOrderId) return;
+    if (!pendingOrderId || !paymentMethod) return;
     setIsSubmitting(true);
     setError(null);
     try {
-      const payRes = await fetch("/api/checkout/create", {
+      const endpoint =
+        paymentMethod === "snappay"
+          ? "/api/checkout/snappay/create"
+          : "/api/checkout/create";
+      const payRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: pendingOrderId }),
@@ -399,7 +432,7 @@ function CheckoutPageInner() {
             />
             <Input
               label="شماره موبایل"
-              placeholder="09123456789"
+              placeholder="09967891973"
               dir="ltr"
               {...register("phone")}
               error={errors.phone?.message}
@@ -469,7 +502,13 @@ function CheckoutPageInner() {
 
             <PaymentMethodSelector
               value={paymentMethod}
-              onChange={setPaymentMethod}
+              onChange={(method) => {
+                setPaymentMethod(method);
+                if (method !== "snappay") setSnappayAccepted(false);
+              }}
+              cashTotal={total}
+              snappayAccepted={snappayAccepted}
+              onSnappayAcceptedChange={setSnappayAccepted}
             />
 
             <CartItemRow />
@@ -494,7 +533,8 @@ function CheckoutPageInner() {
             ) : null}
             <CartSummary shippingOverride={shipping} discount={discount} />
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
-            {pendingOrderId && paymentMethod === "online" ? (
+            {pendingOrderId &&
+            (paymentMethod === "online" || paymentMethod === "snappay") ? (
               <Button
                 type="button"
                 variant="outline"
@@ -523,12 +563,22 @@ function CheckoutPageInner() {
               بعدی
             </Button>
           ) : (
-            <Button type="submit" disabled={isSubmitting} className="flex-1">
+            <Button
+              type="submit"
+              disabled={
+                isSubmitting ||
+                !paymentMethod ||
+                (paymentMethod === "snappay" && !snappayAccepted)
+              }
+              className="flex-1"
+            >
               {isSubmitting
                 ? "در حال پردازش..."
-                : paymentMethod === "online"
-                  ? "پرداخت آنلاین"
-                  : "ثبت سفارش"}
+                : paymentMethod === "snappay"
+                  ? "پرداخت اقساطی اسنپ‌پی"
+                  : paymentMethod === "online"
+                    ? "پرداخت آنلاین"
+                    : "انتخاب روش پرداخت"}
             </Button>
           )}
         </div>

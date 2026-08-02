@@ -3,29 +3,30 @@ import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { getOrderById, updateOrderStatus } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
+import {
+  createSnappayPayment,
+  isSnappayConfigured,
+} from "@/lib/server/snappay";
 
 const createSchema = z.object({
   orderId: z.string().min(1),
-  description: z.string().optional(),
 });
 
 export async function POST(request: Request) {
   const session = getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json(
-      { success: false, message: "برای پرداخت آنلاین باید وارد شوید" },
+      { success: false, message: "برای پرداخت باید وارد شوید" },
       { status: 401 },
     );
   }
 
-  const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-  if (!merchantId || merchantId === "your_merchant_id") {
+  if (!isSnappayConfigured()) {
     return NextResponse.json(
       {
         success: false,
         available: false,
-        message:
-          "درگاه زرین‌پال پیکربندی نشده است. از روش پرداخت دیگری استفاده کنید.",
+        message: "درگاه اسنپ‌پی پیکربندی نشده است.",
       },
       { status: 503 },
     );
@@ -60,6 +61,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (order.paymentMethod !== "snappay") {
+      return NextResponse.json(
+        { success: false, message: "این سفارش برای اسنپ‌پی نیست" },
+        { status: 400 },
+      );
+    }
+
     if (order.status === "cancelled") {
       return NextResponse.json(
         { success: false, message: "این سفارش لغو شده است" },
@@ -71,57 +79,51 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: "این سفارش برای پرداخت آنلاین در دسترس نیست",
+          message: "این سفارش برای پرداخت اقساطی در دسترس نیست",
         },
         { status: 400 },
       );
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    const callbackUrl = `${siteUrl}/api/checkout/verify?orderId=${encodeURIComponent(order.id)}`;
+    const returnURL = `${siteUrl}/api/checkout/snappay/verify?orderId=${encodeURIComponent(order.id)}`;
     const amountRial = Math.round(order.total * 10);
 
-    const zarinRes = await fetch(
-      "https://api.zarinpal.com/pg/v4/payment/request.json",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchant_id: merchantId,
-          amount: amountRial,
-          callback_url: callbackUrl,
-          description: parsed.data.description ?? `سفارش ${order.id}`,
-          metadata: { order_id: order.id, mobile: session.phone },
-        }),
-      },
-    );
+    const cartList = order.items.map((item, index) => ({
+      id: index + 1,
+      name: item.title.slice(0, 100),
+      count: item.quantity,
+      amount: Math.round(item.weight.price * item.quantity * 10),
+      category: "GROCERY",
+      commissionType: 100,
+    }));
 
-    const zarinData = await zarinRes.json();
-    const authority = zarinData.data?.authority;
-
-    if (zarinData.data?.code !== 100 || !authority) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: zarinData.errors?.message ?? "خطا در اتصال به زرین‌پال",
-        },
-        { status: 502 },
-      );
-    }
+    const payment = await createSnappayPayment({
+      amountRial,
+      cartList,
+      returnURL,
+      transactionId: order.id,
+      mobile: session.phone,
+    });
 
     await updateOrderStatus(order.id, "pending_payment");
 
     return NextResponse.json({
       success: true,
       available: true,
-      authority,
-      redirectUrl: `https://www.zarinpal.com/pg/StartPay/${authority}`,
-      callbackUrl,
+      paymentToken: payment.paymentToken,
+      redirectUrl: payment.paymentPageUrl,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, message: "خطا در ایجاد درخواست پرداخت" },
-      { status: 500 },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "خطا در اتصال به درگاه اسنپ‌پی",
+      },
+      { status: 502 },
     );
   }
 }

@@ -29,7 +29,7 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
-export type PaymentMethod = "cod" | "card_to_card" | "online";
+export type PaymentMethod = "online" | "snappay";
 
 export interface StoredOrder {
   id: string;
@@ -68,7 +68,7 @@ function mapRowToOrder(row: Record<string, unknown>): StoredOrder {
   return {
     id: row.id as string,
     status: row.status as OrderStatus,
-    paymentMethod: (row.payment_method as PaymentMethod) ?? "cod",
+    paymentMethod: (row.payment_method as PaymentMethod) ?? "online",
     customer: parseJsonField<CheckoutFormData>(row.customer, {} as CheckoutFormData),
     items: parseJsonField<CartItem[]>(row.items, []),
     subtotal: row.subtotal as number,
@@ -97,20 +97,25 @@ export async function createOrder(input: {
   paymentMethod?: PaymentMethod;
   shippingMethod?: string;
   userId?: string;
+  /** When set (e.g. SnappPay +10%), overrides computed cash total */
+  totalOverride?: number;
 }): Promise<StoredOrder> {
   const discount = Math.max(0, input.discount ?? 0);
   const now = new Date().toISOString();
-  const paymentMethod = input.paymentMethod ?? "cod";
+  const paymentMethod = input.paymentMethod ?? "online";
   const order: StoredOrder = {
     id: generateOrderId(),
-    status: paymentMethod === "cod" ? "confirmed" : "pending_payment",
+    status: "pending_payment",
     paymentMethod,
     customer: input.customer,
     items: input.items,
     subtotal: input.subtotal,
     shipping: input.shipping,
     discount,
-    total: computeOrderTotal(input.subtotal, input.shipping, discount),
+    total:
+      typeof input.totalOverride === "number"
+        ? Math.round(input.totalOverride)
+        : computeOrderTotal(input.subtotal, input.shipping, discount),
     couponCode: input.couponCode,
     shippingMethod: input.shippingMethod,
     createdAt: now,
@@ -214,10 +219,17 @@ export async function getOrderByPhoneAndTracking(
 
 export async function getAllOrders(): Promise<StoredOrder[]> {
   if (isMysqlConfigured()) {
-    const rows = await mysqlQuery<RowDataPacket>(
-      "SELECT * FROM orders ORDER BY created_at DESC",
-    );
-    return rows.map(mapRowToOrder);
+    try {
+      const rows = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM orders ORDER BY created_at DESC",
+      );
+      return rows.map(mapRowToOrder);
+    } catch (error) {
+      console.error(
+        "[orders] getAllOrders mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   if (canUseFilesystemPersistence()) {
     return readJsonFile<StoredOrder[]>(ORDERS_FILE, []);

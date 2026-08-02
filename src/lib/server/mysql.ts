@@ -8,12 +8,69 @@ import { randomUUID } from "crypto";
 
 let pool: Pool | null = null;
 
+/** After connection failures, skip MySQL briefly so auth can use local fallback. */
+let mysqlCircuitOpenUntil = 0;
+const CIRCUIT_COOLDOWN_MS = Number(
+  process.env.MYSQL_CIRCUIT_COOLDOWN_MS || 30_000,
+);
+
 export function isMysqlConfigured(): boolean {
   return Boolean(
     process.env.MYSQL_HOST &&
       process.env.MYSQL_USER &&
       process.env.MYSQL_DATABASE,
   );
+}
+
+/** Configured AND not in open circuit (recent hard failure). */
+export function isMysqlUsable(): boolean {
+  return isMysqlConfigured() && Date.now() >= mysqlCircuitOpenUntil;
+}
+
+function openMysqlCircuit(error: unknown): void {
+  mysqlCircuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(
+    `[mysql] circuit open for ${CIRCUIT_COOLDOWN_MS}ms:`,
+    message,
+  );
+}
+
+function isConnectionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; errno?: number };
+  return (
+    err.code === "ECONNREFUSED" ||
+    err.code === "ETIMEDOUT" ||
+    err.code === "ENOTFOUND" ||
+    err.code === "ECONNRESET" ||
+    err.code === "PROTOCOL_CONNECTION_LOST" ||
+    err.code === "ER_ACCESS_DENIED_ERROR" ||
+    err.errno === -4078
+  );
+}
+
+async function withMysqlCircuit<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
+  if (!isMysqlUsable()) {
+    throw new Error("MySQL temporarily unavailable");
+  }
+  const p = getMysqlPool();
+  if (!p) throw new Error("MySQL is not configured");
+  try {
+    return await fn(p);
+  } catch (error) {
+    if (isConnectionError(error)) {
+      openMysqlCircuit(error);
+      // Drop broken pool so the next successful window recreates connections.
+      try {
+        await p.end();
+      } catch {
+        /* ignore */
+      }
+      pool = null;
+    }
+    throw error;
+  }
 }
 
 /** @deprecated use isMysqlConfigured — kept so old call sites compile during migration */
@@ -31,8 +88,11 @@ export function getMysqlPool(): Pool | null {
       password: process.env.MYSQL_PASSWORD ?? "",
       database: process.env.MYSQL_DATABASE!,
       waitForConnections: true,
-      connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 10),
-      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 3000),
+      connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 5),
+      queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 10),
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 2000),
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
       timezone: "Z",
       dateStrings: false,
       charset: "utf8mb4",
@@ -84,10 +144,10 @@ export async function mysqlQuery<T extends RowDataPacket>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const p = getMysqlPool();
-  if (!p) throw new Error("MySQL is not configured");
-  const [rows] = await p.query<T[]>(sql, params as never[]);
-  return rows;
+  return withMysqlCircuit(async (p) => {
+    const [rows] = await p.query<T[]>(sql, params as never[]);
+    return rows;
+  });
 }
 
 export async function mysqlQueryOne<T extends RowDataPacket>(
@@ -102,29 +162,29 @@ export async function mysqlExecute(
   sql: string,
   params: unknown[] = [],
 ): Promise<ResultSetHeader> {
-  const p = getMysqlPool();
-  if (!p) throw new Error("MySQL is not configured");
-  const [result] = await p.execute<ResultSetHeader>(sql, params as never[]);
-  return result;
+  return withMysqlCircuit(async (p) => {
+    const [result] = await p.execute<ResultSetHeader>(sql, params as never[]);
+    return result;
+  });
 }
 
 export async function withMysqlTransaction<T>(
   fn: (conn: PoolConnection) => Promise<T>,
 ): Promise<T> {
-  const p = getMysqlPool();
-  if (!p) throw new Error("MySQL is not configured");
-  const conn = await p.getConnection();
-  try {
-    await conn.beginTransaction();
-    const out = await fn(conn);
-    await conn.commit();
-    return out;
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
+  return withMysqlCircuit(async (p) => {
+    const conn = await p.getConnection();
+    try {
+      await conn.beginTransaction();
+      const out = await fn(conn);
+      await conn.commit();
+      return out;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  });
 }
 
 export function isDuplicateKeyError(err: unknown): boolean {

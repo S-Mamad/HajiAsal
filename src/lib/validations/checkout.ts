@@ -43,7 +43,7 @@ export const checkoutApiSchema = z.object({
   subtotal: z.number().min(0),
   shipping: z.number().min(0),
   total: z.number().min(0),
-  paymentMethod: z.enum(["cod", "card_to_card", "online"]).optional(),
+  paymentMethod: z.enum(["online", "snappay"]),
   shippingMethod: z.string().optional(),
 });
 

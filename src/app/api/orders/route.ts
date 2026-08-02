@@ -13,6 +13,16 @@ import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
 import { getProductByIdAsync } from "@/lib/server/products-store";
+import {
+  applySnappayFee,
+  isSnappayConfigured,
+} from "@/lib/server/snappay";
+import type { PaymentMethod } from "@/lib/server/orders";
+
+function isZarinpalConfigured(): boolean {
+  const merchantId = process.env.ZARINPAL_MERCHANT_ID;
+  return Boolean(merchantId && merchantId !== "your_merchant_id");
+}
 
 export async function POST(request: Request) {
   try {
@@ -87,12 +97,24 @@ export async function POST(request: Request) {
 
     const extra = body as {
       couponCode?: string;
-      paymentMethod?: "cod" | "card_to_card" | "online";
       shippingMethod?: string;
     };
     const couponCode = extra.couponCode;
-    const paymentMethod = extra.paymentMethod ?? "cod";
+    const paymentMethod = parsed.data.paymentMethod as PaymentMethod;
     const shippingMethod = extra.shippingMethod ?? "standard";
+
+    if (paymentMethod === "online" && !isZarinpalConfigured()) {
+      return NextResponse.json(
+        { success: false, message: "درگاه زرین‌پال در دسترس نیست" },
+        { status: 400 },
+      );
+    }
+    if (paymentMethod === "snappay" && !isSnappayConfigured()) {
+      return NextResponse.json(
+        { success: false, message: "درگاه اسنپ‌پی در دسترس نیست" },
+        { status: 400 },
+      );
+    }
 
     const subtotal = rebuilt.subtotal;
     const shipping = await calcShippingCost(shippingMethod, subtotal);
@@ -119,7 +141,9 @@ export async function POST(request: Request) {
       appliedCouponSellerId = couponResult.coupon?.sellerId;
     }
 
-    const total = computeOrderTotal(subtotal, shipping, discount);
+    const cashTotal = computeOrderTotal(subtotal, shipping, discount);
+    const total =
+      paymentMethod === "snappay" ? applySnappayFee(cashTotal) : cashTotal;
 
     const order = await createOrder({
       customer: { ...customer, phone: customerPhone },
@@ -131,6 +155,7 @@ export async function POST(request: Request) {
       paymentMethod,
       shippingMethod,
       userId: session?.userId,
+      totalOverride: total,
     });
 
     if (appliedCouponSellerId && couponCode) {
@@ -144,11 +169,9 @@ export async function POST(request: Request) {
       status: order.status,
       total: order.total,
       message:
-        paymentMethod === "cod"
-          ? "سفارش ثبت شد. پرداخت هنگام تحویل انجام می‌شود."
-          : paymentMethod === "online"
-            ? "سفارش ثبت شد. در حال انتقال به درگاه پرداخت..."
-            : "سفارش ثبت شد. اطلاعات کارت‌به‌کارت برای شما ارسال می‌شود.",
+        paymentMethod === "snappay"
+          ? "سفارش ثبت شد. در حال انتقال به درگاه اسنپ‌پی..."
+          : "سفارش ثبت شد. در حال انتقال به درگاه پرداخت...",
     });
   } catch {
     return NextResponse.json(

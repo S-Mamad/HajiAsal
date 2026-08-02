@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Phone, Envelope, InstagramLogo } from "@phosphor-icons/react";
+import { Phone, Envelope } from "@phosphor-icons/react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { SocialFollowSection } from "@/components/social/SocialFollowSection";
 import { hajiasalPath } from "@/lib/paths";
 
 const footerLinks = [
@@ -102,18 +103,13 @@ export function Footer() {
           <p className="text-center text-[12px] leading-relaxed text-dim">
             {siteData.footer.address}
           </p>
-          {siteData.social?.instagram ? (
-            <a
-              href={siteData.social.instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 transition-colors active:text-gold"
-            >
-              <InstagramLogo size={14} weight="light" className="text-gold/80" />
-              اینستاگرام
-            </a>
-          ) : null}
         </div>
+
+        <SocialFollowSection
+          social={siteData.social}
+          compact
+          className="mt-8"
+        />
 
         <div className="mt-8 flex justify-center">
           <EnamadSeal />
@@ -193,6 +189,11 @@ export function Footer() {
                 {siteData.footer.address}
               </li>
             </ul>
+            <SocialFollowSection
+              social={siteData.social}
+              compact
+              className="mt-6"
+            />
             <div className="mt-6">
               <EnamadSeal />
             </div>

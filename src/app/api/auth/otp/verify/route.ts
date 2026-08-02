@@ -10,6 +10,7 @@ import {
   createSessionToken,
   sessionCookieOptions,
 } from "@/lib/auth/session";
+import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
     });
 
     const cookie = sessionCookieOptions(token);
+    await clearAllAuthSessions(request, response);
     response.cookies.set(cookie.name, cookie.value, {
       httpOnly: cookie.httpOnly,
       secure: cookie.secure,
