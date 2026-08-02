@@ -51,6 +51,7 @@ export async function createAdminSession(meta?: {
     adminUserId: meta?.adminUserId ?? null,
   };
 
+  let mysqlOk = false;
   if (isMysqlConfigured()) {
     try {
       await mysqlExecute(
@@ -66,7 +67,7 @@ export async function createAdminSession(meta?: {
           meta?.adminUserId ?? null,
         ],
       );
-      return { sessionId, token };
+      mysqlOk = true;
     } catch (error) {
       // Fallback if admin_user_id column not migrated yet
       try {
@@ -82,7 +83,7 @@ export async function createAdminSession(meta?: {
             meta?.userAgent ?? null,
           ],
         );
-        return { sessionId, token };
+        mysqlOk = true;
       } catch (inner) {
         console.error(
           "[admin-sessions] mysql insert failed, falling back:",
@@ -93,16 +94,29 @@ export async function createAdminSession(meta?: {
     }
   }
 
+  // Dual-write: always mirror to FS/memory so sessions survive MySQL outages.
   if (canUseFilesystemPersistence()) {
-    const sessions = await readJsonFile<AdminSession[]>(SESSIONS_FILE, []);
-    sessions.push(session);
-    await writeJsonFile(SESSIONS_FILE, sessions);
-    return { sessionId, token };
+    try {
+      const sessions = await readJsonFile<AdminSession[]>(SESSIONS_FILE, []);
+      sessions.push(session);
+      await writeJsonFile(SESSIONS_FILE, sessions);
+    } catch (error) {
+      console.error(
+        "[admin-sessions] fs dual-write failed:",
+        error instanceof Error ? error.message : error,
+      );
+      if (!mysqlOk) {
+        const mem = memoryGetAdminSessions();
+        mem.push(session);
+        memorySetAdminSessions(mem);
+      }
+    }
+  } else {
+    const mem = memoryGetAdminSessions();
+    mem.push(session);
+    memorySetAdminSessions(mem);
   }
 
-  const mem = memoryGetAdminSessions();
-  mem.push(session);
-  memorySetAdminSessions(mem);
   return { sessionId, token };
 }
 

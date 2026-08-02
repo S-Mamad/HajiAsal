@@ -27,10 +27,17 @@ function mapRow(row: Record<string, unknown>): CategoryRecord {
 
 export async function getAllCategoriesAsync(): Promise<CategoryRecord[]> {
   if (isMysqlConfigured()) {
-    const rows = await mysqlQuery<RowDataPacket>(
-      "SELECT * FROM categories ORDER BY sort_order ASC",
-    );
-    if (rows.length) return rows.map(mapRow);
+    try {
+      const rows = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM categories ORDER BY sort_order ASC",
+      );
+      if (rows.length) return rows.map(mapRow);
+    } catch (error) {
+      console.error(
+        "[categories] getAllCategoriesAsync mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   return siteCategories.map((c, i) => ({
@@ -69,11 +76,15 @@ export async function upsertCategoryAsync(
     return null;
   }
 
-  const row = await mysqlQueryOne<RowDataPacket>(
-    "SELECT * FROM categories WHERE id = ? LIMIT 1",
-    [category.id],
-  );
-  return row ? mapRow(row) : null;
+  try {
+    const row = await mysqlQueryOne<RowDataPacket>(
+      "SELECT * FROM categories WHERE id = ? LIMIT 1",
+      [category.id],
+    );
+    return row ? mapRow(row) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteCategoryAsync(id: string): Promise<boolean> {

@@ -15,6 +15,11 @@ interface LoginAttempt {
 
 const memoryAttempts = new Map<string, number[]>();
 
+/** @internal test helper */
+export function __resetAdminRateLimitForTests(): void {
+  memoryAttempts.clear();
+}
+
 export async function checkAdminLoginRateLimit(
   ipAddress: string,
 ): Promise<{ allowed: boolean; message?: string }> {
@@ -56,31 +61,39 @@ export async function checkAdminLoginRateLimit(
   return { allowed: true };
 }
 
+function recordMemoryAttempt(ipAddress: string, success: boolean): void {
+  if (success) return;
+  const now = Date.now();
+  const times = (memoryAttempts.get(ipAddress) ?? []).filter(
+    (t) => now - t < WINDOW_MS,
+  );
+  memoryAttempts.set(ipAddress, [...times, now]);
+}
+
 export async function recordAdminLoginAttempt(
   ipAddress: string,
   success: boolean,
 ): Promise<void> {
+  let mysqlOk = false;
   if (isMysqlConfigured()) {
     try {
       await mysqlExecute(
         "INSERT INTO admin_login_attempts (id, ip_address, success) VALUES (?, ?, ?)",
         [newId(), ipAddress, success],
       );
+      mysqlOk = true;
     } catch (error) {
       console.error(
         "[admin-rate-limit] record failed:",
         error instanceof Error ? error.message : error,
       );
     }
-    return;
   }
 
-  if (!success) {
-    const now = Date.now();
-    const times = (memoryAttempts.get(ipAddress) ?? []).filter(
-      (t) => now - t < WINDOW_MS,
-    );
-    memoryAttempts.set(ipAddress, [...times, now]);
+  // Always keep in-memory counters when MySQL is unavailable or failed,
+  // so rate limits still work during DB outages.
+  if (!mysqlOk) {
+    recordMemoryAttempt(ipAddress, success);
   }
 
   // Never let audit logging break login (append throws without filesystem in prod).

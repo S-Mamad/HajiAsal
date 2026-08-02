@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import {
   createAdminSession,
@@ -12,22 +12,14 @@ import {
 
 export const ADMIN_COOKIE = "hajiasal_admin_session";
 
-function hashPassword(password: string): string {
-  return createHash("sha256").update(password).digest("hex");
-}
-
 export function verifyAdminPassword(input: string): boolean {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) return false;
-
-  const inputHash = hashPassword(input);
-  const expectedHash = hashPassword(password);
-
+  const a = Buffer.from(input);
+  const b = Buffer.from(password);
+  if (a.length !== b.length) return false;
   try {
-    return timingSafeEqual(
-      Buffer.from(inputHash, "hex"),
-      Buffer.from(expectedHash, "hex"),
-    );
+    return timingSafeEqual(a, b);
   } catch {
     return false;
   }

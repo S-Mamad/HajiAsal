@@ -248,6 +248,26 @@ html {
   --panel-ring: 0 0 0 2px rgba(180, 83, 9, 0.18);
   --panel-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Lock storefront tokens to light so shared Input/Button stay readable */
+  --void: #f4f4f5;
+  --surface: #ffffff;
+  --surface-elevated: #fafafa;
+  --surface-muted: #f4f4f5;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-dim: #71717a;
+  --gold: #b45309;
+  --gold-bright: #c2410c;
+  --gold-dim: rgba(180, 83, 9, 0.12);
+  --gold-glow: rgba(180, 83, 9, 0.22);
+  --success: #059669;
+  --border: rgba(24, 24, 27, 0.12);
+  --border-bright: rgba(24, 24, 27, 0.2);
+  --header-bg: rgba(255, 255, 255, 0.95);
+  --overlay-scrim: rgba(24, 24, 27, 0.45);
+  --star-empty: rgba(24, 24, 27, 0.22);
+  --ink-on-gold: #fffbeb;
+
   isolation: isolate;
   background: var(--panel-bg);
   color: var(--panel-text);

@@ -16,8 +16,9 @@ type BadgeMap = Partial<Record<"tickets" | "messages" | "qa", number>>;
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, user, loading } = useAdminAuth();
-  const groups = filterNavForRole(role ?? "super_admin");
+  const { role, user, loading, legacy } = useAdminAuth();
+  const effectiveRole = legacy ? "super_admin" : role;
+  const groups = loading || !effectiveRole ? [] : filterNavForRole(effectiveRole);
   const [badges, setBadges] = useState<BadgeMap>({});
 
   useEffect(() => {
@@ -58,8 +59,8 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
     : null;
 
   return (
-    <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-e border-[var(--panel-sidebar-border)] bg-[var(--panel-sidebar)] text-zinc-100 pb-[env(safe-area-inset-bottom)]">
-      <div className="border-b border-[var(--panel-sidebar-border)] px-4 py-4">
+    <aside className="flex h-[100dvh] w-[15.5rem] shrink-0 flex-col border-e border-[var(--panel-sidebar-border)] bg-[var(--panel-sidebar)] text-zinc-100 pb-[env(safe-area-inset-bottom)]">
+      <div className="shrink-0 border-b border-[var(--panel-sidebar-border)] px-4 py-4">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-[var(--panel-radius-sm)] bg-[var(--panel-accent)] text-xs font-bold text-white">
             حا
@@ -85,47 +86,58 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
         ) : null}
       </div>
 
-      <nav className="panel-scrollbar flex-1 overflow-y-auto px-2.5 py-3">
-        {groups.map((group) => (
-          <div key={group.id} className="mb-3">
-            <p className="mb-1 px-2.5 text-[10px] font-medium text-zinc-600">
-              {group.label}
-            </p>
-            <ul className="flex flex-col gap-0.5">
-              {group.items.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (item.href !== hajiasalPath("/") &&
-                    pathname.startsWith(`${item.href}/`));
-                const badge =
-                  item.badgeKey && badges[item.badgeKey]
-                    ? badges[item.badgeKey]
-                    : 0;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={onNavigate}
-                      data-active={active}
-                      className="panel-nav-item"
-                    >
-                      <Icon icon={item.icon} size={17} className="shrink-0 opacity-90" />
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {badge && badge > 0 ? (
-                        <span className="rounded-md bg-rose-600/90 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">
-                          {badge > 99 ? "99+" : badge}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+      <nav className="panel-scrollbar min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
+        {loading || !effectiveRole ? (
+          <div className="space-y-2 px-1" aria-hidden>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-9 animate-pulse rounded-[var(--panel-radius-sm)] bg-white/5"
+              />
+            ))}
           </div>
-        ))}
+        ) : (
+          groups.map((group) => (
+            <div key={group.id} className="mb-3">
+              <p className="mb-1 px-2.5 text-[10px] font-medium text-zinc-400">
+                {group.label}
+              </p>
+              <ul className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    (item.href !== hajiasalPath("/") &&
+                      pathname.startsWith(`${item.href}/`));
+                  const badge =
+                    item.badgeKey && badges[item.badgeKey]
+                      ? badges[item.badgeKey]
+                      : 0;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        data-active={active}
+                        className="panel-nav-item"
+                      >
+                        <Icon icon={item.icon} size={17} className="shrink-0 opacity-90" />
+                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                        {badge && badge > 0 ? (
+                          <span className="rounded-md bg-rose-600/90 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">
+                            {badge > 99 ? "99+" : badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))
+        )}
       </nav>
 
-      <div className="border-t border-[var(--panel-sidebar-border)] p-2.5">
+      <div className="shrink-0 border-t border-[var(--panel-sidebar-border)] p-2.5">
         <button
           type="button"
           onClick={() => void handleLogout()}

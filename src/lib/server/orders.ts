@@ -165,11 +165,18 @@ export async function createOrder(input: {
 
 export async function getOrderById(orderId: string): Promise<StoredOrder | null> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM orders WHERE id = ? LIMIT 1",
-      [orderId],
-    );
-    return row ? mapRowToOrder(row) : null;
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM orders WHERE id = ? LIMIT 1",
+        [orderId],
+      );
+      if (row) return mapRowToOrder(row);
+    } catch (error) {
+      console.error(
+        "[orders] getOrderById mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   if (canUseFilesystemPersistence()) {
@@ -184,11 +191,18 @@ export async function getOrderByTracking(
   trackingCode: string,
 ): Promise<StoredOrder | null> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM orders WHERE tracking_code = ? LIMIT 1",
-      [trackingCode.toUpperCase()],
-    );
-    return row ? mapRowToOrder(row) : null;
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM orders WHERE tracking_code = ? LIMIT 1",
+        [trackingCode.toUpperCase()],
+      );
+      if (row) return mapRowToOrder(row);
+    } catch (error) {
+      console.error(
+        "[orders] getOrderByTracking mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   if (canUseFilesystemPersistence()) {

@@ -448,18 +448,25 @@ export async function getProductByIdAsync(
   options?: { allowHidden?: boolean },
 ): Promise<Product | undefined> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM products WHERE id = ? LIMIT 1",
-      [id],
-    );
-    if (row) {
-      const [mapped] = await applyLocalOverrides([mapRowToProduct(row)]);
-      if (!mapped) return undefined;
-      if (!options?.allowHidden) {
-        const activeSellerIds = await getActiveSellerIdsAsync();
-        if (!isPubliclyVisible(mapped, activeSellerIds)) return undefined;
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM products WHERE id = ? LIMIT 1",
+        [id],
+      );
+      if (row) {
+        const [mapped] = await applyLocalOverrides([mapRowToProduct(row)]);
+        if (!mapped) return undefined;
+        if (!options?.allowHidden) {
+          const activeSellerIds = await getActiveSellerIdsAsync();
+          if (!isPubliclyVisible(mapped, activeSellerIds)) return undefined;
+        }
+        return mapped;
       }
-      return mapped;
+    } catch (error) {
+      console.error(
+        "[products] getProductByIdAsync mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
     }
   }
   const local =

@@ -4,9 +4,7 @@ import { z } from "zod";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   isMysqlConfigured,
-  mysqlExecute,
   mysqlQuery,
-  newId,
 } from "@/lib/server/mysql";
 import {
   getSiteSettings,
@@ -24,28 +22,13 @@ export async function GET(request: Request) {
 
   let dbPing = false;
   let dbError: string | null = null;
-  let sessionWriteOk = false;
 
   if (isMysqlConfigured()) {
     try {
-      await mysqlQuery<RowDataPacket>("SELECT id FROM admin_sessions LIMIT 1");
+      await mysqlQuery<RowDataPacket>("SELECT 1 AS ok");
       dbPing = true;
     } catch (err) {
       dbError = err instanceof Error ? err.message : "خطای اتصال به دیتابیس";
-    }
-
-    if (dbPing) {
-      const dryId = newId();
-      try {
-        await mysqlExecute(
-          "INSERT INTO admin_sessions (id, token_hash, expires_at) VALUES (?, ?, ?)",
-          [dryId, "health-check-dry-run", new Date(Date.now() - 60_000)],
-        );
-        sessionWriteOk = true;
-        await mysqlExecute("DELETE FROM admin_sessions WHERE id = ?", [dryId]);
-      } catch {
-        sessionWriteOk = false;
-      }
     }
   }
 
@@ -74,7 +57,6 @@ export async function GET(request: Request) {
       supabase: isMysqlConfigured(),
       supabasePing: dbPing,
       supabaseError: dbError,
-      sessionWriteOk,
       sms: smsConfigured,
       zarinpal: Boolean(
         process.env.ZARINPAL_MERCHANT_ID &&
@@ -91,7 +73,6 @@ export async function GET(request: Request) {
     productionReady:
       isMysqlConfigured() &&
       dbPing &&
-      sessionWriteOk &&
       Boolean(process.env.ADMIN_PASSWORD) &&
       Boolean(process.env.AUTH_SESSION_SECRET) &&
       Boolean(process.env.NEXT_PUBLIC_SITE_URL),

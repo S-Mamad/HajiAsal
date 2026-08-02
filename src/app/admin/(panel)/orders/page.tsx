@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Funnel, MagnifyingGlass } from "@phosphor-icons/react";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { useAdminToast } from "@/components/admin/ui/AdminToast";
 import { Icon } from "@/components/ui/Icon";
 import type { OrderStatus } from "@/lib/server/orders";
 import { hajiasalPath } from "@/lib/paths";
@@ -32,6 +33,7 @@ const STATUS_OPTIONS: { value: OrderStatus | "all"; label: string }[] = [
 
 export default function AdminOrdersPage() {
   const router = useRouter();
+  const toast = useAdminToast();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,15 +91,18 @@ export default function AdminOrdersPage() {
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
       );
+      toast.success("وضعیت سفارش به‌روز شد");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در به‌روزرسانی");
+      const message = err instanceof Error ? err.message : "خطا در به‌روزرسانی";
+      setError(message);
+      toast.error(message);
     }
   };
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-zinc-500">
           {filteredOrders.length.toLocaleString("fa-IR")} سفارش
         </p>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -122,29 +127,29 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:p-4">
+      <div className="panel-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
         <label className="relative flex-1">
           <Icon
             icon={MagnifyingGlass}
             size={16}
-            className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute start-3 top-1/2 -tranzinc-y-1/2 text-zinc-400"
           />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="جستجو شناسه، نام یا تلفن..."
-            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pe-3 ps-9 text-sm outline-none focus:border-slate-400"
+            className="panel-input pe-3 ps-9"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <Icon icon={Funnel} size={16} className="shrink-0 text-slate-400" />
+        <label className="flex items-center gap-2 text-sm text-zinc-600">
+          <Icon icon={Funnel} size={16} className="shrink-0 text-zinc-400" />
           <select
             value={statusFilter}
             onChange={(e) =>
               setStatusFilter(e.target.value as OrderStatus | "all")
             }
-            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-400 sm:w-auto"
+            className="panel-input sm:w-auto"
             aria-label="فیلتر وضعیت"
           >
             {STATUS_OPTIONS.map((opt) => (
@@ -157,14 +162,21 @@ export default function AdminOrdersPage() {
       </div>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">در حال بارگذاری...</p> : null}
 
       {/* Mobile cards */}
       <ul className="space-y-3 md:hidden">
-        {filteredOrders.map((row) => (
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <li
+              key={i}
+              className="h-36 animate-pulse rounded-xl border border-zinc-200 bg-zinc-50"
+            />
+          ))
+        ) : (
+          filteredOrders.map((row) => (
           <li
             key={row.id}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <Link
@@ -174,17 +186,17 @@ export default function AdminOrdersPage() {
               >
                 {row.id}
               </Link>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-zinc-400">
                 {new Date(row.createdAt).toLocaleDateString("fa-IR")}
               </span>
             </div>
-            <p className="font-medium text-slate-900">{row.customer.fullName}</p>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="font-medium text-zinc-900">{row.customer.fullName}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">
               {row.customer.city}
-              <span className="mx-1.5 text-slate-300">·</span>
+              <span className="mx-1.5 text-zinc-300">·</span>
               <span dir="ltr">{row.customer.phone}</span>
             </p>
-            <p className="mt-2 text-sm font-semibold text-slate-800">
+            <p className="mt-2 text-sm font-semibold text-zinc-800">
               {row.total.toLocaleString("fa-IR")} تومان
             </p>
             <select
@@ -192,7 +204,7 @@ export default function AdminOrdersPage() {
               onChange={(e) =>
                 void updateStatus(row.id, e.target.value as OrderStatus)
               }
-              className="mt-3 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
+              className="mt-3 h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm"
               aria-label={`وضعیت سفارش ${row.id}`}
             >
               {STATUS_OPTIONS.filter((o) => o.value !== "all").map((opt) => (
@@ -222,9 +234,10 @@ export default function AdminOrdersPage() {
               </AdminButton>
             </div>
           </li>
-        ))}
+          ))
+        )}
         {!loading && filteredOrders.length === 0 ? (
-          <li className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">
+          <li className="rounded-xl border border-dashed border-zinc-200 py-10 text-center text-sm text-zinc-400">
             سفارشی یافت نشد
           </li>
         ) : null}
@@ -236,10 +249,15 @@ export default function AdminOrdersPage() {
           rowKey={(row) => row.id}
           emptyMessage="سفارشی یافت نشد"
           minWidth={720}
+          loading={loading}
+          error={error || null}
+          onRetry={() => void loadOrders()}
           columns={[
             {
               key: "id",
               header: "شناسه",
+              sortable: true,
+              getSortValue: (row) => row.id,
               render: (row) => (
                 <Link
                   href={hajiasalPath(`/admin/orders/${row.id}`)}
@@ -253,10 +271,12 @@ export default function AdminOrdersPage() {
             {
               key: "customer",
               header: "مشتری",
+              sortable: true,
+              getSortValue: (row) => row.customer.fullName,
               render: (row) => (
                 <div>
                   <p className="font-medium">{row.customer.fullName}</p>
-                  <p className="text-xs text-slate-400" dir="ltr">
+                  <p className="text-xs text-zinc-400" dir="ltr">
                     {row.customer.phone}
                   </p>
                 </div>
@@ -266,30 +286,38 @@ export default function AdminOrdersPage() {
               key: "city",
               header: "شهر",
               hideOnMobile: true,
+              getSortValue: (row) => row.customer.city,
+              sortable: true,
               render: (row) => row.customer.city,
             },
             {
               key: "total",
               header: "مبلغ",
+              sortable: true,
+              getSortValue: (row) => row.total,
               render: (row) => `${row.total.toLocaleString("fa-IR")} تومان`,
             },
             {
               key: "date",
               header: "تاریخ",
               hideOnMobile: true,
+              sortable: true,
+              getSortValue: (row) => new Date(row.createdAt).getTime(),
               render: (row) =>
                 new Date(row.createdAt).toLocaleDateString("fa-IR"),
             },
             {
               key: "status",
               header: "وضعیت",
+              sortable: true,
+              getSortValue: (row) => row.status,
               render: (row) => (
                 <select
                   value={row.status}
                   onChange={(e) =>
                     void updateStatus(row.id, e.target.value as OrderStatus)
                   }
-                  className="h-10 min-w-[9rem] rounded-lg border border-slate-200 bg-white px-2 text-sm"
+                  className="h-10 min-w-[9rem] rounded-lg border border-zinc-200 bg-white px-2 text-sm"
                   aria-label={`وضعیت سفارش ${row.id}`}
                 >
                   {STATUS_OPTIONS.filter((o) => o.value !== "all").map(

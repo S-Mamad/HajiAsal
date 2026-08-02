@@ -53,7 +53,7 @@ export function StatCard({
           <p className="text-xs text-[var(--panel-muted)] sm:text-[13px]">
             {label}
           </p>
-          <p className="mt-1.5 truncate text-xl font-semibold tracking-tight tabular-nums text-zinc-900 sm:text-2xl">
+          <p className="mt-1.5 text-xl font-semibold tracking-tight tabular-nums text-zinc-900 sm:text-2xl">
             {typeof value === "number" ? value.toLocaleString("fa-IR") : value}
           </p>
           {hint ? (

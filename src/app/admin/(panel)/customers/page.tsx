@@ -52,7 +52,7 @@ export default function AdminCustomersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-zinc-500">
           {filtered.length.toLocaleString("fa-IR")} مشتری
         </p>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -60,7 +60,7 @@ export default function AdminCustomersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="جستجو نام / موبایل"
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm sm:w-56"
+            className="panel-input sm:w-56"
           />
           <AdminButton
             type="button"
@@ -81,20 +81,24 @@ export default function AdminCustomersPage() {
       </div>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">در حال بارگذاری...</p> : null}
 
       <DataTable
         data={filtered}
         rowKey={(row) => row.id}
         emptyMessage="مشتری ثبت نشده است"
+        loading={loading}
+        error={error || null}
+        onRetry={() => void loadCustomers()}
         columns={[
           {
             key: "name",
             header: "نام",
+            sortable: true,
+            getSortValue: (row) => row.fullName ?? "",
             render: (row) => (
               <Link
                 href={hajiasalPath(`/admin/customers/${row.id}`)}
-                className="font-medium text-slate-900 hover:underline"
+                className="font-medium text-zinc-900 hover:underline"
               >
                 {row.fullName ?? "بدون نام"}
               </Link>
@@ -112,17 +116,23 @@ export default function AdminCustomersPage() {
           {
             key: "orders",
             header: "سفارش‌ها",
+            sortable: true,
+            getSortValue: (row) => row.orderCount,
             render: (row) => row.orderCount.toLocaleString("fa-IR"),
           },
           {
             key: "spent",
             header: "مجموع خرید",
+            sortable: true,
+            getSortValue: (row) => row.totalSpent,
             render: (row) =>
               `${row.totalSpent.toLocaleString("fa-IR")} تومان`,
           },
           {
             key: "joined",
             header: "عضویت",
+            sortable: true,
+            getSortValue: (row) => new Date(row.createdAt).getTime(),
             render: (row) =>
               new Date(row.createdAt).toLocaleDateString("fa-IR"),
           },

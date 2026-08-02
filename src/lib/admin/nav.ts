@@ -246,3 +246,40 @@ export function filterNavForRole(role: AdminRole | string | null | undefined) {
     items: group.items.filter((item) => can(role, item.permission)),
   })).filter((group) => group.items.length > 0);
 }
+
+/** Longest matching nav href for a panel pathname (excludes storefront `/`). */
+export function findNavItemForPath(pathname: string): AdminNavItem | null {
+  const storefront = hajiasalPath("/");
+  const candidates = ADMIN_NAV_GROUPS.flatMap((g) => g.items).filter(
+    (item) => item.href !== storefront,
+  );
+  let best: AdminNavItem | null = null;
+  for (const item of candidates) {
+    if (
+      pathname === item.href ||
+      pathname.startsWith(`${item.href}/`)
+    ) {
+      if (!best || item.href.length > best.href.length) {
+        best = item;
+      }
+    }
+  }
+  return best;
+}
+
+export function firstAllowedAdminPath(
+  role: AdminRole | string | null | undefined,
+): string {
+  const groups = filterNavForRole(role);
+  const first = groups[0]?.items[0];
+  return first?.href ?? hajiasalPath("/admin/dashboard");
+}
+
+export function canAccessAdminPath(
+  role: AdminRole | string | null | undefined,
+  pathname: string,
+): boolean {
+  const item = findNavItemForPath(pathname);
+  if (!item) return true; // unknown panel path: let API gate handle it
+  return can(role, item.permission);
+}

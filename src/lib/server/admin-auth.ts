@@ -1,4 +1,10 @@
-import { createHash, randomUUID, timingSafeEqual } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  scryptSync,
+  timingSafeEqual,
+} from "crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   can,
@@ -16,6 +22,8 @@ import { readJsonFile, writeJsonFile } from "./db";
 import { canUseFilesystemPersistence } from "./production";
 
 const USERS_FILE = "admin-users.json";
+const SCRYPT_PREFIX = "scrypt$";
+const SCRYPT_KEYLEN = 64;
 
 export interface AdminUser {
   id: string;
@@ -38,21 +46,71 @@ export interface AdminAuthContext {
   legacy: boolean;
 }
 
-function hashPassword(password: string): string {
+function isScryptHash(hash: string): boolean {
+  return hash.startsWith(SCRYPT_PREFIX);
+}
+
+function isLegacySha256Hash(hash: string): boolean {
+  return /^[a-f0-9]{64}$/i.test(hash);
+}
+
+function hashLegacySha256(password: string): string {
   return createHash("sha256").update(password).digest("hex");
 }
 
 export function hashAdminPassword(password: string): string {
-  return hashPassword(password);
+  const salt = randomBytes(16).toString("hex");
+  const derived = scryptSync(password, salt, SCRYPT_KEYLEN).toString("hex");
+  return `${SCRYPT_PREFIX}${salt}$${derived}`;
+}
+
+function hashPassword(password: string): string {
+  return hashAdminPassword(password);
+}
+
+export function isPasswordHashLegacy(hash: string): boolean {
+  return isLegacySha256Hash(hash);
 }
 
 export function verifyPasswordHash(input: string, expectedHash: string): boolean {
-  const inputHash = hashPassword(input);
+  if (isScryptHash(expectedHash)) {
+    const parts = expectedHash.split("$");
+    if (parts.length !== 3) return false;
+    const salt = parts[1];
+    const hash = parts[2];
+    if (!salt || !hash) return false;
+    const derived = scryptSync(input, salt, SCRYPT_KEYLEN).toString("hex");
+    try {
+      return timingSafeEqual(
+        Buffer.from(derived, "hex"),
+        Buffer.from(hash, "hex"),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  if (isLegacySha256Hash(expectedHash)) {
+    const inputHash = hashLegacySha256(input);
+    try {
+      return timingSafeEqual(
+        Buffer.from(inputHash, "hex"),
+        Buffer.from(expectedHash, "hex"),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+function safeEqualString(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
   try {
-    return timingSafeEqual(
-      Buffer.from(inputHash, "hex"),
-      Buffer.from(expectedHash, "hex"),
-    );
+    return timingSafeEqual(aBuf, bBuf);
   } catch {
     return false;
   }
@@ -252,22 +310,29 @@ export async function updateAdminUser(
   };
 
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `UPDATE admin_users SET
-        full_name = ?, email = ?, phone = ?, password_hash = ?, role = ?, status = ?, updated_at = ?
-       WHERE id = ?`,
-      [
-        next.fullName,
-        next.email,
-        next.phone,
-        next.passwordHash,
-        next.role,
-        next.status,
-        next.updatedAt,
-        id,
-      ],
-    );
-    return next;
+    try {
+      await mysqlExecute(
+        `UPDATE admin_users SET
+          full_name = ?, email = ?, phone = ?, password_hash = ?, role = ?, status = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          next.fullName,
+          next.email,
+          next.phone,
+          next.passwordHash,
+          next.role,
+          next.status,
+          next.updatedAt,
+          id,
+        ],
+      );
+      return next;
+    } catch (error) {
+      console.error(
+        "[admin-auth] updateAdminUser mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   if (canUseFilesystemPersistence()) {
@@ -284,10 +349,17 @@ export async function updateAdminUser(
 
 export async function deleteAdminUser(id: string): Promise<boolean> {
   if (isMysqlConfigured()) {
-    const result = await mysqlExecute("DELETE FROM admin_users WHERE id = ?", [
-      id,
-    ]);
-    return (result.affectedRows ?? 0) > 0;
+    try {
+      const result = await mysqlExecute("DELETE FROM admin_users WHERE id = ?", [
+        id,
+      ]);
+      return (result.affectedRows ?? 0) > 0;
+    } catch (error) {
+      console.error(
+        "[admin-auth] deleteAdminUser mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   if (canUseFilesystemPersistence()) {
     const users = await listUsersFs();
@@ -336,6 +408,15 @@ export async function ensureBootstrapSuperAdmin(
   });
 }
 
+async function maybeMigratePasswordHash(
+  user: AdminUser,
+  password: string,
+): Promise<AdminUser> {
+  if (!isPasswordHashLegacy(user.passwordHash)) return user;
+  const updated = await updateAdminUser(user.id, { password });
+  return updated ?? user;
+}
+
 export async function authenticateAdminCredentials(input: {
   password: string;
   login?: string;
@@ -349,42 +430,35 @@ export async function authenticateAdminCredentials(input: {
     const user = await findAdminUserByLogin(input.login);
     if (!user || user.status !== "active") return null;
     if (!verifyPasswordHash(password, user.passwordHash)) return null;
-    return { user, legacy: false };
+    const migrated = await maybeMigratePasswordHash(user, password);
+    return { user: migrated, legacy: false };
   }
 
-  // Bootstrap / legacy: ADMIN_PASSWORD when no login provided
+  // Bootstrap only: ADMIN_PASSWORD when no admin users exist yet
   const envPassword = process.env.ADMIN_PASSWORD;
-  if (envPassword && verifyPasswordHash(password, hashPassword(envPassword))) {
-    if (userCount === 0) {
-      try {
-        const created = await ensureBootstrapSuperAdmin(password);
-        return { user: created, legacy: !created };
-      } catch (error) {
-        console.error(
-          "[admin-auth] bootstrap failed, using legacy session:",
-          error instanceof Error ? error.message : error,
-        );
-        return { user: null, legacy: true };
-      }
+  if (
+    userCount === 0 &&
+    envPassword &&
+    safeEqualString(password, envPassword)
+  ) {
+    try {
+      const created = await ensureBootstrapSuperAdmin(password);
+      return { user: created, legacy: !created };
+    } catch (error) {
+      console.error(
+        "[admin-auth] bootstrap failed, using legacy session:",
+        error instanceof Error ? error.message : error,
+      );
+      return { user: null, legacy: true };
     }
-    // Prefer first super_admin
-    const users = await listAdminUsers();
-    const superAdmin =
-      users.find((u) => u.role === "super_admin" && u.status === "active") ??
-      users.find((u) => u.status === "active") ??
-      null;
-    if (superAdmin && verifyPasswordHash(password, superAdmin.passwordHash)) {
-      return { user: superAdmin, legacy: false };
-    }
-    // Env password still works as legacy super when users exist but password matches env
-    return { user: superAdmin, legacy: !superAdmin };
   }
 
   // Try password against any user (single-field login UX fallback)
   const users = await listAdminUsers();
   for (const user of users) {
     if (user.status === "active" && verifyPasswordHash(password, user.passwordHash)) {
-      return { user, legacy: false };
+      const migrated = await maybeMigratePasswordHash(user, password);
+      return { user: migrated, legacy: false };
     }
   }
 

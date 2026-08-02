@@ -15,6 +15,7 @@ export interface DataTableColumn<T> {
   className?: string;
   hideOnMobile?: boolean;
   sortable?: boolean;
+  getSortValue?: (row: T) => string | number | null | undefined;
   render: (row: T) => ReactNode;
 }
 
@@ -85,15 +86,33 @@ export function DataTable<T>({
       const col = columns.find((c) => c.key === sort.key);
       if (col) {
         rows = [...rows].sort((a, b) => {
-          const av = String(searchKeys ? searchKeys(a) : rowKey(a));
-          const bv = String(searchKeys ? searchKeys(b) : rowKey(b));
-          const cmp = av.localeCompare(bv, "fa");
+          const rawA =
+            col.getSortValue?.(a) ??
+            (searchKeys ? searchKeys(a) : rowKey(a));
+          const rawB =
+            col.getSortValue?.(b) ??
+            (searchKeys ? searchKeys(b) : rowKey(b));
+          if (typeof rawA === "number" && typeof rawB === "number") {
+            return sort.dir === "asc" ? rawA - rawB : rawB - rawA;
+          }
+          const cmp = String(rawA ?? "").localeCompare(String(rawB ?? ""), "fa", {
+            numeric: true,
+          });
           return sort.dir === "asc" ? cmp : -cmp;
         });
       }
     }
     return rows;
   }, [data, query, searchable, searchKeys, sort, columns, rowKey]);
+
+  const toggleColumnVisibility = (key: string) => {
+    setHidden((h) => {
+      const nextHidden = { ...h, [key]: !h[key] };
+      const stillVisible = columns.filter((c) => !nextHidden[c.key]);
+      if (stillVisible.length === 0) return h;
+      return nextHidden;
+    });
+  };
 
   const total = serverPagination?.total ?? filtered.length;
   const currentPage = serverPagination?.page ?? page;
@@ -215,9 +234,10 @@ export function DataTable<T>({
                   <input
                     type="checkbox"
                     checked={!hidden[col.key]}
-                    onChange={() =>
-                      setHidden((h) => ({ ...h, [col.key]: !h[col.key] }))
+                    disabled={
+                      !hidden[col.key] && visibleColumns.length <= 1
                     }
+                    onChange={() => toggleColumnVisibility(col.key)}
                   />
                   {col.header}
                 </label>

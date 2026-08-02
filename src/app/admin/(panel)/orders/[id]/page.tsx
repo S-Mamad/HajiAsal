@@ -64,8 +64,8 @@ export default function AdminOrderDetailPage() {
     void loadOrder();
   }, [loadOrder]);
 
-  const patchOrder = async (body: Record<string, unknown>) => {
-    if (!order) return;
+  const patchOrder = async (body: Record<string, unknown>): Promise<boolean> => {
+    if (!order) return false;
     setSaving(true);
     setError("");
     try {
@@ -81,10 +81,12 @@ export default function AdminOrderDetailPage() {
       setTracking(data.order.trackingCode ?? "");
       setAdminNote(data.order.adminNote ?? "");
       toast.success("سفارش به‌روز شد");
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "خطا در به‌روزرسانی";
       setError(msg);
       toast.error(msg);
+      return false;
     } finally {
       setSaving(false);
     }
@@ -299,14 +301,18 @@ export default function AdminOrderDetailPage() {
 
       <ConfirmModal
         open={refundOpen}
-        onClose={() => setRefundOpen(false)}
+        onClose={() => {
+          if (!saving) setRefundOpen(false);
+        }}
         onConfirm={() => {
-          setRefundOpen(false);
-          void patchOrder({
-            refund: true,
-            refundNote: "ثبت بازپرداخت از پنل ادمین",
-            status: "cancelled",
-          });
+          void (async () => {
+            const ok = await patchOrder({
+              refund: true,
+              refundNote: "ثبت بازپرداخت از پنل ادمین",
+              status: "cancelled",
+            });
+            if (ok) setRefundOpen(false);
+          })();
         }}
         title="ثبت بازپرداخت"
         description="وضعیت سفارش به لغو شده تغییر می‌کند و بازپرداخت در لاگ ثبت می‌شود."

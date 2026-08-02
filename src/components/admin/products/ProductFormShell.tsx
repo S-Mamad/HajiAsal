@@ -290,11 +290,54 @@ export function ProductFormShell({
   }, [values, mode, productId, form, buildPayload, persist]);
 
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    void form.handleSubmit((data) =>
-      persist(data, {
-        redirect: true,
-        status: data.status === "draft" ? "active" : data.status,
-      }),
+    void form.handleSubmit(
+      (data) =>
+        persist(data, {
+          redirect: true,
+          status: data.status === "draft" ? "active" : data.status,
+        }),
+      (errs) => {
+        const fieldToTab: Record<string, ProductFormTabId> = {
+          title: "basic",
+          slug: "basic",
+          shortDescription: "basic",
+          longDescription: "basic",
+          category: "basic",
+          categoryLabel: "basic",
+          discountPrice: "pricing",
+          inStock: "inventory",
+          stockQty: "inventory",
+          weightOptions: "variations",
+          images: "media",
+          seo: "seo",
+          customFields: "custom",
+          ingredients: "advanced",
+          shippingInfo: "advanced",
+          sku: "advanced",
+          brandId: "advanced",
+          status: "advanced",
+        };
+        const first = Object.keys(errs)[0];
+        if (first && fieldToTab[first]) {
+          setTab(fieldToTab[first]);
+        }
+        const messages = Object.entries(errs)
+          .map(([key, val]) => {
+            if (!val) return null;
+            if (typeof val === "object" && "message" in val && val.message) {
+              return String(val.message);
+            }
+            if (key === "weightOptions") return "تنوع وزن را کامل کنید";
+            if (key === "seo") return "فیلدهای سئو را بررسی کنید";
+            return `خطا در فیلد ${key}`;
+          })
+          .filter(Boolean);
+        setError(
+          messages.length
+            ? messages.slice(0, 3).join(" · ")
+            : "لطفاً خطاهای فرم را برطرف کنید",
+        );
+      },
     )(event);
   };
 

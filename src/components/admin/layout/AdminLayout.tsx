@@ -8,6 +8,7 @@ import { AdminAuthProvider } from "@/components/admin/auth/AdminAuthProvider";
 import { AdminToastProvider } from "@/components/admin/ui/AdminToast";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminHeader } from "./AdminHeader";
+import { AdminRouteGuard } from "./AdminRouteGuard";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -38,7 +39,7 @@ function AdminShell({ children, title }: AdminLayoutProps) {
       className="panel-shell admin-shell flex min-h-[100dvh] text-[var(--panel-text)]"
       dir="rtl"
     >
-      <div className="hidden lg:flex">
+      <div className="sticky top-0 hidden h-[100dvh] shrink-0 lg:flex">
         <AdminSidebar />
       </div>
 
@@ -85,7 +86,7 @@ function AdminShell({ children, title }: AdminLayoutProps) {
           <AdminHeader title={title} />
         </div>
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-5 sm:px-6 lg:px-8">
-          {children}
+          <AdminRouteGuard>{children}</AdminRouteGuard>
         </main>
       </div>
     </div>

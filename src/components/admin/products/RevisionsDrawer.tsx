@@ -74,7 +74,7 @@ export function RevisionsDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
+    <div className="fixed inset-0 z-[80] flex justify-start bg-black/30">
       <button
         type="button"
         className="flex-1"

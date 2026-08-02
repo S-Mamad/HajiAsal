@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { X, CheckCircle, WarningCircle, Info } from "@phosphor-icons/react";
+import { X, CheckCircle, WarningCircle, Info, Warning } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 type ToastTone = "success" | "error" | "info" | "warning";
@@ -70,7 +70,7 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 start-4 z-[100] flex w-[min(100%-2rem,22rem)] flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] start-4 z-[100] flex w-[min(100%-2rem,22rem)] flex-col gap-2">
         {items.map((item) => (
           <div
             key={item.id}
@@ -79,23 +79,25 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
               item.tone === "success" && "border-emerald-200",
               item.tone === "error" && "border-red-200",
               item.tone === "warning" && "border-amber-200",
-              item.tone === "info" && "border-stone-200",
+              item.tone === "info" && "border-zinc-200",
             )}
             role="status"
           >
-            <span className="mt-0.5 shrink-0 text-stone-600">
+            <span className="mt-0.5 shrink-0 text-zinc-600">
               {item.tone === "success" ? (
                 <CheckCircle size={18} className="text-emerald-600" />
               ) : item.tone === "error" ? (
                 <WarningCircle size={18} className="text-red-600" />
+              ) : item.tone === "warning" ? (
+                <Warning size={18} className="text-amber-600" />
               ) : (
-                <Info size={18} />
+                <Info size={18} className="text-sky-600" />
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-stone-900">{item.title}</p>
+              <p className="text-sm font-medium text-zinc-900">{item.title}</p>
               {item.description ? (
-                <p className="mt-0.5 text-xs text-stone-500">
+                <p className="mt-0.5 text-xs text-zinc-500">
                   {item.description}
                 </p>
               ) : null}
@@ -103,7 +105,7 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => dismiss(item.id)}
-              className="shrink-0 rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              className="shrink-0 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
               aria-label="بستن"
             >
               <X size={14} />

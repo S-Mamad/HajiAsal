@@ -4,15 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle, WarningCircle } from "@phosphor-icons/react";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import { Input } from "@/components/ui/Input";
+import { AdminInput } from "@/components/admin/ui/AdminForm";
+import { useAdminToast } from "@/components/admin/ui/AdminToast";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
 
 interface EnvStatus {
-  supabase: boolean;
-  supabasePing: boolean;
-  sessionWriteOk: boolean;
-  supabaseError?: string | null;
+  mysql: boolean;
+  mysqlPing: boolean;
+  mysqlError?: string | null;
   sms: boolean;
   zarinpal: boolean;
   authSecret: boolean;
@@ -20,11 +20,10 @@ interface EnvStatus {
   siteUrl: boolean;
 }
 
-const LABELS: Record<keyof Omit<EnvStatus, "supabaseError">, string> = {
-  supabase: "Supabase (پیکربندی)",
-  supabasePing: "Supabase (اتصال)",
-  sessionWriteOk: "نشست ادمین (نوشتن DB)",
-  sms: "پیامک (Kavenegar)",
+const LABELS: Record<keyof Omit<EnvStatus, "mysqlError">, string> = {
+  mysql: "MySQL (پیکربندی)",
+  mysqlPing: "MySQL (اتصال)",
+  sms: "پیامک (OTP)",
   zarinpal: "زرین‌پال",
   authSecret: "AUTH_SESSION_SECRET",
   adminPassword: "ADMIN_PASSWORD",
@@ -33,12 +32,12 @@ const LABELS: Record<keyof Omit<EnvStatus, "supabaseError">, string> = {
 
 export default function AdminSettingsPage() {
   const router = useRouter();
+  const toast = useAdminToast();
   const [env, setEnv] = useState<EnvStatus | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [productionReady, setProductionReady] = useState(false);
   const [shippingCost, setShippingCost] = useState("");
   const [savingShipping, setSavingShipping] = useState(false);
-  const [shippingSaved, setShippingSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -54,7 +53,17 @@ export default function AdminSettingsPage() {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری");
-      setEnv(data.env);
+      const rawEnv = data.env ?? {};
+      setEnv({
+        mysql: Boolean(rawEnv.mysql ?? rawEnv.supabase),
+        mysqlPing: Boolean(rawEnv.mysqlPing ?? rawEnv.supabasePing),
+        mysqlError: rawEnv.mysqlError ?? rawEnv.supabaseError ?? null,
+        sms: Boolean(rawEnv.sms),
+        zarinpal: Boolean(rawEnv.zarinpal),
+        authSecret: Boolean(rawEnv.authSecret),
+        adminPassword: Boolean(rawEnv.adminPassword),
+        siteUrl: Boolean(rawEnv.siteUrl),
+      });
       setMissing(data.missing ?? []);
       setProductionReady(Boolean(data.productionReady));
       if (data.settings) {
@@ -74,7 +83,6 @@ export default function AdminSettingsPage() {
   const saveShipping = async () => {
     setSavingShipping(true);
     setError("");
-    setShippingSaved(false);
     try {
       const cost = Number(shippingCost);
       if (!Number.isFinite(cost) || cost < 0) {
@@ -89,9 +97,11 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در ذخیره");
-      setShippingSaved(true);
+      toast.success("هزینه ارسال ذخیره شد");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطای ناشناخته");
+      const message = err instanceof Error ? err.message : "خطای ناشناخته";
+      setError(message);
+      toast.error(message);
     } finally {
       setSavingShipping(false);
     }
@@ -110,26 +120,26 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">تنظیمات سیستم و وضعیت سرویس‌ها</p>
+        <p className="text-sm text-zinc-500">تنظیمات سیستم و وضعیت سرویس‌ها</p>
         <AdminButton type="button" variant="outline" onClick={() => void loadSettings()}>
           بروزرسانی
         </AdminButton>
       </div>
 
       {productionReady ? (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="flex items-center gap-2 rounded-[var(--panel-radius)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <Icon icon={CheckCircle} size={20} />
           آماده production
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="flex items-center gap-2 rounded-[var(--panel-radius)] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <Icon icon={WarningCircle} size={20} />
-          هنوز برای production آماده نیست. متغیرهای زیر را در Vercel تکمیل کنید
+          هنوز برای production آماده نیست. متغیرهای زیر را تکمیل کنید
         </div>
       )}
 
       {missing.length > 0 ? (
-        <ul className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <ul className="rounded-[var(--panel-radius)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {missing.map((m) => (
             <li key={m}>• {m}</li>
           ))}
@@ -137,16 +147,26 @@ export default function AdminSettingsPage() {
       ) : null}
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">در حال بارگذاری...</p> : null}
+
+      {loading && !env ? (
+        <div className="grid gap-3 sm:grid-cols-2" aria-busy>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-14 animate-pulse rounded-[var(--panel-radius)] border border-zinc-200 bg-zinc-100"
+            />
+          ))}
+        </div>
+      ) : null}
 
       {env ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {(Object.keys(LABELS) as Array<keyof typeof LABELS>).map((key) => (
             <div
               key={key}
-              className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3"
+              className="panel-card flex min-w-0 items-center justify-between gap-3 px-4 py-3"
             >
-              <span className="min-w-0 truncate text-sm text-slate-700">
+              <span className="min-w-0 truncate text-sm text-zinc-700">
                 {LABELS[key]}
               </span>
               <span className="flex shrink-0 items-center gap-1.5 text-sm">
@@ -162,18 +182,18 @@ export default function AdminSettingsPage() {
         </div>
       ) : null}
 
-      {env?.supabaseError ? (
+      {env?.mysqlError ? (
         <p className="text-xs text-red-500" dir="ltr">
-          Supabase: {env.supabaseError}
+          MySQL: {env.mysqlError}
         </p>
       ) : null}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="mb-3 font-semibold text-slate-900">ارسال</h3>
+      <div className="panel-card p-5">
+        <h3 className="mb-3 font-semibold text-zinc-900">ارسال</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <label className="space-y-1 text-sm">
             <span>هزینه ارسال عادی (تومان)</span>
-            <Input
+            <AdminInput
               dir="ltr"
               type="number"
               value={shippingCost}
@@ -190,14 +210,11 @@ export default function AdminSettingsPage() {
             {savingShipping ? "در حال ذخیره..." : "ذخیره ارسال"}
           </AdminButton>
         </div>
-        {shippingSaved ? (
-          <p className="mt-3 text-sm text-emerald-700">هزینه ارسال ذخیره شد.</p>
-        ) : null}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <h3 className="mb-2 font-semibold text-slate-900">خروج از پنل</h3>
-        <p className="mb-4 text-sm text-slate-500">
+      <div className="panel-card p-5">
+        <h3 className="mb-2 font-semibold text-zinc-900">خروج از پنل</h3>
+        <p className="mb-4 text-sm text-zinc-500">
           با خروج، نشست ادمین از سرور حذف می‌شود.
         </p>
         <AdminButton

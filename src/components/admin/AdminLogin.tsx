@@ -67,8 +67,8 @@ export function AdminLogin() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <FormField
             label="ایمیل یا موبایل"
-            hint="برای ورود bootstrap می‌توانید خالی بگذارید"
-            tooltip="اگر هنوز کاربر ادمین نساخته‌اید، فقط رمز ADMIN_PASSWORD کافی است"
+            hint="فقط برای راه‌اندازی اولیه می‌توانید خالی بگذارید"
+            tooltip="اگر هنوز هیچ کاربر ادمینی ساخته نشده، رمز ADMIN_PASSWORD کافی است. بعد از ساخت کاربر، فقط رمز همان کاربر قبول می‌شود."
           >
             <AdminInput
               dir="ltr"

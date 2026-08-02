@@ -330,10 +330,11 @@ export default function AdminProductsPage() {
             key: "title",
             header: "محصول",
             sortable: true,
+            getSortValue: (row) => row.title,
             render: (row) => (
               <div>
                 <p className="font-medium">{row.title}</p>
-                <p className="text-xs text-stone-400" dir="ltr">
+                <p className="text-xs text-zinc-400" dir="ltr">
                   {row.slug}
                 </p>
               </div>
@@ -343,23 +344,31 @@ export default function AdminProductsPage() {
             key: "status",
             header: "وضعیت",
             hideOnMobile: true,
+            sortable: true,
+            getSortValue: (row) => row.status ?? "active",
             render: (row) => STATUS_LABEL[row.status ?? "active"],
           },
           {
             key: "category",
             header: "دسته",
             hideOnMobile: true,
+            sortable: true,
+            getSortValue: (row) => row.categoryLabel,
             render: (row) => row.categoryLabel,
           },
           {
             key: "price",
             header: "قیمت از",
+            sortable: true,
+            getSortValue: (row) => getMinPrice(row),
             render: (row) =>
               `${getMinPrice(row).toLocaleString("fa-IR")} تومان`,
           },
           {
             key: "stock",
             header: "موجودی",
+            sortable: true,
+            getSortValue: (row) => (row.inStock ? 1 : 0),
             render: (row) => (
               <Can permission="products.edit" fallback={row.inStock ? "موجود" : "ناموجود"}>
                 <AdminButton

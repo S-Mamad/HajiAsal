@@ -45,11 +45,18 @@ export async function findProfileByPhone(
   phone: string,
 ): Promise<CustomerUser | null> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM profiles WHERE phone = ? LIMIT 1",
-      [phone],
-    );
-    return row ? mapProfileRow(row) : null;
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM profiles WHERE phone = ? LIMIT 1",
+        [phone],
+      );
+      if (row) return mapProfileRow(row);
+    } catch (error) {
+      console.error(
+        "[profiles] findProfileByPhone mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   const profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
@@ -60,11 +67,18 @@ export async function findProfileById(
   id: string,
 ): Promise<CustomerUser | null> {
   if (isMysqlConfigured()) {
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM profiles WHERE id = ? LIMIT 1",
-      [id],
-    );
-    return row ? mapProfileRow(row) : null;
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM profiles WHERE id = ? LIMIT 1",
+        [id],
+      );
+      if (row) return mapProfileRow(row);
+    } catch (error) {
+      console.error(
+        "[profiles] findProfileById mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   const profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
@@ -355,10 +369,18 @@ export async function getAllProfilesWithStats(): Promise<ProfileWithStats[]> {
   let profiles: CustomerUser[] = [];
 
   if (isMysqlConfigured()) {
-    const rows = await mysqlQuery<RowDataPacket>(
-      "SELECT * FROM profiles ORDER BY created_at DESC",
-    );
-    profiles = rows.map(mapProfileRow);
+    try {
+      const rows = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM profiles ORDER BY created_at DESC",
+      );
+      profiles = rows.map(mapProfileRow);
+    } catch (error) {
+      console.error(
+        "[profiles] getAllProfilesWithStats mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+      profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
+    }
   } else {
     profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
   }

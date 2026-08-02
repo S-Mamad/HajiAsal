@@ -78,26 +78,33 @@ export async function upsertBrand(
   };
 
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `INSERT INTO brands (id, slug, name, logo, description, sort_order, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         slug=VALUES(slug), name=VALUES(name), logo=VALUES(logo),
-         description=VALUES(description), sort_order=VALUES(sort_order),
-         is_active=VALUES(is_active), updated_at=VALUES(updated_at)`,
-      [
-        record.id,
-        record.slug,
-        record.name,
-        record.logo,
-        record.description,
-        record.sortOrder,
-        record.isActive ? 1 : 0,
-        record.createdAt,
-        record.updatedAt,
-      ],
-    );
-    return record;
+    try {
+      await mysqlExecute(
+        `INSERT INTO brands (id, slug, name, logo, description, sort_order, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           slug=VALUES(slug), name=VALUES(name), logo=VALUES(logo),
+           description=VALUES(description), sort_order=VALUES(sort_order),
+           is_active=VALUES(is_active), updated_at=VALUES(updated_at)`,
+        [
+          record.id,
+          record.slug,
+          record.name,
+          record.logo,
+          record.description,
+          record.sortOrder,
+          record.isActive ? 1 : 0,
+          record.createdAt,
+          record.updatedAt,
+        ],
+      );
+      return record;
+    } catch (error) {
+      console.error(
+        "[admin-platform] upsertBrand mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   if (canUseFilesystemPersistence()) {
@@ -501,24 +508,31 @@ export async function createMedia(
     createdAt: new Date().toISOString(),
   };
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `INSERT INTO media_assets
-        (id, filename, original_name, mime_type, size_bytes, url, alt_text, folder, uploaded_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        record.id,
-        record.filename,
-        record.originalName,
-        record.mimeType,
-        record.sizeBytes,
-        record.url,
-        record.altText,
-        record.folder,
-        record.uploadedBy,
-        record.createdAt,
-      ],
-    );
-    return record;
+    try {
+      await mysqlExecute(
+        `INSERT INTO media_assets
+          (id, filename, original_name, mime_type, size_bytes, url, alt_text, folder, uploaded_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          record.id,
+          record.filename,
+          record.originalName,
+          record.mimeType,
+          record.sizeBytes,
+          record.url,
+          record.altText,
+          record.folder,
+          record.uploadedBy,
+          record.createdAt,
+        ],
+      );
+      return record;
+    } catch (error) {
+      console.error(
+        "[admin-platform] createMedia mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   if (canUseFilesystemPersistence()) {
     const list = await fsList<MediaRecord>("media-assets.json");
@@ -672,27 +686,34 @@ export async function upsertTicket(
     updatedAt: now,
   };
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `INSERT INTO support_tickets
-        (id, subject, customer_id, customer_name, customer_phone, status, priority, assigned_to, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         subject=VALUES(subject), status=VALUES(status), priority=VALUES(priority),
-         assigned_to=VALUES(assigned_to), updated_at=VALUES(updated_at)`,
-      [
-        record.id,
-        record.subject,
-        record.customerId,
-        record.customerName,
-        record.customerPhone,
-        record.status,
-        record.priority,
-        record.assignedTo,
-        record.createdAt,
-        record.updatedAt,
-      ],
-    );
-    return record;
+    try {
+      await mysqlExecute(
+        `INSERT INTO support_tickets
+          (id, subject, customer_id, customer_name, customer_phone, status, priority, assigned_to, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           subject=VALUES(subject), status=VALUES(status), priority=VALUES(priority),
+           assigned_to=VALUES(assigned_to), updated_at=VALUES(updated_at)`,
+        [
+          record.id,
+          record.subject,
+          record.customerId,
+          record.customerName,
+          record.customerPhone,
+          record.status,
+          record.priority,
+          record.assignedTo,
+          record.createdAt,
+          record.updatedAt,
+        ],
+      );
+      return record;
+    } catch (error) {
+      console.error(
+        "[admin-platform] upsertTicket mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   if (canUseFilesystemPersistence()) {
     const list = await fsList<TicketRecord>("support-tickets.json");

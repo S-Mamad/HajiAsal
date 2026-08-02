@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import { Input } from "@/components/ui/Input";
+import { AdminInput } from "@/components/admin/ui/AdminForm";
 import { hajiasalPath } from "@/lib/paths";
 
 interface CategoryRow {
@@ -70,7 +70,7 @@ export default function AdminCategoriesPage() {
         throw new Error(
           data.error ??
             data.message ??
-            "ذخیره نشد. برای مدیریت دسته‌ها Supabase لازم است.",
+            "ذخیره نشد. برای مدیریت دسته‌ها اتصال پایگاه‌داده لازم است.",
         );
       }
       setName("");
@@ -85,14 +85,14 @@ export default function AdminCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2">
-        <Input
+      <div className="panel-card flex flex-wrap gap-2 p-4">
+        <AdminInput
           placeholder="نام دسته"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="max-w-xs"
         />
-        <Input
+        <AdminInput
           placeholder="slug"
           dir="ltr"
           value={slug}
@@ -104,32 +104,37 @@ export default function AdminCategoriesPage() {
           disabled={saving}
           onClick={() => void save()}
         >
-          {saving ? "در حال ذخیره..." : "افزودن / ذخیره"}
+          {saving ? "در حال ذخیره..." : "افزودن دسته"}
         </AdminButton>
       </div>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-500">در حال بارگذاری...</p> : null}
 
       <DataTable
         data={categories}
         rowKey={(r) => r.id}
         emptyMessage="دسته‌ای یافت نشد"
+        loading={loading}
+        error={error || null}
+        onRetry={() => void load()}
         columns={[
-          { key: "name", header: "نام", render: (r) => r.name },
+          {
+            key: "name",
+            header: "نام",
+            sortable: true,
+            getSortValue: (r) => r.name,
+            render: (r) => r.name,
+          },
           {
             key: "slug",
             header: "slug",
+            sortable: true,
+            getSortValue: (r) => r.slug,
             render: (r) => (
               <span dir="ltr" className="font-mono text-xs">
                 {r.slug}
               </span>
             ),
-          },
-          {
-            key: "desc",
-            header: "توضیح",
-            render: (r) => r.description?.trim() || "بدون توضیح",
           },
         ]}
       />

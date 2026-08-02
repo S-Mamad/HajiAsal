@@ -21,9 +21,17 @@ export async function GET(request: Request) {
 
   let logs: unknown[] = [];
   if (isMysqlConfigured()) {
-    logs = await mysqlQuery<RowDataPacket>(
-      "SELECT * FROM inventory_logs ORDER BY created_at DESC LIMIT 50",
-    );
+    try {
+      logs = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM inventory_logs ORDER BY created_at DESC LIMIT 50",
+      );
+    } catch (error) {
+      console.error(
+        "[inventory] logs query failed:",
+        error instanceof Error ? error.message : error,
+      );
+      logs = [];
+    }
   }
 
   return NextResponse.json({
@@ -52,15 +60,22 @@ export async function PATCH(request: Request) {
     }
 
     if (isMysqlConfigured()) {
-      await mysqlExecute(
-        "INSERT INTO inventory_logs (id, product_id, delta, reason) VALUES (?, ?, ?, ?)",
-        [
-          newId(),
-          parsed.data.productId,
-          parsed.data.inStock ? 1 : -1,
-          parsed.data.reason ?? "admin_update",
-        ],
-      );
+      try {
+        await mysqlExecute(
+          "INSERT INTO inventory_logs (id, product_id, delta, reason) VALUES (?, ?, ?, ?)",
+          [
+            newId(),
+            parsed.data.productId,
+            parsed.data.inStock ? 1 : -1,
+            parsed.data.reason ?? "admin_update",
+          ],
+        );
+      } catch (error) {
+        console.error(
+          "[inventory] log insert failed:",
+          error instanceof Error ? error.message : error,
+        );
+      }
     }
 
     await logAdminAction({
