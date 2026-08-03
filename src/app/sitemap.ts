@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllSlugs } from "@/lib/products";
+import { getAllSlugsAsync } from "@/lib/server/products-store";
 import { hajiasalAbsoluteUrl } from "@/lib/paths";
 
 const routes = [
@@ -16,7 +16,7 @@ const routes = [
   "/shipping",
 ] as const;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const staticEntries: MetadataRoute.Sitemap = routes.map((route) => ({
     url: hajiasalAbsoluteUrl(route),
@@ -25,7 +25,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === "" ? 1 : route === "/shop" ? 0.9 : 0.7,
   }));
 
-  const productEntries: MetadataRoute.Sitemap = getAllSlugs().map((slug) => ({
+  let productSlugs: string[] = [];
+  try {
+    productSlugs = await getAllSlugsAsync();
+  } catch {
+    productSlugs = [];
+  }
+
+  const productEntries: MetadataRoute.Sitemap = productSlugs.map((slug) => ({
     url: hajiasalAbsoluteUrl(`/product/${slug}`),
     lastModified: now,
     changeFrequency: "weekly",

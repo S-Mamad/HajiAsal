@@ -15,9 +15,16 @@ export async function GET(request: Request) {
   const gated = await gateSeller(request, "qa.reply");
   if (!gated.ok) return gated.response;
 
+  if (!isMysqlConfigured()) {
+    return NextResponse.json(
+      { error: "دیتابیس در دسترس نیست" },
+      { status: 503 },
+    );
+  }
+
   const products = await getSellerProducts(gated.ctx.seller.id);
   const ids = products.map((p) => p.id);
-  if (!ids.length || !isMysqlConfigured()) {
+  if (!ids.length) {
     return NextResponse.json({ questions: [] });
   }
 
@@ -42,8 +49,14 @@ export async function GET(request: Request) {
         createdAt: toIso(r.created_at),
       })),
     });
-  } catch {
-    return NextResponse.json({ questions: [] });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "خطا در خواندن پرسش‌ها",
+      },
+      { status: 503 },
+    );
   }
 }
 

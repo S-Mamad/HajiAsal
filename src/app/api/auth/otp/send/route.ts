@@ -12,12 +12,16 @@ import {
   getTestOtpProvider,
   isTestOtpAllowed,
 } from "@/lib/auth/get-otp-provider";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const ipLimit = checkRateLimit(`otp-send:ip:${ip}`, 10, 15 * 60 * 1000);
+    const ipLimit = await checkRateLimitAsync(
+      `otp-send:ip:${ip}`,
+      10,
+      15 * 60 * 1000,
+    );
     if (!ipLimit.ok) {
       return NextResponse.json(
         { success: false, message: "تعداد درخواست‌ها زیاد است" },
@@ -117,7 +121,11 @@ export async function POST(request: Request) {
       codeLength: storedCode.length,
       expiresInSec: 5 * 60,
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "[otp/send]",
+      error instanceof Error ? error.message : error,
+    );
     return NextResponse.json(
       { success: false, message: "خطا در ارسال کد" },
       { status: 500 },

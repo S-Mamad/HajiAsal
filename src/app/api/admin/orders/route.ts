@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { adminHasPermission } from "@/lib/server/admin-auth";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import { getContactMessagesBySource } from "@/lib/server/newsletter";
 import {
@@ -24,11 +25,17 @@ export async function GET(request: Request) {
   const gate = await gateAdmin(request, "orders.view");
   if (!gate.ok) return gate.response;
 
+  const canViewMessages = adminHasPermission(gate.ctx, "messages.view");
   const [orders, messages] = await Promise.all([
     getAllOrders(),
-    getContactMessagesBySource("hajiasal"),
+    canViewMessages
+      ? getContactMessagesBySource("hajiasal")
+      : Promise.resolve([]),
   ]);
-  return NextResponse.json({ orders, messages });
+  return NextResponse.json({
+    orders,
+    messages: canViewMessages ? messages : [],
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -55,7 +62,13 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ success: true, order });
-  } catch {
-    return NextResponse.json({ error: "خطای سرور" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "خطای سرور",
+      },
+      { status: 503 },
+    );
   }
 }

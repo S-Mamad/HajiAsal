@@ -17,6 +17,7 @@ export default function SellerReviewsPage() {
   const router = useRouter();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [replyMap, setReplyMap] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/seller/reviews");
@@ -24,7 +25,13 @@ export default function SellerReviewsPage() {
       router.push(hajiasalPath("/seller"));
       return;
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در بارگذاری نظرات");
+      setReviews([]);
+      return;
+    }
+    setError("");
     setReviews(data.reviews ?? []);
   }, [router]);
 
@@ -33,27 +40,40 @@ export default function SellerReviewsPage() {
   }, [load]);
 
   const reply = async (id: string) => {
-    await fetch("/api/seller/reviews", {
+    setError("");
+    const res = await fetch("/api/seller/reviews", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reviewId: id, reply: replyMap[id] ?? "" }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در ثبت پاسخ");
+      return;
+    }
     await load();
   };
 
   const report = async (id: string) => {
+    setError("");
     const note = window.prompt("دلیل گزارش به ادمین؟");
     if (!note) return;
-    await fetch("/api/seller/reviews", {
+    const res = await fetch("/api/seller/reviews", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reviewId: id, reportNote: note }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در گزارش");
+      return;
+    }
     await load();
   };
 
   return (
     <div className="space-y-4">
+      {error ? <p className="text-sm text-rose-700">{error}</p> : null}
       {reviews.length === 0 ? (
         <p className="text-sm text-stone-500">نظری ثبت نشده</p>
       ) : (

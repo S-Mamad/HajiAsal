@@ -186,6 +186,21 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "فایل نامعتبر" }, { status: 400 });
     }
+    if (!ALLOWED_MIME.has(parsed.data.mimeType)) {
+      return NextResponse.json(
+        { error: "فقط تصویر JPEG/PNG/WebP/GIF" },
+        { status: 400 },
+      );
+    }
+    if (
+      !parsed.data.url.startsWith("/") &&
+      !parsed.data.url.startsWith("https://")
+    ) {
+      return NextResponse.json(
+        { error: "آدرس فایل نامعتبر است" },
+        { status: 400 },
+      );
+    }
 
     await persistMediaMeta({
       id,

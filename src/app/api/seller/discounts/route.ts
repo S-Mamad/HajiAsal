@@ -16,7 +16,10 @@ export async function GET(request: Request) {
   if (!gated.ok) return gated.response;
 
   if (!isMysqlConfigured()) {
-    return NextResponse.json({ discounts: [] });
+    return NextResponse.json(
+      { error: "دیتابیس در دسترس نیست" },
+      { status: 503 },
+    );
   }
 
   try {
@@ -37,8 +40,14 @@ export async function GET(request: Request) {
         maxUses: r.max_uses != null ? Number(r.max_uses) : undefined,
       })),
     });
-  } catch {
-    return NextResponse.json({ discounts: [] });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "خطا در خواندن تخفیف‌ها",
+      },
+      { status: 503 },
+    );
   }
 }
 

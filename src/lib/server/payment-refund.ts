@@ -1,0 +1,197 @@
+import {
+  getOrderPaymentBinding,
+  type PaymentProvider,
+} from "./payment-refs";
+import { isSnappayConfigured } from "./snappay";
+import type { StoredOrder } from "./orders";
+
+export type GatewayRefundResult =
+  | { ok: true; provider: PaymentProvider; message?: string }
+  | { ok: false; error: string; status?: number };
+
+function zarinpalAccessToken(): string | null {
+  return process.env.ZARINPAL_ACCESS_TOKEN?.trim() || null;
+}
+
+function zarinpalMerchantId(): string | null {
+  const id = process.env.ZARINPAL_MERCHANT_ID?.trim();
+  if (!id || id === "your_merchant_id") return null;
+  return id;
+}
+
+/**
+ * Zarinpal refund requires a Personal Access Token from the panel.
+ * Docs: POST https://api.zarinpal.com/pg/v4/payment/refund.json
+ */
+export async function refundZarinpal(input: {
+  authority: string;
+  amountRial?: number;
+}): Promise<GatewayRefundResult> {
+  const merchantId = zarinpalMerchantId();
+  const accessToken = zarinpalAccessToken();
+  if (!merchantId) {
+    return {
+      ok: false,
+      error: "زرین‌پال پیکربندی نشده است (ZARINPAL_MERCHANT_ID)",
+      status: 503,
+    };
+  }
+  if (!accessToken) {
+    return {
+      ok: false,
+      error:
+        "برای استرداد زرین‌پال، ZARINPAL_ACCESS_TOKEN را از پنل زرین‌پال تنظیم کنید",
+      status: 503,
+    };
+  }
+  if (!input.authority) {
+    return { ok: false, error: "مرجع پرداخت (authority) یافت نشد", status: 400 };
+  }
+
+  try {
+    const res = await fetch(
+      "https://api.zarinpal.com/pg/v4/payment/refund.json",
+      {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          merchant_id: merchantId,
+          authority: input.authority,
+          ...(typeof input.amountRial === "number"
+            ? { amount: input.amountRial }
+            : {}),
+        }),
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      data?: { code?: number; message?: string };
+      errors?: { message?: string; code?: number };
+      message?: string;
+    };
+
+    const code = data.data?.code;
+    if (res.ok && (code === 100 || code === 101)) {
+      return {
+        ok: true,
+        provider: "zarinpal",
+        message: data.data?.message ?? "استرداد زرین‌پال موفق بود",
+      };
+    }
+
+    const errMsg =
+      data.errors?.message ||
+      data.data?.message ||
+      data.message ||
+      "استرداد زرین‌پال ناموفق بود";
+    return { ok: false, error: errMsg, status: 502 };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "ارتباط با زرین‌پال برقرار نشد",
+      status: 503,
+    };
+  }
+}
+
+/**
+ * SnappPay (اسنپ‌پی) cancel/revert after settle.
+ * Uses /api/online/payment/v1/cancel with paymentToken.
+ */
+export async function refundSnappay(input: {
+  paymentToken: string;
+}): Promise<GatewayRefundResult> {
+  if (!isSnappayConfigured()) {
+    return {
+      ok: false,
+      error: "اسنپ‌پی پیکربندی نشده است",
+      status: 503,
+    };
+  }
+  if (!input.paymentToken) {
+    return {
+      ok: false,
+      error: "توکن پرداخت اسنپ‌پی یافت نشد",
+      status: 400,
+    };
+  }
+
+  try {
+    const { cancelSnappayPayment } = await import("./snappay");
+    const result = await cancelSnappayPayment(input.paymentToken);
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.message ?? "لغو/استرداد اسنپ‌پی ناموفق بود",
+        status: 502,
+      };
+    }
+    return {
+      ok: true,
+      provider: "snappay",
+      message: result.message ?? "استرداد اسنپ‌پی موفق بود",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "ارتباط با اسنپ‌پی برقرار نشد",
+      status: 503,
+    };
+  }
+}
+
+/**
+ * Attempt real gateway refund for a paid order. Fail-closed: does not mutate order.
+ */
+export async function refundOrderAtGateway(
+  order: StoredOrder,
+): Promise<GatewayRefundResult> {
+  if (order.refundedAt) {
+    return {
+      ok: false,
+      error: "این سفارش قبلاً استرداد شده است",
+      status: 400,
+    };
+  }
+
+  const binding = await getOrderPaymentBinding(order.id);
+  const provider =
+    binding?.provider ??
+    (order.paymentMethod === "snappay" ? "snappay" : "zarinpal");
+
+  if (provider === "snappay") {
+    const token = binding?.paymentRef;
+    if (!token) {
+      return {
+        ok: false,
+        error: "مرجع پرداخت اسنپ‌پی برای این سفارش یافت نشد",
+        status: 400,
+      };
+    }
+    return refundSnappay({ paymentToken: token });
+  }
+
+  const authority = binding?.paymentRef;
+  if (!authority) {
+    return {
+      ok: false,
+      error: "مرجع پرداخت زرین‌پال (authority) برای این سفارش یافت نشد",
+      status: 400,
+    };
+  }
+
+  return refundZarinpal({
+    authority,
+    amountRial: Math.round(order.total * 10),
+  });
+}

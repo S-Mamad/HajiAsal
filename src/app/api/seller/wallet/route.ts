@@ -14,12 +14,22 @@ export async function GET(request: Request) {
   if (!gated.ok) return gated.response;
 
   const sellerId = gated.ctx.seller.id;
-  const [balance, ledger, withdrawals] = await Promise.all([
-    getSellerWalletBalance(sellerId),
-    listSellerLedger(sellerId),
-    listWithdrawals(sellerId),
-  ]);
-  return NextResponse.json({ balance, ledger, withdrawals });
+  try {
+    const [balance, ledger, withdrawals] = await Promise.all([
+      getSellerWalletBalance(sellerId),
+      listSellerLedger(sellerId),
+      listWithdrawals(sellerId),
+    ]);
+    return NextResponse.json({ balance, ledger, withdrawals });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error ? err.message : "خطا در خواندن کیف‌پول",
+      },
+      { status: 503 },
+    );
+  }
 }
 
 const withdrawSchema = z.object({
@@ -39,6 +49,12 @@ export async function POST(request: Request) {
 
   try {
     const seller = gated.ctx.seller;
+    if (!seller.bankSheba?.trim()) {
+      return NextResponse.json(
+        { error: "ابتدا شماره شبا را در پروفایل ثبت کنید" },
+        { status: 400 },
+      );
+    }
     const withdrawal = await createWithdrawal({
       sellerId: seller.id,
       amount: parsed.data.amount,

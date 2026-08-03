@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
+import type { StoredOrder } from "./orders";
 import {
   isMysqlConfigured,
   mysqlExecute,
   mysqlQuery,
   mysqlQueryOne,
   toIso,
+  withMysqlTransaction,
 } from "./mysql";
+import { getAllProductsAsync } from "./products-store";
+import { getSellerByIdAsync } from "./sellers-store";
 
 export type WalletBalance = {
   available: number;
@@ -42,6 +46,31 @@ export type Withdrawal = {
 const memoryLedger: LedgerEntry[] = [];
 const memoryWithdrawals: Withdrawal[] = [];
 
+function sumBalanceFromRows(
+  rows: Array<{ status: string; total: number }>,
+): WalletBalance {
+  let available = 0;
+  let pending = 0;
+  let totalEarned = 0;
+  for (const r of rows) {
+    const sum = Number(r.total ?? 0);
+    if (r.status === "available") available += sum;
+    if (r.status === "pending") pending += sum;
+    if (sum > 0) totalEarned += sum;
+  }
+  return { available, pending, totalEarned };
+}
+
+export class WalletMysqlError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = "WalletMysqlError";
+    if (cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
 export async function getSellerWalletBalance(
   sellerId: string,
 ): Promise<WalletBalance> {
@@ -54,19 +83,14 @@ export async function getSellerWalletBalance(
          GROUP BY status`,
         [sellerId],
       );
-      let available = 0;
-      let pending = 0;
-      let totalEarned = 0;
-      for (const r of rows) {
-        const sum = Number(r.total ?? 0);
-        const status = String(r.status);
-        if (status === "available") available += sum;
-        if (status === "pending") pending += sum;
-        if (sum > 0) totalEarned += sum;
-      }
-      return { available, pending, totalEarned };
-    } catch {
-      /* fall through */
+      return sumBalanceFromRows(
+        rows.map((r) => ({
+          status: String(r.status),
+          total: Number(r.total ?? 0),
+        })),
+      );
+    } catch (error) {
+      throw new WalletMysqlError("خواندن موجودی کیف‌پول ناموفق بود", error);
     }
   }
 
@@ -105,13 +129,11 @@ export async function listSellerLedger(
         note: r.note != null ? String(r.note) : undefined,
         createdAt: toIso(r.created_at),
       }));
-    } catch {
-      /* fall through */
+    } catch (error) {
+      throw new WalletMysqlError("خواندن دفتر کیف‌پول ناموفق بود", error);
     }
   }
-  return memoryLedger
-    .filter((e) => e.sellerId === sellerId)
-    .slice(0, limit);
+  return memoryLedger.filter((e) => e.sellerId === sellerId).slice(0, limit);
 }
 
 export async function addLedgerEntry(input: {
@@ -136,30 +158,160 @@ export async function addLedgerEntry(input: {
   };
 
   if (isMysqlConfigured()) {
-    try {
-      await mysqlExecute(
-        `INSERT INTO seller_wallet_ledger
-          (id, seller_id, type, amount, status, reference_type, reference_id, note, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          entry.id,
-          entry.sellerId,
-          entry.type,
-          entry.amount,
-          entry.status,
-          entry.referenceType ?? null,
-          entry.referenceId ?? null,
-          entry.note ?? null,
-          entry.createdAt,
-        ],
-      );
-      return entry;
-    } catch (error) {
-      console.error("[wallet] ledger insert failed", error);
-    }
+    await mysqlExecute(
+      `INSERT INTO seller_wallet_ledger
+        (id, seller_id, type, amount, status, reference_type, reference_id, note, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        entry.id,
+        entry.sellerId,
+        entry.type,
+        entry.amount,
+        entry.status,
+        entry.referenceType ?? null,
+        entry.referenceId ?? null,
+        entry.note ?? null,
+        entry.createdAt,
+      ],
+    );
+    return entry;
   }
+
   memoryLedger.unshift(entry);
   return entry;
+}
+
+async function hasSaleCredit(
+  sellerId: string,
+  orderId: string,
+): Promise<boolean> {
+  if (isMysqlConfigured()) {
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        `SELECT id FROM seller_wallet_ledger
+         WHERE seller_id = ? AND type = 'sale' AND reference_type = 'order'
+           AND reference_id = ? LIMIT 1`,
+        [sellerId, orderId],
+      );
+      return Boolean(row);
+    } catch (error) {
+      throw new WalletMysqlError("بررسی اعتبار فروش ناموفق بود", error);
+    }
+  }
+  return memoryLedger.some(
+    (e) =>
+      e.sellerId === sellerId &&
+      e.type === "sale" &&
+      e.referenceType === "order" &&
+      e.referenceId === orderId,
+  );
+}
+
+/**
+ * Credit each seller's wallet when an order reaches `delivered`.
+ * Net = seller line subtotal × (1 − commissionPercent/100). Idempotent per order+seller.
+ */
+export async function creditSellersForDeliveredOrder(
+  order: StoredOrder,
+): Promise<void> {
+  const products = await getAllProductsAsync({ scope: "admin" });
+  const byProduct = new Map(products.map((p) => [p.id, p]));
+
+  const totals = new Map<string, number>();
+  for (const item of order.items) {
+    const product = byProduct.get(item.productId);
+    const sellerId = product?.sellerId;
+    if (!sellerId) continue;
+    const line = item.weight.price * item.quantity;
+    totals.set(sellerId, (totals.get(sellerId) ?? 0) + line);
+  }
+
+  for (const [sellerId, subtotal] of totals) {
+    if (await hasSaleCredit(sellerId, order.id)) continue;
+    const seller = await getSellerByIdAsync(sellerId);
+    const commission = Math.min(
+      100,
+      Math.max(0, seller?.commissionPercent ?? 10),
+    );
+    const net = Math.max(0, Math.round(subtotal * (1 - commission / 100)));
+    if (net <= 0) continue;
+    await addLedgerEntry({
+      sellerId,
+      type: "sale",
+      amount: net,
+      status: "available",
+      referenceType: "order",
+      referenceId: order.id,
+      note: `فروش سفارش ${order.id} (کمیسیون ${commission}٪)`,
+    });
+  }
+}
+
+async function hasSaleReversal(
+  sellerId: string,
+  orderId: string,
+): Promise<boolean> {
+  if (isMysqlConfigured()) {
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        `SELECT id FROM seller_wallet_ledger
+         WHERE seller_id = ? AND type = 'sale_reversal' AND reference_type = 'order'
+           AND reference_id = ? LIMIT 1`,
+        [sellerId, orderId],
+      );
+      return Boolean(row);
+    } catch (error) {
+      throw new WalletMysqlError("بررسی برگشت فروش ناموفق بود", error);
+    }
+  }
+  return memoryLedger.some(
+    (e) =>
+      e.sellerId === sellerId &&
+      e.type === "sale_reversal" &&
+      e.referenceType === "order" &&
+      e.referenceId === orderId,
+  );
+}
+
+/**
+ * Claw back sale credits when an admin refunds a delivered order.
+ * Idempotent per order+seller via sale_reversal ledger rows.
+ */
+export async function reverseSaleCreditsForOrder(
+  order: StoredOrder,
+): Promise<void> {
+  const products = await getAllProductsAsync({ scope: "admin" });
+  const byProduct = new Map(products.map((p) => [p.id, p]));
+
+  const totals = new Map<string, number>();
+  for (const item of order.items) {
+    const product = byProduct.get(item.productId);
+    const sellerId = product?.sellerId;
+    if (!sellerId) continue;
+    const line = item.weight.price * item.quantity;
+    totals.set(sellerId, (totals.get(sellerId) ?? 0) + line);
+  }
+
+  for (const [sellerId, subtotal] of totals) {
+    if (!(await hasSaleCredit(sellerId, order.id))) continue;
+    if (await hasSaleReversal(sellerId, order.id)) continue;
+    const seller = await getSellerByIdAsync(sellerId);
+    const commission = Math.min(
+      100,
+      Math.max(0, seller?.commissionPercent ?? 10),
+    );
+    const net = Math.max(0, Math.round(subtotal * (1 - commission / 100)));
+    if (net <= 0) continue;
+    await addLedgerEntry({
+      sellerId,
+      type: "sale_reversal",
+      amount: -net,
+      status: "available",
+      referenceType: "order",
+      referenceId: order.id,
+      note: `برگشت فروش سفارش ${order.id} (استرداد ادمین)`,
+    });
+  }
 }
 
 export async function createWithdrawal(input: {
@@ -169,9 +321,9 @@ export async function createWithdrawal(input: {
   bankCard?: string;
   note?: string;
 }): Promise<Withdrawal> {
-  const balance = await getSellerWalletBalance(input.sellerId);
-  if (input.amount <= 0 || input.amount > balance.available) {
-    throw new Error("مبلغ برداشت نامعتبر است");
+  const sheba = input.bankSheba?.trim();
+  if (!sheba) {
+    throw new Error("شماره شبا برای تسویه الزامی است");
   }
 
   const w: Withdrawal = {
@@ -179,15 +331,31 @@ export async function createWithdrawal(input: {
     sellerId: input.sellerId,
     amount: input.amount,
     status: "pending",
-    bankSheba: input.bankSheba,
+    bankSheba: sheba,
     bankCard: input.bankCard,
     note: input.note,
     createdAt: new Date().toISOString(),
   };
 
   if (isMysqlConfigured()) {
-    try {
-      await mysqlExecute(
+    await withMysqlTransaction(async (conn) => {
+      // Lock existing ledger rows for this seller to serialize concurrent withdraws
+      await conn.execute(
+        `SELECT id FROM seller_wallet_ledger WHERE seller_id = ? FOR UPDATE`,
+        [input.sellerId],
+      );
+      const [sumRows] = await conn.query<RowDataPacket[]>(
+        `SELECT COALESCE(SUM(amount), 0) AS available
+         FROM seller_wallet_ledger
+         WHERE seller_id = ? AND status = 'available'`,
+        [input.sellerId],
+      );
+      const available = Number(sumRows[0]?.available ?? 0);
+      if (input.amount <= 0 || input.amount > available) {
+        throw new Error("مبلغ برداشت نامعتبر است");
+      }
+
+      await conn.execute(
         `INSERT INTO seller_withdrawals
           (id, seller_id, amount, status, bank_sheba, bank_card, note, created_at, updated_at)
          VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
@@ -202,30 +370,41 @@ export async function createWithdrawal(input: {
           w.createdAt,
         ],
       );
-      await addLedgerEntry({
-        sellerId: input.sellerId,
-        type: "withdrawal_hold",
-        amount: -input.amount,
-        status: "available",
-        referenceType: "withdrawal",
-        referenceId: w.id,
-        note: "مسدودسازی برای درخواست تسویه",
-      });
-      return w;
-    } catch (error) {
-      console.error("[wallet] withdraw failed", error);
-      throw new Error("ثبت درخواست تسویه ناموفق بود");
-    }
+
+      const ledgerId = randomUUID();
+      await conn.execute(
+        `INSERT INTO seller_wallet_ledger
+          (id, seller_id, type, amount, status, reference_type, reference_id, note, created_at)
+         VALUES (?, ?, 'withdrawal_hold', ?, 'available', 'withdrawal', ?, ?, ?)`,
+        [
+          ledgerId,
+          input.sellerId,
+          -input.amount,
+          w.id,
+          "مسدودسازی برای درخواست تسویه",
+          w.createdAt,
+        ],
+      );
+    });
+    return w;
+  }
+
+  const balance = await getSellerWalletBalance(input.sellerId);
+  if (input.amount <= 0 || input.amount > balance.available) {
+    throw new Error("مبلغ برداشت نامعتبر است");
   }
 
   memoryWithdrawals.unshift(w);
-  await addLedgerEntry({
+  memoryLedger.unshift({
+    id: randomUUID(),
     sellerId: input.sellerId,
     type: "withdrawal_hold",
     amount: -input.amount,
     status: "available",
     referenceType: "withdrawal",
     referenceId: w.id,
+    note: "مسدودسازی برای درخواست تسویه",
+    createdAt: w.createdAt,
   });
   return w;
 }
@@ -238,8 +417,8 @@ export async function listWithdrawals(sellerId: string): Promise<Withdrawal[]> {
         [sellerId],
       );
       return rows.map(mapWithdrawal);
-    } catch {
-      /* fall through */
+    } catch (error) {
+      throw new WalletMysqlError("خواندن درخواست‌های تسویه ناموفق بود", error);
     }
   }
   return memoryWithdrawals.filter((w) => w.sellerId === sellerId);
@@ -260,12 +439,20 @@ export async function reviewWithdrawal(input: {
       );
       if (!row || String(row.status) !== "pending") return null;
 
-      await mysqlExecute(
+      const result = await mysqlExecute(
         `UPDATE seller_withdrawals
          SET status = ?, admin_note = ?, reviewed_at = ?, updated_at = ?
-         WHERE id = ?`,
-        [input.status, input.adminNote ?? null, now, now, input.withdrawalId],
+         WHERE id = ? AND seller_id = ? AND status = 'pending'`,
+        [
+          input.status,
+          input.adminNote ?? null,
+          now,
+          now,
+          input.withdrawalId,
+          input.sellerId,
+        ],
       );
+      if (!result.affectedRows) return null;
 
       if (input.status === "rejected") {
         await addLedgerEntry({
@@ -323,4 +510,10 @@ function mapWithdrawal(r: RowDataPacket): Withdrawal {
     reviewedAt: r.reviewed_at ? toIso(r.reviewed_at) : undefined,
     createdAt: toIso(r.created_at),
   };
+}
+
+/** @internal test helper */
+export function __resetSellerWalletMemoryForTests(): void {
+  memoryLedger.length = 0;
+  memoryWithdrawals.length = 0;
 }

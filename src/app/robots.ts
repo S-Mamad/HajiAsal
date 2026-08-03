@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+import { hajiasalAbsoluteUrl } from "@/lib/paths";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -20,6 +19,6 @@ export default function robots(): MetadataRoute.Robots {
         "/api/",
       ],
     },
-    sitemap: `${siteUrl}/sitemap.xml`,
+    sitemap: hajiasalAbsoluteUrl("/sitemap.xml"),
   };
 }

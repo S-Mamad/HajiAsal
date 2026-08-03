@@ -4,6 +4,7 @@ import { hajiasalCanonical } from "@/lib/paths";
 export const metadata: Metadata = {
   title: "سبد خرید",
   description: "بررسی و مدیریت سبد خرید حاجی عسل",
+  robots: { index: false, follow: false },
   alternates: { canonical: hajiasalCanonical("/cart") },
 };
 

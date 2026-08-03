@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { updateOrderStatus, getOrderById } from "@/lib/server/orders";
+import { confirmPaidOrder, getOrderById } from "@/lib/server/orders";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
+import {
+  assertOrderPaymentRef,
+  setOrderSettleRef,
+} from "@/lib/server/payment-refs";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 const PAYABLE_STATUSES = new Set(["pending_payment"]);
 
@@ -33,17 +38,37 @@ function cancelledRedirect(orderId: string) {
   );
 }
 
+function successRedirect(orderId: string, tracking: string, ref?: string) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const qs = new URLSearchParams({
+    orderId,
+    tracking,
+  });
+  if (ref) qs.set("ref", ref);
+  return NextResponse.redirect(
+    new URL(`/checkout/success?${qs.toString()}`, siteUrl),
+  );
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const authority = searchParams.get("Authority");
   const status = searchParams.get("Status");
   const orderId = searchParams.get("orderId");
 
+  const ip = getClientIp(request);
+  const limited = await checkRateLimitAsync(
+    `checkout-verify:${ip}`,
+    30,
+    15 * 60 * 1000,
+  );
+  if (!limited.ok) {
+    return failedRedirect(request.url, orderId ?? undefined);
+  }
+
   if (!authority || !orderId) {
     return failedRedirect(request.url);
   }
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   if (status !== "OK") {
     return cancelledRedirect(orderId);
@@ -60,19 +85,24 @@ export async function GET(request: Request) {
   }
 
   if (!PAYABLE_STATUSES.has(order.status)) {
-    if (order.status === "confirmed" || order.status === "processing") {
-      return NextResponse.redirect(
-        new URL(
-          `/checkout/success?orderId=${encodeURIComponent(orderId)}&tracking=${encodeURIComponent(order.trackingCode ?? "")}`,
-          siteUrl,
-        ),
-      );
+    if (
+      order.status === "confirmed" ||
+      order.status === "processing" ||
+      order.status === "shipped" ||
+      order.status === "delivered"
+    ) {
+      return successRedirect(orderId, order.trackingCode ?? "");
     }
     return failedRedirect(request.url, orderId);
   }
 
   const session = getSessionFromRequest(request);
-  if (session && !ownsOrder(order, session)) {
+  if (!session || !ownsOrder(order, session)) {
+    return failedRedirect(request.url, orderId);
+  }
+
+  const refOk = await assertOrderPaymentRef(orderId, "zarinpal", authority);
+  if (!refOk) {
     return failedRedirect(request.url, orderId);
   }
 
@@ -94,13 +124,15 @@ export async function GET(request: Request) {
 
     const verifyData = await verifyRes.json();
     if (verifyData.data?.code === 100 || verifyData.data?.code === 101) {
-      await updateOrderStatus(orderId, "confirmed");
-      return NextResponse.redirect(
-        new URL(
-          `/checkout/success?orderId=${encodeURIComponent(orderId)}&ref=${encodeURIComponent(String(verifyData.data.ref_id ?? ""))}&tracking=${encodeURIComponent(order.trackingCode ?? "")}`,
-          siteUrl,
-        ),
-      );
+      const settleRef = String(verifyData.data.ref_id ?? "");
+      if (settleRef) await setOrderSettleRef(orderId, settleRef);
+      const confirmed = await confirmPaidOrder(orderId);
+      if (!confirmed.ok && confirmed.reason === "not_payable") {
+        return failedRedirect(request.url, orderId);
+      }
+      const tracking =
+        (confirmed.ok ? confirmed.order.trackingCode : order.trackingCode) ?? "";
+      return successRedirect(orderId, tracking, settleRef);
     }
   } catch {
     // fall through
@@ -161,13 +193,28 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          verified: order.status === "confirmed",
+          verified:
+            order.status === "confirmed" ||
+            order.status === "processing" ||
+            order.status === "shipped" ||
+            order.status === "delivered",
           message:
-            order.status === "confirmed"
+            order.status === "confirmed" ||
+            order.status === "processing" ||
+            order.status === "shipped" ||
+            order.status === "delivered"
               ? "این سفارش قبلاً تأیید شده است"
               : "وضعیت سفارش قابل تأیید پرداخت نیست",
         },
         { status: 400 },
+      );
+    }
+
+    const refOk = await assertOrderPaymentRef(orderId, "zarinpal", authority);
+    if (!refOk) {
+      return NextResponse.json(
+        { success: false, message: "مرجع پرداخت با سفارش هم‌خوانی ندارد" },
+        { status: 403 },
       );
     }
 
@@ -189,15 +236,36 @@ export async function POST(request: Request) {
       verifyData.data?.code === 100 || verifyData.data?.code === 101;
 
     if (verified) {
-      await updateOrderStatus(orderId, "confirmed");
+      const settleRef = String(verifyData.data?.ref_id ?? "");
+      if (settleRef) await setOrderSettleRef(orderId, settleRef);
+      const confirmed = await confirmPaidOrder(orderId);
+      if (!confirmed.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            verified: false,
+            message: "تأیید سفارش پس از پرداخت ناموفق بود",
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        refId: settleRef || null,
+        trackingCode: confirmed.order.trackingCode ?? null,
+        message: confirmed.alreadyConfirmed
+          ? "این سفارش قبلاً تأیید شده است"
+          : "پرداخت تأیید شد",
+      });
     }
 
     return NextResponse.json({
-      success: verified,
-      verified,
-      refId: verifyData.data?.ref_id ?? null,
+      success: false,
+      verified: false,
+      refId: null,
       trackingCode: order.trackingCode ?? null,
-      message: verified ? "پرداخت تأیید شد" : "تأیید پرداخت ناموفق بود",
+      message: "تأیید پرداخت ناموفق بود",
     });
   } catch {
     return NextResponse.json(

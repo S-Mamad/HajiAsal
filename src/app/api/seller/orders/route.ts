@@ -3,8 +3,12 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { gateSeller, clientIpFromRequest } from "@/lib/server/seller-gate";
 import { getSellerOrders } from "@/lib/server/sellers";
-import { updateOrderAdmin } from "@/lib/server/orders";
+import { getOrderById, updateOrderAdmin } from "@/lib/server/orders";
 import { logSellerActivity } from "@/lib/server/seller-activity";
+import {
+  notifyOrderStatusChange,
+  resolveOrderNotifyEvent,
+} from "@/lib/server/order-notify";
 import {
   isMysqlConfigured,
   mysqlExecute,
@@ -65,6 +69,7 @@ export async function PATCH(request: Request) {
   const gated = await gateSeller(request, "orders.manage");
   if (!gated.ok) return gated.response;
 
+  try {
   const body = await request.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
@@ -84,6 +89,13 @@ export async function PATCH(request: Request) {
     for (const id of parsed.data.orderIds) {
       const order = orders.find((o) => o.id === id);
       if (!order || !order.soleOwner) continue;
+      // Sellers cannot mark unpaid orders as paid/confirmed.
+      if (
+        order.status === "pending_payment" ||
+        order.status === "cancelled"
+      ) {
+        continue;
+      }
       await updateOrderAdmin(id, { status: nextStatus });
       updated += 1;
       await logSellerActivity({
@@ -116,6 +128,18 @@ export async function PATCH(request: Request) {
         { status: 403 },
       );
     }
+    if (
+      order.status === "pending_payment" ||
+      order.status === "cancelled"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "تأیید سفارش پرداخت‌نشده فقط پس از پرداخت موفق (درگاه) یا توسط مدیر مجاز است.",
+        },
+        { status: 403 },
+      );
+    }
     await updateOrderAdmin(parsed.data.orderId, { status: "confirmed" });
   } else if (parsed.data.action === "prepare") {
     if (!order.soleOwner) {
@@ -123,6 +147,18 @@ export async function PATCH(request: Request) {
         {
           error:
             "تغییر وضعیت سفارش چندفروشنده‌ای فقط توسط مدیر مجاز است. می‌توانید یادداشت ثبت کنید.",
+        },
+        { status: 403 },
+      );
+    }
+    if (
+      order.status === "pending_payment" ||
+      order.status === "cancelled"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "آماده‌سازی سفارش پرداخت‌نشده مجاز نیست.",
         },
         { status: 403 },
       );
@@ -138,6 +174,15 @@ export async function PATCH(request: Request) {
         { status: 403 },
       );
     }
+    if (
+      order.status === "pending_payment" ||
+      order.status === "cancelled"
+    ) {
+      return NextResponse.json(
+        { error: "ثبت رهگیری برای سفارش پرداخت‌نشده مجاز نیست." },
+        { status: 403 },
+      );
+    }
     if (!parsed.data.trackingCode) {
       return NextResponse.json({ error: "کد رهگیری لازم است" }, { status: 400 });
     }
@@ -146,28 +191,32 @@ export async function PATCH(request: Request) {
       status: "shipped",
     });
   } else if (parsed.data.action === "note") {
-    if (isMysqlConfigured()) {
-      try {
-        await mysqlExecute(
-          `INSERT INTO order_seller_notes (id, order_id, seller_id, note, tags, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE note = VALUES(note), tags = VALUES(tags), updated_at = VALUES(updated_at)`,
-          [
-            randomUUID(),
-            parsed.data.orderId,
-            gated.ctx.seller.id,
-            parsed.data.note ?? "",
-            JSON.stringify(parsed.data.tags ?? []),
-            new Date().toISOString(),
-            new Date().toISOString(),
-          ],
-        );
-      } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "خطا" },
-          { status: 500 },
-        );
-      }
+    if (!isMysqlConfigured()) {
+      return NextResponse.json(
+        { error: "ذخیره یادداشت بدون دیتابیس ممکن نیست" },
+        { status: 503 },
+      );
+    }
+    try {
+      await mysqlExecute(
+        `INSERT INTO order_seller_notes (id, order_id, seller_id, note, tags, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE note = VALUES(note), tags = VALUES(tags), updated_at = VALUES(updated_at)`,
+        [
+          randomUUID(),
+          parsed.data.orderId,
+          gated.ctx.seller.id,
+          parsed.data.note ?? "",
+          JSON.stringify(parsed.data.tags ?? []),
+          new Date().toISOString(),
+          new Date().toISOString(),
+        ],
+      );
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "خطا" },
+        { status: 500 },
+      );
     }
   }
 
@@ -182,5 +231,32 @@ export async function PATCH(request: Request) {
   const refreshed = (await getSellerOrders(gated.ctx.seller.id)).find(
     (o) => o.id === parsed.data.orderId,
   );
+
+  if (
+    parsed.data.action === "confirm" ||
+    parsed.data.action === "tracking"
+  ) {
+    const full = await getOrderById(parsed.data.orderId);
+    if (full) {
+      const event = resolveOrderNotifyEvent({
+        prevStatus: order.status,
+        nextStatus: full.status,
+        trackingCode: full.trackingCode,
+      });
+      if (event) {
+        void notifyOrderStatusChange(full, event);
+      }
+    }
+  }
+
   return NextResponse.json({ success: true, order: refreshed });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "خطا در به‌روزرسانی سفارش",
+      },
+      { status: 503 },
+    );
+  }
 }

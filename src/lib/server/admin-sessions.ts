@@ -69,27 +69,44 @@ export async function createAdminSession(meta?: {
       );
       mysqlOk = true;
     } catch (error) {
-      // Fallback if admin_user_id column not migrated yet
-      try {
-        await mysqlExecute(
-          `INSERT INTO admin_sessions (id, token_hash, created_at, expires_at, ip_address, user_agent)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            sessionId,
-            tokenHash,
-            session.createdAt,
-            expiresAt.toISOString(),
-            meta?.ipAddress ?? null,
-            meta?.userAgent ?? null,
-          ],
-        );
-        mysqlOk = true;
-      } catch (inner) {
+      // Only omit admin_user_id when the column truly does not exist yet.
+      // Any other failure must not create an unbound session (legacy → super_admin).
+      const message =
+        error instanceof Error ? error.message : String(error);
+      const unknownColumn =
+        /unknown column ['`]?admin_user_id['`]?/i.test(message) ||
+        (typeof error === "object" &&
+          error !== null &&
+          "errno" in error &&
+          Number((error as { errno: number }).errno) === 1054);
+      if (unknownColumn && !meta?.adminUserId) {
+        try {
+          await mysqlExecute(
+            `INSERT INTO admin_sessions (id, token_hash, created_at, expires_at, ip_address, user_agent)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              sessionId,
+              tokenHash,
+              session.createdAt,
+              expiresAt.toISOString(),
+              meta?.ipAddress ?? null,
+              meta?.userAgent ?? null,
+            ],
+          );
+          mysqlOk = true;
+        } catch (inner) {
+          console.error(
+            "[admin-sessions] mysql insert failed, falling back:",
+            inner instanceof Error ? inner.message : inner,
+          );
+        }
+      } else {
         console.error(
           "[admin-sessions] mysql insert failed, falling back:",
-          inner instanceof Error ? inner.message : inner,
+          message,
         );
-        // Fall through to filesystem / memory when MySQL is unreachable
+        // Fall through to filesystem / memory when MySQL is unreachable —
+        // FS/memory session still keeps adminUserId from the in-memory object.
       }
     }
   }

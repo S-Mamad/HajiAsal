@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminHasPermission } from "@/lib/server/admin-auth";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getDashboardStats,
@@ -12,6 +13,8 @@ import { getAllProductsAsync } from "@/lib/server/products-store";
 export async function GET(request: Request) {
   const gate = await gateAdmin(request, "dashboard.view");
   if (!gate.ok) return gate.response;
+
+  const canViewMessages = adminHasPermission(gate.ctx, "messages.view");
 
   try {
     const stats = await getDashboardStats().catch(() => ({
@@ -27,7 +30,9 @@ export async function GET(request: Request) {
     }));
     const [orders, messages, products, tickets, questions] = await Promise.all([
       getAllOrders().catch(() => []),
-      getContactMessagesBySource("hajiasal").catch(() => []),
+      canViewMessages
+        ? getContactMessagesBySource("hajiasal").catch(() => [])
+        : Promise.resolve([]),
       getAllProductsAsync({ scope: "admin" }).catch(() => []),
       listTickets().catch(() => []),
       listQuestions().catch(() => []),
@@ -51,7 +56,7 @@ export async function GET(request: Request) {
         totalOrders: orders.length,
         pendingOrders: pendingOrders.length,
         totalRevenue: activeOrders.reduce((sum, o) => sum + o.total, 0),
-        unreadMessages: unreadMessages.length,
+        unreadMessages: canViewMessages ? unreadMessages.length : 0,
         totalProducts: products.length,
         outOfStock: outOfStock.length,
         salesToday: stats.salesToday,
@@ -68,12 +73,12 @@ export async function GET(request: Request) {
         ),
       },
       navBadges: {
-        messages: unreadMessages.length,
+        messages: canViewMessages ? unreadMessages.length : 0,
         tickets: openTickets.length,
         qa: openQa.length,
       },
       recentOrders: orders.slice(0, 8),
-      recentMessages: messages.slice(0, 6),
+      recentMessages: canViewMessages ? messages.slice(0, 6) : [],
       recentCustomers: stats.recentCustomers,
       salesChart: stats.salesChart,
       ordersChart: stats.ordersChart,

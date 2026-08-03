@@ -21,7 +21,10 @@ export default function AdminMediaPage() {
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [mime, setMime] = useState("image/webp");
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const canSave = Boolean(file) || Boolean(url.trim() && name.trim());
 
   return (
     <AdminCrudList<Media>
@@ -60,27 +63,40 @@ export default function AdminMediaPage() {
           title="ثبت فایل رسانه"
           footer={
             <AdminButton
-              disabled={saving || !url || !name}
+              disabled={saving || !canSave}
               onClick={async () => {
                 setSaving(true);
                 try {
-                  const res = await fetch("/api/admin/media", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({
-                      filename: name,
-                      originalName: name,
-                      mimeType: mime,
-                      sizeBytes: 0,
-                      url,
-                    }),
-                  });
+                  let res: Response;
+                  if (file) {
+                    const form = new FormData();
+                    form.append("file", file);
+                    form.append("folder", "library");
+                    res = await fetch("/api/admin/media", {
+                      method: "POST",
+                      credentials: "include",
+                      body: form,
+                    });
+                  } else {
+                    res = await fetch("/api/admin/media", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        filename: name,
+                        originalName: name,
+                        mimeType: mime,
+                        sizeBytes: 0,
+                        url: url.trim(),
+                      }),
+                    });
+                  }
                   const data = await res.json();
                   if (!res.ok) throw new Error(data.error ?? "خطا");
                   toast.success("ثبت شد");
                   setUrl("");
                   setName("");
+                  setFile(null);
                   onSaved();
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : "خطا");
@@ -94,14 +110,44 @@ export default function AdminMediaPage() {
           }
         >
           <div className="space-y-3">
-            <FormField label="نام فایل" required>
-              <AdminInput value={name} onChange={(e) => setName(e.target.value)} />
+            <FormField label="آپلود فایل" tooltip="JPEG/PNG/WebP/GIF تا ۵ مگابایت">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="block w-full text-sm"
+                onChange={(e) => {
+                  const next = e.target.files?.[0] ?? null;
+                  setFile(next);
+                  if (next) {
+                    setName(next.name);
+                    setMime(next.type || "image/jpeg");
+                  }
+                }}
+              />
             </FormField>
-            <FormField label="آدرس URL" required tooltip="مسیر فایل در public یا CDN">
-              <AdminInput dir="ltr" value={url} onChange={(e) => setUrl(e.target.value)} />
+            <p className="text-xs text-stone-400">یا لینک عمومی:</p>
+            <FormField label="نام فایل">
+              <AdminInput
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={Boolean(file)}
+              />
+            </FormField>
+            <FormField label="آدرس URL" tooltip="مسیر فایل در public یا CDN">
+              <AdminInput
+                dir="ltr"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={Boolean(file)}
+              />
             </FormField>
             <FormField label="MIME">
-              <AdminInput dir="ltr" value={mime} onChange={(e) => setMime(e.target.value)} />
+              <AdminInput
+                dir="ltr"
+                value={mime}
+                onChange={(e) => setMime(e.target.value)}
+                disabled={Boolean(file)}
+              />
             </FormField>
           </div>
         </AdminModal>

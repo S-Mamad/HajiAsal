@@ -88,9 +88,10 @@ export function getMysqlPool(): Pool | null {
       password: process.env.MYSQL_PASSWORD ?? "",
       database: process.env.MYSQL_DATABASE!,
       waitForConnections: true,
-      connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 5),
-      queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 10),
-      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 2000),
+      connectionLimit: Number(process.env.MYSQL_POOL_SIZE || 10),
+      // SSG / burst traffic can queue many queries; keep headroom above pool size.
+      queueLimit: Number(process.env.MYSQL_QUEUE_LIMIT || 50),
+      connectTimeout: Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 5000),
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
       timezone: "Z",

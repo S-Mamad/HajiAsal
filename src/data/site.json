@@ -36,7 +36,8 @@
     "subtitle": "از دل کوهستان تا خانه شما، با ضمانت اصالت و ارسال سریع",
     "cta": "مشاهده محصولات",
     "ctaHref": "/shop",
-    "image": "/images/hajiasal/hero-studio.png"
+    "image": "/images/hajiasal/hero-studio.webp",
+    "imageMobile": "/images/hajiasal/hero-mobile.webp"
   },
   "couponHAJI10": {
     "minOrder": 300000,

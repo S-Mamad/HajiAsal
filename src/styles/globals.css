@@ -21,11 +21,11 @@
   --border-bright: rgba(28, 25, 23, 0.2);
   --header-bg: rgba(255, 255, 255, 0.92);
   --overlay-scrim: rgba(28, 25, 23, 0.45);
-  --hero-wash-top: rgba(243, 241, 236, 0.72);
-  --hero-wash-mid: rgba(243, 241, 236, 0.35);
-  --hero-wash-bottom: rgba(243, 241, 236, 0.95);
-  --hero-wash-dark-top: rgba(243, 241, 236, 0.55);
-  --hero-wash-dark-mid: rgba(243, 241, 236, 0.7);
+  --hero-wash-top: rgba(28, 25, 23, 0.28);
+  --hero-wash-mid: rgba(243, 241, 236, 0.08);
+  --hero-wash-bottom: rgba(243, 241, 236, 0.94);
+  --hero-wash-dark-top: rgba(28, 25, 23, 0.22);
+  --hero-wash-dark-mid: rgba(243, 241, 236, 0.12);
   --hero-wash-dark-bottom: #f3f1ec;
   --mesh-a: rgba(161, 98, 7, 0.06);
   --mesh-b: rgba(161, 98, 7, 0.04);
@@ -55,11 +55,11 @@
   --border-bright: rgba(255, 255, 255, 0.12);
   --header-bg: rgba(20, 20, 20, 0.95);
   --overlay-scrim: rgba(10, 10, 10, 0.8);
-  --hero-wash-top: rgba(10, 10, 10, 0.55);
-  --hero-wash-mid: transparent;
-  --hero-wash-bottom: #0a0a0a;
-  --hero-wash-dark-top: rgba(10, 10, 10, 0.5);
-  --hero-wash-dark-mid: rgba(10, 10, 10, 0.75);
+  --hero-wash-top: rgba(10, 10, 10, 0.45);
+  --hero-wash-mid: rgba(10, 10, 10, 0.12);
+  --hero-wash-bottom: rgba(10, 10, 10, 0.92);
+  --hero-wash-dark-top: rgba(10, 10, 10, 0.4);
+  --hero-wash-dark-mid: rgba(10, 10, 10, 0.55);
   --hero-wash-dark-bottom: #0a0a0a;
   --mesh-a: rgba(212, 160, 86, 0.08);
   --mesh-b: rgba(212, 160, 86, 0.06);
@@ -182,6 +182,15 @@ html {
 .site-header {
   background: var(--header-bg);
   border-bottom-color: var(--border);
+}
+
+.hero-wash {
+  background: linear-gradient(
+    to bottom,
+    var(--hero-wash-top) 0%,
+    var(--hero-wash-mid) 38%,
+    var(--hero-wash-bottom) 100%
+  );
 }
 
 .hero-wash-mobile {

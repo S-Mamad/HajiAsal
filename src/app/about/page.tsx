@@ -3,12 +3,14 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 import { SocialFollowSection } from "@/components/social/SocialFollowSection";
 import { getSiteSettings } from "@/lib/server/site-settings";
+import { hajiasalCanonical } from "@/lib/paths";
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteData = await getSiteSettings();
   return {
     title: "درباره ما",
     description: siteData.brand.description,
+    alternates: { canonical: hajiasalCanonical("/about") },
   };
 }
 

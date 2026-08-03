@@ -9,6 +9,12 @@ const PROTECTED_PREFIXES = ["/account"];
 const ADMIN_COOKIE = "hajiasal_admin_session";
 const SELLER_COOKIE = "hajiasal_seller_session";
 
+/** Edge-safe shape check — full validation happens in layout/API. */
+function looksLikeSessionToken(token: string | undefined): boolean {
+  if (!token || token.length < 16 || token.length > 512) return false;
+  return /^[A-Za-z0-9_-]+$/.test(token);
+}
+
 function isProtected(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
@@ -30,7 +36,7 @@ export async function middleware(request: NextRequest) {
 
   if (isSellerPanelPath(pathname)) {
     const token = request.cookies.get(SELLER_COOKIE)?.value;
-    if (!token) {
+    if (!looksLikeSessionToken(token)) {
       return NextResponse.redirect(new URL("/seller", request.url));
     }
     return NextResponse.next();
@@ -42,7 +48,7 @@ export async function middleware(request: NextRequest) {
 
   if (isAdminPanelPath(pathname)) {
     const token = request.cookies.get(ADMIN_COOKIE)?.value;
-    if (!token) {
+    if (!looksLikeSessionToken(token)) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return NextResponse.next();

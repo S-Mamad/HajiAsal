@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import type { CartItem, CheckoutFormData } from "@/types";
 import { normalizePhone } from "@/lib/auth/phone";
@@ -8,6 +9,7 @@ import {
   memoryUpdateOrder,
 } from "./memory-store";
 import { canUseFilesystemPersistence } from "./production";
+import type { ResultSetHeader } from "mysql2/promise";
 import {
   asJson,
   isMysqlConfigured,
@@ -16,8 +18,10 @@ import {
   mysqlQueryOne,
   parseJsonField,
   toIso,
+  withMysqlTransaction,
 } from "./mysql";
 import { computeOrderTotal } from "@/lib/commerce/money";
+import { decrementStockForPaidOrder } from "./order-stock";
 
 export { computeOrderTotal } from "@/lib/commerce/money";
 
@@ -56,12 +60,12 @@ const ORDERS_FILE = "orders.json";
 
 function generateOrderId(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const random = randomBytes(3).toString("hex").toUpperCase();
   return `HA-${timestamp}-${random}`;
 }
 
 function generateTrackingCode(): string {
-  return `TRK-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  return `TRK-${randomBytes(6).toString("hex").toUpperCase()}`;
 }
 
 function mapRowToOrder(row: Record<string, unknown>): StoredOrder {
@@ -287,6 +291,265 @@ export async function updateOrderStatus(
   return updateOrderAdmin(orderId, { status });
 }
 
+const PAID_OR_FULFILLING = new Set<OrderStatus>([
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+]);
+
+export type ConfirmPaidResult =
+  | {
+      ok: true;
+      order: StoredOrder;
+      alreadyConfirmed: boolean;
+      stockShortages: string[];
+    }
+  | { ok: false; reason: "not_found" | "not_payable" };
+
+async function burnCouponAfterPaid(previous: StoredOrder): Promise<void> {
+  if (!previous.couponCode) return;
+  const { getProductByIdAsync } = await import("./products-store");
+  const { incrementCouponUsageForPaidOrder } = await import("./coupons");
+  const sellerIdsInOrder: string[] = [];
+  for (const item of previous.items) {
+    const product = await getProductByIdAsync(item.productId);
+    if (product?.sellerId) sellerIdsInOrder.push(product.sellerId);
+  }
+  try {
+    await incrementCouponUsageForPaidOrder({
+      couponCode: previous.couponCode,
+      sellerIdsInOrder,
+    });
+  } catch (error) {
+    console.error(
+      "[orders] coupon used_count after payment failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+function shortageNote(shortages: string[]): string {
+  return `کمبود موجودی پس از پرداخت: ${shortages.join(", ")}`;
+}
+
+/**
+ * Atomically flip pending_payment → confirmed (payment verify path).
+ * Idempotent when already paid/fulfilling. Burns coupon + decrements stock once.
+ */
+export async function confirmPaidOrder(
+  orderId: string,
+): Promise<ConfirmPaidResult> {
+  const previous = await getOrderById(orderId);
+  if (!previous) return { ok: false, reason: "not_found" };
+  if (PAID_OR_FULFILLING.has(previous.status)) {
+    return {
+      ok: true,
+      order: previous,
+      alreadyConfirmed: true,
+      stockShortages: [],
+    };
+  }
+  if (previous.status !== "pending_payment") {
+    return { ok: false, reason: "not_payable" };
+  }
+
+  const now = new Date().toISOString();
+  let flipped = false;
+  let stockShortages: string[] = [];
+
+  if (isMysqlConfigured()) {
+    try {
+      const txResult = await withMysqlTransaction(async (conn) => {
+        const [result] = await conn.execute<ResultSetHeader>(
+          `UPDATE orders SET status = 'confirmed', updated_at = ?
+           WHERE id = ? AND status = 'pending_payment'`,
+          [now, orderId],
+        );
+        if (result.affectedRows === 0) {
+          return { flipped: false, shortages: [] as string[] };
+        }
+        const shortages = await decrementStockForPaidOrder(previous.items, conn);
+        if (shortages.length > 0) {
+          const note = shortageNote(shortages);
+          await conn.execute(
+            `UPDATE orders SET admin_note = CASE
+               WHEN admin_note IS NULL OR admin_note = '' THEN ?
+               ELSE CONCAT(admin_note, ' | ', ?)
+             END
+             WHERE id = ?`,
+            [note, note, orderId],
+          );
+        }
+        return { flipped: true, shortages };
+      });
+      flipped = txResult.flipped;
+      stockShortages = txResult.shortages;
+    } catch (error) {
+      console.error(
+        "[orders] confirmPaidOrder mysql tx failed, trying atomic update:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    if (!flipped) {
+      try {
+        const result = await mysqlExecute(
+          `UPDATE orders SET status = 'confirmed', updated_at = ?
+           WHERE id = ? AND status = 'pending_payment'`,
+          [now, orderId],
+        );
+        if (result.affectedRows > 0) {
+          flipped = true;
+          stockShortages = await decrementStockForPaidOrder(previous.items);
+          if (stockShortages.length > 0) {
+            const note = shortageNote(stockShortages);
+            await mysqlExecute(
+              `UPDATE orders SET admin_note = CASE
+                 WHEN admin_note IS NULL OR admin_note = '' THEN ?
+                 ELSE CONCAT(admin_note, ' | ', ?)
+               END
+               WHERE id = ?`,
+              [note, note, orderId],
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "[orders] confirmPaidOrder mysql fallback failed:",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+  }
+
+  if (!flipped && !isMysqlConfigured()) {
+    if (canUseFilesystemPersistence()) {
+      const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
+      const idx = orders.findIndex((o) => o.id === orderId);
+      if (idx >= 0 && orders[idx]!.status === "pending_payment") {
+        stockShortages = await decrementStockForPaidOrder(previous.items);
+        const note =
+          stockShortages.length > 0 ? shortageNote(stockShortages) : undefined;
+        orders[idx] = {
+          ...orders[idx]!,
+          status: "confirmed",
+          updatedAt: now,
+          ...(note
+            ? {
+                adminNote: orders[idx]!.adminNote
+                  ? `${orders[idx]!.adminNote} | ${note}`
+                  : note,
+              }
+            : {}),
+        };
+        await writeJsonFile(ORDERS_FILE, orders);
+        flipped = true;
+      }
+    } else {
+      const current = await getOrderById(orderId);
+      if (current?.status === "pending_payment") {
+        stockShortages = await decrementStockForPaidOrder(previous.items);
+        const note =
+          stockShortages.length > 0 ? shortageNote(stockShortages) : undefined;
+        await memoryUpdateOrder<StoredOrder>(orderId, {
+          status: "confirmed",
+          updatedAt: now,
+          ...(note
+            ? {
+                adminNote: current.adminNote
+                  ? `${current.adminNote} | ${note}`
+                  : note,
+              }
+            : {}),
+        });
+        flipped = true;
+      }
+    }
+  } else if (!flipped && isMysqlConfigured()) {
+    // Transaction/fallback did not flip — re-check below
+  }
+
+  if (!flipped) {
+    const current = await getOrderById(orderId);
+    if (current && PAID_OR_FULFILLING.has(current.status)) {
+      return {
+        ok: true,
+        order: current,
+        alreadyConfirmed: true,
+        stockShortages: [],
+      };
+    }
+    return { ok: false, reason: "not_payable" };
+  }
+
+  await burnCouponAfterPaid(previous);
+  const updated = await getOrderById(orderId);
+  if (!updated) return { ok: false, reason: "not_found" };
+  return {
+    ok: true,
+    order: updated,
+    alreadyConfirmed: false,
+    stockShortages,
+  };
+}
+
+/** Cancel unpaid orders older than ttlMs (default 24h). Safe for create-order path. */
+export async function expireStalePendingOrders(
+  ttlMs = 24 * 60 * 60 * 1000,
+): Promise<number> {
+  const cutoff = Date.now() - ttlMs;
+  let cancelled = 0;
+
+  if (isMysqlConfigured()) {
+    try {
+      const result = await mysqlExecute(
+        `UPDATE orders SET status = 'cancelled', updated_at = ?
+         WHERE status = 'pending_payment' AND created_at < ?`,
+        [new Date().toISOString(), new Date(cutoff).toISOString()],
+      );
+      return result.affectedRows;
+    } catch (error) {
+      console.error(
+        "[orders] expireStalePendingOrders mysql failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const applyList = async (orders: StoredOrder[]) => {
+    let changed = false;
+    for (let i = 0; i < orders.length; i++) {
+      const o = orders[i]!;
+      if (
+        o.status === "pending_payment" &&
+        new Date(o.createdAt).getTime() < cutoff
+      ) {
+        orders[i] = {
+          ...o,
+          status: "cancelled",
+          updatedAt: new Date().toISOString(),
+        };
+        cancelled += 1;
+        changed = true;
+      }
+    }
+    return changed;
+  };
+
+  if (canUseFilesystemPersistence()) {
+    const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
+    if (await applyList(orders)) {
+      await writeJsonFile(ORDERS_FILE, orders);
+    }
+    return cancelled;
+  }
+
+  const mem = memoryGetOrders() as StoredOrder[];
+  await applyList(mem);
+  return cancelled;
+}
+
 export async function updateOrderAdmin(
   orderId: string,
   patch: {
@@ -297,7 +560,28 @@ export async function updateOrderAdmin(
     refundNote?: string | null;
   },
 ): Promise<StoredOrder | null> {
+  const needsPrevious =
+    patch.status === "delivered" || patch.status === "confirmed";
+  const previous = needsPrevious ? await getOrderById(orderId) : null;
   const now = new Date().toISOString();
+
+  // Credit wallet before status flip so a failure leaves the order undelivered.
+  if (
+    patch.status === "delivered" &&
+    previous &&
+    previous.status !== "delivered"
+  ) {
+    const { creditSellersForDeliveredOrder } = await import("./seller-wallet");
+    await creditSellersForDeliveredOrder({
+      ...previous,
+      status: "delivered",
+    });
+  }
+
+  let updated: StoredOrder | null = null;
+  const confirmingFromPending =
+    patch.status === "confirmed" && previous?.status === "pending_payment";
+
   if (isMysqlConfigured()) {
     const sets: string[] = ["updated_at = ?"];
     const params: unknown[] = [now];
@@ -313,7 +597,6 @@ export async function updateOrderAdmin(
       sets.push("admin_note = ?");
       params.push(patch.adminNote);
     }
-    // refund columns may not exist until migration; ignore failures via try/catch below
     if (patch.refundedAt !== undefined) {
       sets.push("refunded_at = ?");
       params.push(patch.refundedAt);
@@ -322,44 +605,67 @@ export async function updateOrderAdmin(
       sets.push("refund_note = ?");
       params.push(patch.refundNote);
     }
-    params.push(orderId);
-    try {
-      const result = await mysqlExecute(
-        `UPDATE orders SET ${sets.join(", ")} WHERE id = ?`,
-        params,
-      );
-      if (result.affectedRows === 0) return null;
-      return getOrderById(orderId);
-    } catch {
-      // Fallback without refund columns
-      const basicSets = ["updated_at = ?"];
-      const basicParams: unknown[] = [now];
-      if (patch.status !== undefined) {
-        basicSets.push("status = ?");
-        basicParams.push(patch.status);
-      }
-      if (patch.trackingCode !== undefined) {
-        basicSets.push("tracking_code = ?");
-        basicParams.push(patch.trackingCode);
-      }
-      if (patch.adminNote !== undefined) {
-        basicSets.push("admin_note = ?");
-        basicParams.push(patch.adminNote);
-      }
-      basicParams.push(orderId);
-      const result = await mysqlExecute(
-        `UPDATE orders SET ${basicSets.join(", ")} WHERE id = ?`,
-        basicParams,
-      );
-      if (result.affectedRows === 0) return null;
-      return getOrderById(orderId);
-    }
-  }
 
-  if (canUseFilesystemPersistence()) {
+    // Atomic guard when admin/seller confirms an unpaid order via this path.
+    if (confirmingFromPending) {
+      params.push(orderId);
+      try {
+        const result = await mysqlExecute(
+          `UPDATE orders SET ${sets.join(", ")} WHERE id = ? AND status = 'pending_payment'`,
+          params,
+        );
+        if (result.affectedRows === 0) {
+          const current = await getOrderById(orderId);
+          if (current && PAID_OR_FULFILLING.has(current.status)) return current;
+          return null;
+        }
+        updated = await getOrderById(orderId);
+      } catch {
+        updated = null;
+      }
+    } else {
+      params.push(orderId);
+      try {
+        const result = await mysqlExecute(
+          `UPDATE orders SET ${sets.join(", ")} WHERE id = ?`,
+          params,
+        );
+        if (result.affectedRows === 0) return null;
+        updated = await getOrderById(orderId);
+      } catch {
+        const basicSets = ["updated_at = ?"];
+        const basicParams: unknown[] = [now];
+        if (patch.status !== undefined) {
+          basicSets.push("status = ?");
+          basicParams.push(patch.status);
+        }
+        if (patch.trackingCode !== undefined) {
+          basicSets.push("tracking_code = ?");
+          basicParams.push(patch.trackingCode);
+        }
+        if (patch.adminNote !== undefined) {
+          basicSets.push("admin_note = ?");
+          basicParams.push(patch.adminNote);
+        }
+        basicParams.push(orderId);
+        const result = await mysqlExecute(
+          `UPDATE orders SET ${basicSets.join(", ")} WHERE id = ?`,
+          basicParams,
+        );
+        if (result.affectedRows === 0) return null;
+        updated = await getOrderById(orderId);
+      }
+    }
+  } else if (canUseFilesystemPersistence()) {
     const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
     const idx = orders.findIndex((o) => o.id === orderId);
     if (idx === -1) return null;
+    if (
+      confirmingFromPending &&
+      orders[idx]!.status !== "pending_payment"
+    ) {
+      return orders[idx]!;
+    }
     orders[idx] = {
       ...orders[idx]!,
       ...(patch.status !== undefined ? { status: patch.status } : {}),
@@ -378,25 +684,66 @@ export async function updateOrderAdmin(
       updatedAt: now,
     };
     await writeJsonFile(ORDERS_FILE, orders);
-    return orders[idx]!;
+    updated = orders[idx]!;
+  } else {
+    if (confirmingFromPending) {
+      const cur = await getOrderById(orderId);
+      if (!cur || cur.status !== "pending_payment") {
+        return cur && PAID_OR_FULFILLING.has(cur.status) ? cur : null;
+      }
+    }
+    updated = await memoryUpdateOrder<StoredOrder>(orderId, {
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.trackingCode !== undefined
+        ? { trackingCode: patch.trackingCode ?? undefined }
+        : {}),
+      ...(patch.adminNote !== undefined
+        ? { adminNote: patch.adminNote ?? undefined }
+        : {}),
+      ...(patch.refundedAt !== undefined
+        ? { refundedAt: patch.refundedAt ?? undefined }
+        : {}),
+      ...(patch.refundNote !== undefined
+        ? { refundNote: patch.refundNote ?? undefined }
+        : {}),
+      updatedAt: now,
+    });
   }
 
-  return memoryUpdateOrder<StoredOrder>(orderId, {
-    ...(patch.status !== undefined ? { status: patch.status } : {}),
-    ...(patch.trackingCode !== undefined
-      ? { trackingCode: patch.trackingCode ?? undefined }
-      : {}),
-    ...(patch.adminNote !== undefined
-      ? { adminNote: patch.adminNote ?? undefined }
-      : {}),
-    ...(patch.refundedAt !== undefined
-      ? { refundedAt: patch.refundedAt ?? undefined }
-      : {}),
-    ...(patch.refundNote !== undefined
-      ? { refundNote: patch.refundNote ?? undefined }
-      : {}),
-    updatedAt: now,
-  });
+  // Side effects only on real pending_payment → confirmed transition.
+  if (updated && confirmingFromPending && previous) {
+    await burnCouponAfterPaid(previous);
+    const stockShortages = await decrementStockForPaidOrder(previous.items);
+    if (stockShortages.length > 0) {
+      const note = shortageNote(stockShortages);
+      const mergedNote = updated.adminNote
+        ? `${updated.adminNote} | ${note}`
+        : note;
+      // Avoid re-entering confirm side effects: patch note only.
+      if (isMysqlConfigured()) {
+        try {
+          await mysqlExecute(
+            `UPDATE orders SET admin_note = ?, updated_at = ? WHERE id = ?`,
+            [mergedNote, new Date().toISOString(), orderId],
+          );
+        } catch {
+          /* ignore note persist */
+        }
+      } else if (canUseFilesystemPersistence()) {
+        const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
+        const idx = orders.findIndex((o) => o.id === orderId);
+        if (idx >= 0) {
+          orders[idx] = { ...orders[idx]!, adminNote: mergedNote };
+          await writeJsonFile(ORDERS_FILE, orders);
+        }
+      } else {
+        await memoryUpdateOrder<StoredOrder>(orderId, { adminNote: mergedNote });
+      }
+      updated = { ...updated, adminNote: mergedNote };
+    }
+  }
+
+  return updated;
 }
 
 export function getPersistenceMode(): "mysql" | "file" | "memory" {

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getBestsellersAsync } from "@/lib/server/products-store";
 import { getFeaturedReviewsAsync } from "@/lib/server/reviews";
 import { Hero } from "@/components/sections/Hero";
@@ -8,6 +9,20 @@ import { CategoryGrid } from "@/components/sections/CategoryGrid";
 import { BrandStory } from "@/components/sections/BrandStory";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { ReviewForm } from "@/components/sections/ReviewForm";
+import { hajiasalAbsoluteUrl } from "@/lib/paths";
+import site from "@/data/site.json";
+import type { SiteConfig } from "@/types";
+
+const siteData = site as SiteConfig;
+
+export const metadata: Metadata = {
+  alternates: { canonical: hajiasalAbsoluteUrl() },
+  openGraph: {
+    url: hajiasalAbsoluteUrl(),
+    title: `${siteData.brand.name} | عسل طبیعی و اصل`,
+    description: siteData.brand.tagline,
+  },
+};
 
 export default async function HomePage() {
   const bestsellers = await getBestsellersAsync(8);

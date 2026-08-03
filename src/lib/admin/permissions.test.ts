@@ -21,10 +21,10 @@ describe("admin permissions", () => {
     expect(permissionsForRole("super_admin")).toEqual(listAllPermissions());
   });
 
-  it("denies support from admin user management", () => {
-    expect(can("support", "orders.view")).toBe(true);
-    expect(can("support", "admin_users.manage")).toBe(false);
+  it("allows support refunds but not settings", () => {
+    expect(can("support", "orders.refund")).toBe(true);
     expect(can("support", "settings.edit")).toBe(false);
+    expect(can("support", "admin_users.manage")).toBe(false);
   });
 
   it("allows warehouse inventory but not coupons", () => {

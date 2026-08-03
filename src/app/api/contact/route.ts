@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { saveContactMessage } from "@/lib/server/newsletter";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 const schema = z.object({
   name: z.string().min(2, "نام الزامی است"),
@@ -12,6 +13,22 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const limited = await checkRateLimitAsync(
+      `contact:${ip}`,
+      5,
+      15 * 60 * 1000,
+    );
+    if (!limited.ok) {
+      return NextResponse.json(
+        { success: false, message: "تعداد درخواست‌ها زیاد است" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limited.retryAfterSec) },
+        },
+      );
+    }
+
     const body = await request.json();
     const parsed = schema.safeParse(body);
 

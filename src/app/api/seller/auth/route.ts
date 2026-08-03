@@ -8,7 +8,7 @@ import {
   toPublicSeller,
   verifySellerPassword,
 } from "@/lib/server/sellers";
-import { checkRateLimit, getTrustedClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimitAsync, getTrustedClientIp } from "@/lib/server/rate-limit";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import { clientIpFromRequest } from "@/lib/server/seller-gate";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
@@ -21,7 +21,11 @@ const loginSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ip = getTrustedClientIp(request);
-    const ipLimit = checkRateLimit(`seller-login:ip:${ip}`, 20, 15 * 60 * 1000);
+    const ipLimit = await checkRateLimitAsync(
+      `seller-login:ip:${ip}`,
+      20,
+      15 * 60 * 1000,
+    );
     if (!ipLimit.ok) {
       return NextResponse.json(
         { success: false, message: "تعداد تلاش زیاد است. کمی بعد دوباره تلاش کنید." },
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const phoneKey = parsed.data.phone.replace(/\D/g, "");
-    const phoneLimit = checkRateLimit(
+    const phoneLimit = await checkRateLimitAsync(
       `seller-login:phone:${phoneKey}`,
       8,
       15 * 60 * 1000,

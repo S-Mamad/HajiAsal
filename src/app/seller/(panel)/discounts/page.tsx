@@ -34,7 +34,13 @@ export default function SellerDiscountsPage() {
       setForbidden(true);
       return;
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در بارگذاری تخفیف‌ها");
+      setRows([]);
+      return;
+    }
+    setError("");
     setRows(data.discounts ?? []);
   }, [router]);
 
@@ -72,11 +78,17 @@ export default function SellerDiscountsPage() {
   };
 
   const remove = async (id: string) => {
-    await fetch("/api/seller/discounts", {
+    setError("");
+    const res = await fetch("/api/seller/discounts", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در حذف");
+      return;
+    }
     await load();
   };
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { getOrderById, updateOrderStatus } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
+import { setOrderPaymentRef } from "@/lib/server/payment-refs";
 
 const createSchema = z.object({
   orderId: z.string().min(1),
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
     }
 
     await updateOrderStatus(order.id, "pending_payment");
+    await setOrderPaymentRef(order.id, "zarinpal", String(authority));
 
     return NextResponse.json({
       success: true,

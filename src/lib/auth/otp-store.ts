@@ -20,7 +20,11 @@ export const MIN_OTP_LENGTH = 4;
 export const MAX_OTP_LENGTH = 10;
 
 const OTP_TTL_MS = 5 * 60 * 1000;
-const MAX_SENDS_PER_WINDOW = 3;
+/** Production stays strict; local/E2E need headroom for repeated test-phone logins. */
+const MAX_SENDS_PER_WINDOW =
+  process.env.NODE_ENV === "production"
+    ? 3
+    : Number(process.env.AUTH_OTP_MAX_SENDS || 30);
 const SEND_WINDOW_MS = 10 * 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
 
@@ -68,6 +72,41 @@ function generateCode(): string {
   return String(randomInt(1000, 10000));
 }
 
+function storeMemoryChallenge(phone: string, codeHash: string): void {
+  getMemory().challenges.set(phone, {
+    codeHash,
+    expiresAt: Date.now() + OTP_TTL_MS,
+    attempts: 0,
+  });
+}
+
+function verifyMemoryChallenge(
+  phone: string,
+  codeHash: string,
+): { valid: boolean; message: string } {
+  const challenge = getMemory().challenges.get(phone);
+  if (!challenge) {
+    return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
+  }
+
+  if (challenge.expiresAt < Date.now()) {
+    getMemory().challenges.delete(phone);
+    return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
+  }
+
+  if (challenge.attempts >= MAX_VERIFY_ATTEMPTS) {
+    return { valid: false, message: "تعداد تلاش بیش از حد. کد جدید بگیرید" };
+  }
+
+  if (!safeEqualHex(challenge.codeHash, codeHash)) {
+    challenge.attempts += 1;
+    return { valid: false, message: "کد تأیید نادرست است" };
+  }
+
+  getMemory().challenges.delete(phone);
+  return { valid: true, message: "تأیید شد" };
+}
+
 export function isValidOtpCode(code: string): boolean {
   return new RegExp(`^\\d{${MIN_OTP_LENGTH},${MAX_OTP_LENGTH}}$`).test(code);
 }
@@ -110,7 +149,14 @@ export function checkSendRateLimit(
 
 async function clearPreviousChallenges(phone: string): Promise<void> {
   if (isMysqlConfigured()) {
-    await mysqlExecute("DELETE FROM otp_challenges WHERE phone = ?", [phone]);
+    try {
+      await mysqlExecute("DELETE FROM otp_challenges WHERE phone = ?", [phone]);
+    } catch (error) {
+      console.error(
+        "[otp] clear mysql challenges failed, continuing:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   getMemory().challenges.delete(phone);
 }
@@ -142,19 +188,20 @@ export async function createOtpChallenge(
          VALUES (?, ?, ?, ?, 0)`,
         [newId(), phone, codeHash, expiresAt],
       );
-    } catch (err) {
-      throw new Error(
-        `Failed to store OTP challenge: ${err instanceof Error ? err.message : String(err)}`,
+      // Keep a memory mirror so verify still works if MySQL drops mid-flight.
+      storeMemoryChallenge(phone, codeHash);
+      return code;
+    } catch (error) {
+      console.error(
+        "[otp] mysql store failed, using memory fallback:",
+        error instanceof Error ? error.message : error,
       );
+      storeMemoryChallenge(phone, codeHash);
+      return code;
     }
-  } else {
-    getMemory().challenges.set(phone, {
-      codeHash,
-      expiresAt: Date.now() + OTP_TTL_MS,
-      attempts: 0,
-    });
   }
 
+  storeMemoryChallenge(phone, codeHash);
   return code;
 }
 
@@ -173,55 +220,68 @@ export async function verifyOtpChallenge(
   const codeHash = hashCode(code);
 
   if (isMysqlConfigured()) {
-    const data = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM otp_challenges WHERE phone = ? ORDER BY created_at DESC LIMIT 1",
-      [phone],
-    );
+    try {
+      const data = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM otp_challenges WHERE phone = ? ORDER BY created_at DESC LIMIT 1",
+        [phone],
+      );
 
-    if (!data) {
-      return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
+      if (data) {
+        if (new Date(toIso(data.expires_at)).getTime() < Date.now()) {
+          try {
+            await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [
+              data.id,
+            ]);
+          } catch {
+            /* ignore */
+          }
+          getMemory().challenges.delete(phone);
+          return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
+        }
+
+        if ((data.attempts as number) >= MAX_VERIFY_ATTEMPTS) {
+          return {
+            valid: false,
+            message: "تعداد تلاش بیش از حد. کد جدید بگیرید",
+          };
+        }
+
+        if (!safeEqualHex(String(data.code_hash), codeHash)) {
+          try {
+            await mysqlExecute(
+              "UPDATE otp_challenges SET attempts = ? WHERE id = ?",
+              [(data.attempts as number) + 1, data.id],
+            );
+          } catch {
+            /* ignore — still reject */
+          }
+          return { valid: false, message: "کد تأیید نادرست است" };
+        }
+
+        try {
+          await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [
+            data.id,
+          ]);
+        } catch {
+          /* ignore */
+        }
+        getMemory().challenges.delete(phone);
+        return { valid: true, message: "تأیید شد" };
+      }
+    } catch (error) {
+      console.error(
+        "[otp] mysql verify failed, trying memory:",
+        error instanceof Error ? error.message : error,
+      );
     }
-
-    if (new Date(toIso(data.expires_at)).getTime() < Date.now()) {
-      await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [data.id]);
-      return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
-    }
-
-    if ((data.attempts as number) >= MAX_VERIFY_ATTEMPTS) {
-      return { valid: false, message: "تعداد تلاش بیش از حد. کد جدید بگیرید" };
-    }
-
-    if (!safeEqualHex(String(data.code_hash), codeHash)) {
-      await mysqlExecute("UPDATE otp_challenges SET attempts = ? WHERE id = ?", [
-        (data.attempts as number) + 1,
-        data.id,
-      ]);
-      return { valid: false, message: "کد تأیید نادرست است" };
-    }
-
-    await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [data.id]);
-    return { valid: true, message: "تأیید شد" };
   }
 
-  const challenge = getMemory().challenges.get(phone);
-  if (!challenge) {
-    return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
-  }
+  return verifyMemoryChallenge(phone, codeHash);
+}
 
-  if (challenge.expiresAt < Date.now()) {
-    getMemory().challenges.delete(phone);
-    return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
-  }
-
-  if (challenge.attempts >= MAX_VERIFY_ATTEMPTS) {
-    return { valid: false, message: "تعداد تلاش بیش از حد. کد جدید بگیرید" };
-  }
-
-  if (!safeEqualHex(challenge.codeHash, codeHash)) {
-    challenge.attempts += 1;
-    return { valid: false, message: "کد تأیید نادرست است" };
-  }
-
-  getMemory().challenges.delete(phone);
-  return { valid: true, message: "تأیید شد" };
+/** @internal */
+export function __resetOtpMemoryForTests(): void {
+  const mem = getMemory();
+  mem.challenges.clear();
+  mem.sendLog.clear();
 }

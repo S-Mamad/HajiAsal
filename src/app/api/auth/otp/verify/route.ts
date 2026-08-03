@@ -11,12 +11,16 @@ import {
   sessionCookieOptions,
 } from "@/lib/auth/session";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const limited = checkRateLimit(`otp-verify:ip:${ip}`, 30, 15 * 60 * 1000);
+    const limited = await checkRateLimitAsync(
+      `otp-verify:ip:${ip}`,
+      30,
+      15 * 60 * 1000,
+    );
     if (!limited.ok) {
       return NextResponse.json(
         { success: false, message: "تعداد تلاش زیاد است. کمی بعد دوباره تلاش کنید." },
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     const phone = normalizePhone(parsed.data.phone)!;
-    const phoneLimited = checkRateLimit(
+    const phoneLimited = await checkRateLimitAsync(
       `otp-verify:phone:${phone}`,
       10,
       15 * 60 * 1000,

@@ -10,7 +10,13 @@ test.describe("Haji Asal auth flows", () => {
     await page.getByLabel("شماره موبایل").fill("09123456789");
     await page.getByRole("button", { name: /دریافت کد/ }).click();
 
-    await expect(page.getByLabel("رقم 1")).toBeVisible({ timeout: 10_000 });
+    const otpDigit = page.getByLabel("رقم 1");
+    const sendError = page.locator("p.text-red-500").first();
+    await expect(otpDigit.or(sendError)).toBeVisible({ timeout: 15_000 });
+    if (await sendError.isVisible().catch(() => false) && !(await otpDigit.isVisible().catch(() => false))) {
+      throw new Error(`OTP send failed: ${(await sendError.innerText()).trim()}`);
+    }
+    await expect(otpDigit).toBeVisible();
     await expect(page.getByLabel("رقم 4")).toBeVisible();
     await expect(page.getByLabel("رقم 5")).toHaveCount(0);
   });

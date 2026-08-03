@@ -7,6 +7,11 @@ import {
   type OrderStatus,
 } from "@/lib/server/orders";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { refundOrderAtGateway } from "@/lib/server/payment-refund";
+import {
+  notifyOrderStatusChange,
+  resolveOrderNotifyEvent,
+} from "@/lib/server/order-notify";
 
 const patchSchema = z.object({
   status: z
@@ -22,6 +27,8 @@ const patchSchema = z.object({
   trackingCode: z.string().nullable().optional(),
   adminNote: z.string().nullable().optional(),
   refund: z.boolean().optional(),
+  /** Skip gateway; mark refunded in DB only (ops override). */
+  manualRefund: z.boolean().optional(),
   refundNote: z.string().nullable().optional(),
 });
 
@@ -62,6 +69,30 @@ export async function PATCH(request: Request, context: RouteContext) {
       if (!refundGate.ok) return refundGate.response;
     }
 
+    const before = await getOrderById(id);
+    if (!before) {
+      return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
+    }
+
+    if (parsed.data.refund) {
+      if (before.refundedAt) {
+        return NextResponse.json(
+          { error: "این سفارش قبلاً استرداد شده است" },
+          { status: 400 },
+        );
+      }
+
+      if (!parsed.data.manualRefund) {
+        const gateway = await refundOrderAtGateway(before);
+        if (!gateway.ok) {
+          return NextResponse.json(
+            { error: gateway.error },
+            { status: gateway.status ?? 502 },
+          );
+        }
+      }
+    }
+
     const order = await updateOrderAdmin(id, {
       status: parsed.data.status as OrderStatus | undefined,
       trackingCode: parsed.data.trackingCode,
@@ -74,8 +105,29 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
     }
 
+    if (parsed.data.refund && before.status === "delivered") {
+      const { reverseSaleCreditsForOrder } = await import(
+        "@/lib/server/seller-wallet"
+      );
+      await reverseSaleCreditsForOrder(before);
+    }
+
+    const notifyEvent = resolveOrderNotifyEvent({
+      prevStatus: before.status,
+      nextStatus: order.status,
+      refunded: Boolean(parsed.data.refund),
+      trackingCode: order.trackingCode,
+    });
+    if (notifyEvent) {
+      void notifyOrderStatusChange(order, notifyEvent);
+    }
+
     await logAdminAction({
-      action: parsed.data.refund ? "order.refund" : "order.update",
+      action: parsed.data.refund
+        ? parsed.data.manualRefund
+          ? "order.refund.manual"
+          : "order.refund"
+        : "order.update",
       entityType: "order",
       entityId: id,
       adminUserId: gate.ctx.user?.id,
@@ -83,7 +135,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     return NextResponse.json({ success: true, order });
-  } catch {
-    return NextResponse.json({ error: "خطای سرور" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "خطای سرور",
+      },
+      { status: 503 },
+    );
   }
 }

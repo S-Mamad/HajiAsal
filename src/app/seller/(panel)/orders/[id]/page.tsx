@@ -23,6 +23,7 @@ export default function SellerOrderDetailPage() {
   const [note, setNote] = useState("");
   const [tracking, setTracking] = useState("");
   const [message, setMessage] = useState("");
+  const [messageOk, setMessageOk] = useState(true);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/seller/orders?id=${params.id}`);
@@ -51,11 +52,13 @@ export default function SellerOrderDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId: params.id, action, ...extra }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      setMessageOk(false);
       setMessage(data.error ?? "خطا");
       return;
     }
+    setMessageOk(true);
     setMessage("انجام شد");
     await load();
   };
@@ -80,7 +83,13 @@ export default function SellerOrderDetailPage() {
 
   return (
     <div className="space-y-4">
-      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
+      {message ? (
+        <p
+          className={`text-sm ${messageOk ? "text-emerald-700" : "text-red-600"}`}
+        >
+          {message}
+        </p>
+      ) : null}
       <div className="rounded-xl border border-stone-200 bg-white p-4">
         <h3 className="text-lg font-semibold">سفارش {order.id}</h3>
         <p className="mt-1 text-sm text-stone-600">وضعیت: {order.status}</p>

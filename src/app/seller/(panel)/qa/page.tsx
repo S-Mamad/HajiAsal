@@ -16,6 +16,7 @@ export default function SellerQaPage() {
   const router = useRouter();
   const [questions, setQuestions] = useState<Q[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/seller/qa");
@@ -23,7 +24,13 @@ export default function SellerQaPage() {
       router.push(hajiasalPath("/seller"));
       return;
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "خطا در بارگذاری پرسش‌ها");
+      setQuestions([]);
+      return;
+    }
+    setError("");
     setQuestions(data.questions ?? []);
   }, [router]);
 
@@ -42,6 +49,7 @@ export default function SellerQaPage() {
 
   return (
     <div className="space-y-4">
+      {error ? <p className="text-sm text-rose-700">{error}</p> : null}
       {questions.length === 0 ? (
         <p className="text-sm text-stone-500">سؤالی نیست</p>
       ) : (

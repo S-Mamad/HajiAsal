@@ -7,11 +7,10 @@ import {
 } from "@/lib/server/products-store";
 import { getReviewsByProduct } from "@/lib/server/reviews";
 import {
-  buildProductJsonLd,
-  buildBreadcrumbJsonLd,
+  buildProductMetadata,
+  buildProductSeoBundle,
 } from "@/lib/seo";
 import { ProductDetailClient } from "@/components/product/ProductDetailClient";
-import { hajiasalCanonical, hajiasalPath } from "@/lib/paths";
 import { serializeJsonLd } from "@/lib/json-ld";
 
 interface ProductPageProps {
@@ -35,17 +34,7 @@ export async function generateMetadata({
   try {
     const product = await getProductBySlugAsync(slug);
     if (!product) return { title: "محصول یافت نشد" };
-
-    return {
-      title: product.title,
-      description: product.shortDescription,
-      openGraph: {
-        title: product.title,
-        description: product.shortDescription,
-        images: product.images,
-      },
-      alternates: { canonical: hajiasalCanonical(`/product/${slug}`) },
-    };
+    return buildProductMetadata(product);
   } catch {
     return { title: "محصول" };
   }
@@ -66,12 +55,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
     getReviewsByProduct(product.id).catch(() => []),
   ]);
 
-  const productJsonLd = buildProductJsonLd(product);
-  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
-    { name: "خانه", href: hajiasalPath() },
-    { name: "فروشگاه", href: hajiasalPath("/shop") },
-    { name: product.title, href: hajiasalPath(`/product/${slug}`) },
-  ]);
+  const { product: productJsonLd, breadcrumb: breadcrumbJsonLd, faq: faqJsonLd } =
+    buildProductSeoBundle(product);
 
   return (
     <>
@@ -83,6 +68,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
+      {faqJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+        />
+      ) : null}
       <ProductDetailClient
         product={product}
         relatedProducts={relatedProducts}

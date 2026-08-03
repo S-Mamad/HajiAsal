@@ -7,29 +7,14 @@ import { Input } from "@/components/ui/Input";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { cn } from "@/lib/utils";
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("خواندن فایل ناموفق بود"));
-    reader.readAsDataURL(file);
-  });
-}
-
 async function uploadImageFile(file: File): Promise<string> {
-  const dataUrl = await fileToDataUrl(file);
+  const form = new FormData();
+  form.append("file", file);
+  form.append("folder", "products");
   const res = await fetch("/api/admin/media", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({
-      filename: file.name.replace(/\s+/g, "-"),
-      originalName: file.name,
-      mimeType: file.type || "image/jpeg",
-      sizeBytes: file.size,
-      url: dataUrl,
-      folder: "products",
-    }),
+    body: form,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

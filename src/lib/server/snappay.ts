@@ -117,9 +117,13 @@ export async function createSnappayPayment(input: {
   return { paymentToken, paymentPageUrl };
 }
 
-export async function verifyAndSettleSnappay(paymentToken: string): Promise<{
+export async function verifyAndSettleSnappay(
+  paymentToken: string,
+  options?: { expectedAmountRial?: number },
+): Promise<{
   ok: boolean;
   message?: string;
+  amountRial?: number;
 }> {
   const token = await getBearerToken();
 
@@ -138,6 +142,10 @@ export async function verifyAndSettleSnappay(paymentToken: string): Promise<{
     successful?: boolean;
     errorData?: { message?: string };
     message?: string;
+    response?: {
+      amount?: number;
+      transactionAmount?: number;
+    };
   };
 
   if (!verifyRes.ok || !verifyData.successful) {
@@ -148,6 +156,42 @@ export async function verifyAndSettleSnappay(paymentToken: string): Promise<{
         verifyData.message ||
         "تأیید پرداخت اسنپ‌پی ناموفق بود",
     };
+  }
+
+  const reportedAmount =
+    typeof verifyData.response?.amount === "number"
+      ? verifyData.response.amount
+      : typeof verifyData.response?.transactionAmount === "number"
+        ? verifyData.response.transactionAmount
+        : undefined;
+
+  if (
+    typeof options?.expectedAmountRial === "number" &&
+    typeof reportedAmount === "number" &&
+    Math.round(reportedAmount) !== Math.round(options.expectedAmountRial)
+  ) {
+    console.error(
+      "[snappay] amount mismatch",
+      {
+        expected: options.expectedAmountRial,
+        reported: reportedAmount,
+      },
+    );
+    return {
+      ok: false,
+      message: "مبلغ پرداخت با سفارش هم‌خوانی ندارد",
+      amountRial: reportedAmount,
+    };
+  }
+
+  if (
+    typeof options?.expectedAmountRial === "number" &&
+    reportedAmount == null
+  ) {
+    console.warn(
+      "[snappay] verify response had no amount; relying on payment-ref bind",
+      { expected: options.expectedAmountRial },
+    );
   }
 
   const settleRes = await fetch(
@@ -177,5 +221,41 @@ export async function verifyAndSettleSnappay(paymentToken: string): Promise<{
     };
   }
 
-  return { ok: true };
+  return { ok: true, amountRial: reportedAmount };
+}
+
+/** Cancel / reverse a settled SnappPay payment (refund path). */
+export async function cancelSnappayPayment(
+  paymentToken: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const token = await getBearerToken();
+  const url = `${baseUrl()}/api/online/payment/v1/cancel`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ paymentToken }),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    successful?: boolean;
+    errorData?: { message?: string };
+    message?: string;
+  };
+
+  if (!res.ok || !data.successful) {
+    return {
+      ok: false,
+      message:
+        data.errorData?.message ||
+        data.message ||
+        "لغو پرداخت اسنپ‌پی ناموفق بود",
+    };
+  }
+
+  return { ok: true, message: data.message ?? "پرداخت اسنپ‌پی لغو شد" };
 }

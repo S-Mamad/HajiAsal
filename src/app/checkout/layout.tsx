@@ -4,6 +4,7 @@ import { hajiasalCanonical } from "@/lib/paths";
 export const metadata: Metadata = {
   title: "تکمیل خرید",
   description: "ثبت سفارش و پرداخت امن در فروشگاه حاجی عسل",
+  robots: { index: false, follow: false },
   alternates: { canonical: hajiasalCanonical("/checkout") },
 };
 

@@ -102,10 +102,30 @@ describe("authenticateAdminCredentials backdoor", () => {
     });
     expect(denied).toBeNull();
 
+    // Password-only (no login) is rejected after users exist
+    const passwordOnly = await authenticateAdminCredentials({
+      password: "user-pass",
+    });
+    expect(passwordOnly).toBeNull();
+
     const ok = await authenticateAdminCredentials({
+      login: "a@b.c",
       password: "user-pass",
     });
     expect(ok?.user?.id).toBe("u1");
+  });
+
+  it("keeps adminUserId on memory fallback when MySQL insert fails", async () => {
+    vi.mocked(isMysqlConfigured).mockReturnValue(true);
+    vi.mocked(canUseFilesystemPersistence).mockReturnValue(false);
+    memorySetAdminSessions([]);
+    vi.mocked(mysqlExecute).mockRejectedValueOnce(
+      Object.assign(new Error("Deadlock found"), { errno: 1213 }),
+    );
+
+    const created = await createAdminSession({ adminUserId: "support-1" });
+    expect(created?.token).toBeTruthy();
+    expect(memoryGetAdminSessions()[0]?.adminUserId).toBe("support-1");
   });
 });
 

@@ -38,16 +38,13 @@ export async function getAdminTokenFromCookies(): Promise<string | null> {
 export async function isAdminAuthenticated(): Promise<boolean> {
   const token = await getAdminTokenFromCookies();
   if (!token) return false;
-  return validateAdminSessionToken(token);
+  const ctx = await getAdminAuthFromToken(token);
+  return ctx.authenticated;
 }
 
 export async function getAdminAuthContext(): Promise<AdminAuthContext> {
   const token = await getAdminTokenFromCookies();
   return getAdminAuthFromToken(token);
-}
-
-export function isAdminRequestAuthenticated(_request: Request): boolean {
-  return false;
 }
 
 export async function isAdminRequestAuthenticatedAsync(
@@ -84,7 +81,7 @@ export function adminCookieOptions(token: string) {
     value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   };

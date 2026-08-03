@@ -171,20 +171,23 @@ export function getSellerByPhone(phone: string): Seller | null {
 export function verifySellerPassword(seller: Seller, password: string): boolean {
   if (!password || password.length < 4) return false;
 
-  const envKey = `SELLER_PASSWORD_${seller.id.toUpperCase()}`;
-  const envPassword =
-    process.env[envKey] ?? process.env.SELLER_PASSWORD ?? "";
-  if (envPassword) {
-    return safeEqualString(password, envPassword);
+  // Env password overrides are a local-dev escape hatch only — never in production.
+  if (!isProduction()) {
+    const envKey = `SELLER_PASSWORD_${seller.id.toUpperCase()}`;
+    const envPassword =
+      process.env[envKey] ?? process.env.SELLER_PASSWORD ?? "";
+    if (envPassword) {
+      return safeEqualString(password, envPassword);
+    }
+
+    const demo = process.env.SELLER_DEMO_PASSWORD;
+    if (demo && safeEqualString(password, demo)) {
+      return true;
+    }
   }
 
   if (isProduction() && seller.isDemo) {
     return false;
-  }
-
-  const demo = process.env.SELLER_DEMO_PASSWORD;
-  if (demo && !isProduction() && safeEqualString(password, demo)) {
-    return true;
   }
 
   return verifyStoredPasswordHash(password, seller.passwordHash);
@@ -485,7 +488,7 @@ export function sellerCookieOptions(token: string) {
     value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
+    sameSite: "strict" as const,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   };

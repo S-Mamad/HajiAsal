@@ -56,8 +56,14 @@ function CheckoutPageInner() {
   const subtotal = useCartStore((s) => s.getSubtotal());
   const clearCart = useCartStore((s) => s.clearCart);
   const baseShippingCost = useCartStore((s) => s.shippingConfig.shippingCost);
+  const appliedCouponCode = useCartStore((s) => s.appliedCouponCode);
+  const setAppliedCouponCode = useCartStore((s) => s.setAppliedCouponCode);
 
-  const loginHref = `${hajiasalPath("/login")}?redirect=${encodeURIComponent(hajiasalPath("/checkout"))}`;
+  const couponFromQuery = searchParams.get("coupon")?.trim() ?? "";
+  const checkoutRedirectPath = couponFromQuery
+    ? `${hajiasalPath("/checkout")}?coupon=${encodeURIComponent(couponFromQuery)}`
+    : hajiasalPath("/checkout");
+  const loginHref = `${hajiasalPath("/login")}?redirect=${encodeURIComponent(checkoutRedirectPath)}`;
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -79,6 +85,17 @@ function CheckoutPageInner() {
       if (orderId) setPendingOrderId(orderId);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const seed =
+      couponFromQuery || appliedCouponCode?.trim() || "";
+    if (!seed) return;
+    const normalized = seed.toUpperCase();
+    setCouponCode((prev) => (prev.trim() ? prev : normalized));
+    if (couponFromQuery) {
+      setAppliedCouponCode(normalized);
+    }
+  }, [couponFromQuery, appliedCouponCode, setAppliedCouponCode]);
 
   const shippingOptions: ShippingOption[] = useMemo(
     () => [
@@ -213,7 +230,14 @@ function CheckoutPageInner() {
       const res = await fetch("/api/coupons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode, subtotal }),
+        body: JSON.stringify({
+          code: couponCode,
+          subtotal,
+          lineItems: items.map((i) => ({
+            productId: i.productId,
+            lineTotal: i.weight.price * i.quantity,
+          })),
+        }),
       });
       const data = await res.json();
       if (data.valid) {
@@ -346,7 +370,14 @@ function CheckoutPageInner() {
           const res = await fetch("/api/coupons", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code: couponCode, subtotal }),
+            body: JSON.stringify({
+              code: couponCode,
+              subtotal,
+              lineItems: items.map((i) => ({
+                productId: i.productId,
+                lineTotal: i.weight.price * i.quantity,
+              })),
+            }),
           });
           const data = await res.json();
           if (data.valid) {

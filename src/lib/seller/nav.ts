@@ -202,6 +202,39 @@ export function getSellerNavGroups(
   })).filter((g) => g.items.length > 0);
 }
 
+export function findSellerNavItemForPath(
+  pathname: string,
+): SellerNavItem | null {
+  for (const group of GROUPS) {
+    for (const item of group.items) {
+      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+export function canAccessSellerPath(
+  capabilities: SellerCapabilitiesMap | null | undefined,
+  pathname: string,
+): boolean {
+  const item = findSellerNavItemForPath(pathname);
+  if (!item) return true;
+  if (!item.capability) return true;
+  return canSeller(capabilities, item.capability);
+}
+
+export function firstAllowedSellerPath(
+  capabilities?: SellerCapabilitiesMap | null,
+): string {
+  for (const group of getSellerNavGroups(capabilities)) {
+    const first = group.items[0];
+    if (first) return first.href;
+  }
+  return hajiasalPath("/seller/dashboard");
+}
+
 export const SELLER_PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/seller/dashboard")]: "داشبورد",
   [hajiasalPath("/seller/products")]: "محصولات",

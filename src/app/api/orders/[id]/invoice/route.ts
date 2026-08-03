@@ -3,6 +3,7 @@ import { getOrderById } from "@/lib/server/orders";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
 import { isAdminRequestAuthenticatedAsync } from "@/lib/server/admin";
+import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getSellerFromRequest,
   getSellerProducts,
@@ -12,11 +13,28 @@ import {
   buildProfessionalInvoiceHtml,
   type InvoiceAudience,
 } from "@/lib/server/invoice";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const ip = getClientIp(request);
+  const limited = await checkRateLimitAsync(
+    `invoice:${ip}`,
+    30,
+    15 * 60 * 1000,
+  );
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "تعداد درخواست‌ها زیاد است" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
   const { id } = await params;
   const order = await getOrderById(id);
 
@@ -30,7 +48,8 @@ export async function GET(
   const phoneParam = normalizePhone(searchParams.get("phone") ?? "");
   const trackingParam = (searchParams.get("tracking") ?? "").toUpperCase();
 
-  const isAdmin = await isAdminRequestAuthenticatedAsync(request);
+  const adminPrint = await gateAdmin(request, "orders.print");
+  const isAdminAuthed = await isAdminRequestAuthenticatedAsync(request);
   const seller = await getSellerFromRequest(request);
   const session = getSessionFromRequest(request);
 
@@ -50,8 +69,13 @@ export async function GET(
   let sellerSubtotal = order.subtotal;
   let sellerShopName: string | undefined;
 
-  if (isAdmin) {
+  if (adminPrint.ok) {
     audience = "admin";
+  } else if (isAdminAuthed) {
+    return NextResponse.json(
+      { error: "مجوز چاپ فاکتور ندارید" },
+      { status: 403 },
+    );
   } else if (seller) {
     const sellerProducts = await getSellerProducts(seller.id);
     const ids = new Set(sellerProducts.map((p) => p.id));

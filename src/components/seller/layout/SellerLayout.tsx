@@ -7,6 +7,7 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { SellerSidebar } from "./SellerSidebar";
 import { SellerHeader } from "./SellerHeader";
 import { SellerShortcutsProvider } from "@/components/seller/global/SellerShortcutsProvider";
+import { SellerRouteGuard } from "./SellerRouteGuard";
 import type { SellerCapabilitiesMap } from "@/lib/seller/capabilities";
 
 interface SellerLayoutProps {
@@ -95,7 +96,9 @@ export function SellerLayout({
             <SellerHeader />
           </div>
           <main className="mx-auto w-full max-w-[1440px] min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">
-            {children}
+            <SellerRouteGuard capabilities={capabilities}>
+              {children}
+            </SellerRouteGuard>
           </main>
         </div>
       </div>

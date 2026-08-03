@@ -126,6 +126,7 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[] | "*"> = {
     "orders.view",
     "orders.edit",
     "orders.print",
+    "orders.refund",
     "customers.view",
     "customers.edit",
     "reviews.view",

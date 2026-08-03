@@ -48,6 +48,14 @@ export async function GET(request: Request) {
     missing.push("MELIPAYAMAK_OTP_URL یا SMS_API_KEY / SMS_SENDER (برای OTP واقعی)");
   }
 
+  const { isOrderSmsConfigured } = await import("@/lib/server/order-notify");
+  const orderSms = isOrderSmsConfigured();
+  if (!orderSms) {
+    missing.push(
+      "MELIPAYAMAK_SMS_URL یا SMS_API_KEY/SMS_SENDER (برای پیامک وضعیت سفارش)",
+    );
+  }
+
   return NextResponse.json({
     env: {
       mysql: isMysqlConfigured(),
@@ -58,10 +66,12 @@ export async function GET(request: Request) {
       supabasePing: dbPing,
       supabaseError: dbError,
       sms: smsConfigured,
+      orderSms,
       zarinpal: Boolean(
         process.env.ZARINPAL_MERCHANT_ID &&
           process.env.ZARINPAL_MERCHANT_ID !== "your_merchant_id",
       ),
+      zarinpalRefund: Boolean(process.env.ZARINPAL_ACCESS_TOKEN?.trim()),
       authSecret: Boolean(process.env.AUTH_SESSION_SECRET),
       adminPassword: Boolean(process.env.ADMIN_PASSWORD),
       siteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),

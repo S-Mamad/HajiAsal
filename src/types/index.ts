@@ -193,6 +193,8 @@ export interface SiteConfig {
     cta: string;
     ctaHref: string;
     image: string;
+    /** اختیاری؛ نسخه عمودی برای موبایل */
+    imageMobile?: string;
   };
   couponHAJI10: {
     minOrder: number;

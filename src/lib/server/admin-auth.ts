@@ -434,13 +434,14 @@ export async function authenticateAdminCredentials(input: {
     return { user: migrated, legacy: false };
   }
 
+  // After bootstrap, login identifier (email/phone) is required.
+  if (userCount > 0) {
+    return null;
+  }
+
   // Bootstrap only: ADMIN_PASSWORD when no admin users exist yet
   const envPassword = process.env.ADMIN_PASSWORD;
-  if (
-    userCount === 0 &&
-    envPassword &&
-    safeEqualString(password, envPassword)
-  ) {
+  if (envPassword && safeEqualString(password, envPassword)) {
     try {
       const created = await ensureBootstrapSuperAdmin(password);
       return { user: created, legacy: !created };
@@ -450,15 +451,6 @@ export async function authenticateAdminCredentials(input: {
         error instanceof Error ? error.message : error,
       );
       return { user: null, legacy: true };
-    }
-  }
-
-  // Try password against any user (single-field login UX fallback)
-  const users = await listAdminUsers();
-  for (const user of users) {
-    if (user.status === "active" && verifyPasswordHash(password, user.passwordHash)) {
-      const migrated = await maybeMigratePasswordHash(user, password);
-      return { user: migrated, legacy: false };
     }
   }
 
@@ -490,13 +482,19 @@ export async function getAdminAuthFromToken(
     };
   }
 
-  // Legacy session without user id → treat as super_admin
-  return {
-    authenticated: true,
-    user: null,
-    role: "super_admin",
-    legacy: true,
-  };
+  // Legacy unbound sessions are only allowed when no admin users exist yet
+  // (bootstrap escape hatch). Otherwise deny — never auto-promote to super_admin.
+  const userCount = await countAdminUsers();
+  if (userCount === 0) {
+    return {
+      authenticated: true,
+      user: null,
+      role: "super_admin",
+      legacy: true,
+    };
+  }
+
+  return empty;
 }
 
 export function adminHasPermission(

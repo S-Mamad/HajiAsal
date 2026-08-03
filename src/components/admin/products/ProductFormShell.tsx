@@ -25,6 +25,7 @@ import { MediaDropzone } from "./MediaDropzone";
 import { AutosaveIndicator, type AutosaveState } from "./AutosaveIndicator";
 import { RevisionsDrawer } from "./RevisionsDrawer";
 import { DynamicFieldRenderer } from "./DynamicFieldRenderer";
+import { useAdminAuth, Can } from "@/components/admin/auth/AdminAuthProvider";
 
 const formSchema = z.object({
   title: z.string().min(1, "عنوان الزامی است"),
@@ -147,6 +148,8 @@ export function ProductFormShell({
   initialProduct?: Product | null;
 }) {
   const router = useRouter();
+  const { can } = useAdminAuth();
+  const canEditPrice = can("products.edit_price");
   const [tab, setTab] = useState<ProductFormTabId>("basic");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -182,42 +185,55 @@ export function ProductFormShell({
       .catch(() => setFields([]));
   }, [values.category]);
 
-  const buildPayload = useCallback((data: ProductFormValues, extras?: { autosave?: boolean; status?: ProductStatus }) => {
-    const discount =
-      data.discountPrice === "" || data.discountPrice == null
-        ? undefined
-        : Number(data.discountPrice);
-    const stockQty =
-      data.stockQty === "" || data.stockQty == null
-        ? undefined
-        : Number(data.stockQty);
-    return {
-      title: data.title,
-      slug: data.slug,
-      shortDescription: data.shortDescription,
-      longDescription: data.longDescription,
-      category: data.category,
-      categoryLabel:
-        data.categoryLabel ||
-        CATEGORY_OPTIONS.find((c) => c.id === data.category)?.label ||
-        data.category,
-      images: data.images,
-      weightOptions: data.weightOptions as WeightOption[],
-      discountPrice: discount,
-      inStock: data.inStock,
-      stockQty,
-      isBestseller: data.isBestseller,
-      isNew: data.isNew,
-      ingredients: data.ingredients,
-      shippingInfo: data.shippingInfo,
-      sku: data.sku || undefined,
-      brandId: data.brandId || null,
-      status: extras?.status ?? data.status,
-      seo: data.seo,
-      customFields: data.customFields,
-      autosave: extras?.autosave,
-    };
-  }, []);
+  const buildPayload = useCallback(
+    (
+      data: ProductFormValues,
+      extras?: { autosave?: boolean; status?: ProductStatus },
+    ) => {
+      const discount =
+        data.discountPrice === "" || data.discountPrice == null
+          ? undefined
+          : Number(data.discountPrice);
+      const stockQty =
+        data.stockQty === "" || data.stockQty == null
+          ? undefined
+          : Number(data.stockQty);
+      const base = {
+        title: data.title,
+        slug: data.slug,
+        shortDescription: data.shortDescription,
+        longDescription: data.longDescription,
+        category: data.category,
+        categoryLabel:
+          data.categoryLabel ||
+          CATEGORY_OPTIONS.find((c) => c.id === data.category)?.label ||
+          data.category,
+        images: data.images,
+        inStock: data.inStock,
+        stockQty,
+        isBestseller: data.isBestseller,
+        isNew: data.isNew,
+        ingredients: data.ingredients,
+        shippingInfo: data.shippingInfo,
+        sku: data.sku || undefined,
+        brandId: data.brandId || null,
+        status: extras?.status ?? data.status,
+        seo: data.seo,
+        customFields: data.customFields,
+        autosave: extras?.autosave,
+      };
+      // Only include price fields when the role may edit prices (avoids 403 on warehouse/content).
+      if (canEditPrice) {
+        return {
+          ...base,
+          weightOptions: data.weightOptions as WeightOption[],
+          discountPrice: discount,
+        };
+      }
+      return base;
+    },
+    [canEditPrice],
+  );
 
   const persist = useCallback(
     async (
@@ -397,10 +413,23 @@ export function ProductFormShell({
       case "pricing":
         return (
           <div className="space-y-4">
-            <Input label="قیمت تخفیف‌خورده (اختیاری)" type="number" {...form.register("discountPrice")} />
-            <p className="text-xs text-stone-500">
-              قیمت اصلی از گزینه‌های وزن در تب «تنوع وزن» گرفته می‌شود.
-            </p>
+            <Can
+              permission="products.edit_price"
+              fallback={
+                <p className="text-sm text-stone-500">
+                  ویرایش قیمت برای نقش شما مجاز نیست.
+                </p>
+              }
+            >
+              <Input
+                label="قیمت تخفیف‌خورده (اختیاری)"
+                type="number"
+                {...form.register("discountPrice")}
+              />
+              <p className="text-xs text-stone-500">
+                قیمت اصلی از گزینه‌های وزن در تب «تنوع وزن» گرفته می‌شود.
+              </p>
+            </Can>
           </div>
         );
       case "inventory":
@@ -424,20 +453,25 @@ export function ProductFormShell({
       case "variations":
         return (
           <div className="space-y-3">
+            {!canEditPrice ? (
+              <p className="text-sm text-stone-500">
+                ویرایش قیمت تنوع وزن برای نقش شما مجاز نیست؛ سایر فیلدها قابل ذخیره است.
+              </p>
+            ) : null}
             {weightFields.map((field, index) => (
               <div
                 key={field.id}
                 className="grid gap-2 rounded-xl border border-stone-200 p-3 md:grid-cols-4"
               >
-                <Input label="برچسب" {...form.register(`weightOptions.${index}.label`)} />
-                <Input label="گرم" type="number" {...form.register(`weightOptions.${index}.grams`)} />
-                <Input label="قیمت" type="number" {...form.register(`weightOptions.${index}.price`)} />
+                <Input label="برچسب" {...form.register(`weightOptions.${index}.label`)} disabled={!canEditPrice} />
+                <Input label="گرم" type="number" {...form.register(`weightOptions.${index}.grams`)} disabled={!canEditPrice} />
+                <Input label="قیمت" type="number" {...form.register(`weightOptions.${index}.price`)} disabled={!canEditPrice} />
                 <div className="flex items-end">
                   <AdminButton
                     type="button"
                     variant="ghost"
                     size="sm"
-                    disabled={weightFields.length <= 1}
+                    disabled={!canEditPrice || weightFields.length <= 1}
                     onClick={() => remove(index)}
                   >
                     حذف
@@ -449,6 +483,7 @@ export function ProductFormShell({
               type="button"
               variant="outline"
               size="sm"
+              disabled={!canEditPrice}
               onClick={() => append({ label: "گزینه جدید", grams: 500, price: 0 })}
             >
               افزودن وزن

@@ -5,24 +5,15 @@ import type { RowDataPacket } from "mysql2/promise";
 import { gateSeller, clientIpFromRequest } from "@/lib/server/seller-gate";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import {
+  createMemoryTicket,
+  listMemoryTickets,
+} from "@/lib/server/seller-tickets-memory";
+import {
   isMysqlConfigured,
   mysqlExecute,
   mysqlQuery,
-  mysqlQueryOne,
   toIso,
 } from "@/lib/server/mysql";
-
-type Ticket = {
-  id: string;
-  subject: string;
-  category: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-const memoryTickets: Array<Ticket & { sellerId: string; messages: Array<{ id: string; senderType: string; body: string; createdAt: string }> }> = [];
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "tickets.manage");
@@ -47,14 +38,14 @@ export async function GET(request: Request) {
         })),
       });
     } catch {
-      /* fallthrough */
+      /* fallthrough to memory */
     }
   }
 
   return NextResponse.json({
-    tickets: memoryTickets
-      .filter((t) => t.sellerId === sellerId)
-      .map(({ messages: _m, sellerId: _s, ...t }) => t),
+    tickets: listMemoryTickets(sellerId).map(
+      ({ messages: _m, sellerId: _s, ...t }) => t,
+    ),
   });
 }
 
@@ -101,40 +92,39 @@ export async function POST(request: Request) {
          VALUES (?, ?, 'seller', ?, ?)`,
         [msgId, id, parsed.data.body, now],
       );
+
+      await logSellerActivity({
+        sellerId: gated.ctx.seller.id,
+        action: "ticket.create",
+        entityType: "ticket",
+        entityId: id,
+        ip: clientIpFromRequest(request),
+      });
+
+      return NextResponse.json({ success: true, id });
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "خطا" },
         { status: 500 },
       );
     }
-  } else {
-    memoryTickets.unshift({
-      id,
-      sellerId: gated.ctx.seller.id,
-      subject: parsed.data.subject,
-      category: parsed.data.category,
-      priority: parsed.data.priority,
-      status: "open",
-      createdAt: now,
-      updatedAt: now,
-      messages: [
-        {
-          id: msgId,
-          senderType: "seller",
-          body: parsed.data.body,
-          createdAt: now,
-        },
-      ],
-    });
   }
+
+  const ticket = createMemoryTicket({
+    sellerId: gated.ctx.seller.id,
+    subject: parsed.data.subject,
+    category: parsed.data.category,
+    priority: parsed.data.priority,
+    body: parsed.data.body,
+  });
 
   await logSellerActivity({
     sellerId: gated.ctx.seller.id,
     action: "ticket.create",
     entityType: "ticket",
-    entityId: id,
+    entityId: ticket.id,
     ip: clientIpFromRequest(request),
   });
 
-  return NextResponse.json({ success: true, id });
+  return NextResponse.json({ success: true, id: ticket.id });
 }

@@ -7,6 +7,7 @@ import {
   createSnappayPayment,
   isSnappayConfigured,
 } from "@/lib/server/snappay";
+import { setOrderPaymentRef } from "@/lib/server/payment-refs";
 
 const createSchema = z.object({
   orderId: z.string().min(1),
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
     });
 
     await updateOrderStatus(order.id, "pending_payment");
+    await setOrderPaymentRef(order.id, "snappay", payment.paymentToken);
 
     return NextResponse.json({
       success: true,

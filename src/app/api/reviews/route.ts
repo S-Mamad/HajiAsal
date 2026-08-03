@@ -8,11 +8,14 @@ import {
 } from "@/lib/server/reviews";
 import { hasPurchasedByPhone } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { getSessionFromRequest } from "@/lib/auth/session";
 
 const BUYER_ONLY_MESSAGE =
-  "ثبت نظر فقط برای خریداران امکان‌پذیر است. وارد حساب شوید یا شماره موبایل سفارش را وارد کنید.";
+  "ثبت نظر فقط برای خریداران امکان‌پذیر است. وارد حساب شوید.";
+
+const SESSION_REQUIRED_MESSAGE =
+  "برای ثبت نظر ابتدا وارد حساب کاربری شوید.";
 
 const reviewSchema = z.object({
   productId: z.string().min(1).max(64).optional(),
@@ -50,7 +53,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const limited = checkRateLimit(`review:${ip}`, 5, 15 * 60 * 1000);
+    const limited = await checkRateLimitAsync(`review:${ip}`, 5, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(
         {
@@ -79,9 +82,14 @@ export async function POST(request: Request) {
     }
 
     const session = getSessionFromRequest(request);
-    const phoneRaw = session?.phone ?? parsed.data.phone ?? "";
-    const phone = normalizePhone(phoneRaw);
+    if (!session) {
+      return NextResponse.json(
+        { success: false, message: SESSION_REQUIRED_MESSAGE },
+        { status: 401 },
+      );
+    }
 
+    const phone = normalizePhone(session.phone);
     if (!phone) {
       return NextResponse.json(
         { success: false, message: BUYER_ONLY_MESSAGE },
@@ -99,7 +107,7 @@ export async function POST(request: Request) {
 
     const author =
       parsed.data.author.trim() ||
-      session?.fullName?.trim() ||
+      session.fullName?.trim() ||
       "خریدار";
 
     const review = await createReview({
@@ -119,7 +127,7 @@ export async function POST(request: Request) {
     });
   } catch {
     return NextResponse.json(
-      { success: false, message: "خطا در ثبت نظر" },
+      { success: false, message: "خطای سرور" },
       { status: 500 },
     );
   }

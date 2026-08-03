@@ -259,7 +259,7 @@ export default function AdminOrderDetailPage() {
                   disabled={saving || Boolean(order.refundedAt)}
                   onClick={() => setRefundOpen(true)}
                 >
-                  {order.refundedAt ? "بازپرداخت ثبت شده" : "ثبت بازپرداخت"}
+                  {order.refundedAt ? "بازپرداخت انجام شده" : "بازپرداخت از درگاه"}
                 </AdminButton>
               </Can>
             </div>
@@ -308,15 +308,15 @@ export default function AdminOrderDetailPage() {
           void (async () => {
             const ok = await patchOrder({
               refund: true,
-              refundNote: "ثبت بازپرداخت از پنل ادمین",
+              refundNote: "بازپرداخت از درگاه از پنل ادمین",
               status: "cancelled",
             });
             if (ok) setRefundOpen(false);
           })();
         }}
-        title="ثبت بازپرداخت"
-        description="وضعیت سفارش به لغو شده تغییر می‌کند و بازپرداخت در لاگ ثبت می‌شود."
-        confirmLabel="تأیید بازپرداخت"
+        title="بازپرداخت از درگاه"
+        description="مبلغ از طریق درگاه به مشتری برمی‌گردد. در صورت شکست درگاه، سفارش تغییر نمی‌کند. برای ثبت دستی بدون درگاه از API با manualRefund استفاده کنید."
+        confirmLabel="تأیید بازپرداخت درگاه"
         danger
         loading={saving}
       />

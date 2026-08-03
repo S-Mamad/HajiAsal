@@ -15,7 +15,9 @@
 | `AUTH_TEST_PHONE` / `AUTH_TEST_OTP` | **فقط توسعه**؛ در production غیرفعال اجباری |
 | `NEXT_PUBLIC_SITE_URL` | آدرس سایت بدون `/` انتهایی |
 | `SMS_PROVIDER` / `MELIPAYAMAK_OTP_URL` | OTP پیامک |
+| `MELIPAYAMAK_SMS_URL` یا `SMS_API_KEY` / `SMS_SENDER` | پیامک وضعیت سفارش (اختیاری) |
 | `ZARINPAL_MERCHANT_ID` | اختیاری — پرداخت آنلاین |
+| `ZARINPAL_ACCESS_TOKEN` | اختیاری — استرداد واقعی زرین‌پال |
 | `SELLER_DEMO_PASSWORD` / `SELLER_PASSWORD_S1` | ورود فروشندگان دمو/عملیاتی |
 | `SELLER_DEMO_PHONE` | اختیاری برای E2E پنل فروشنده |
 

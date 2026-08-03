@@ -9,7 +9,6 @@ import {
 import { getSiteSettings } from "@/lib/server/site-settings";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
-import { hajiasalAbsoluteUrl } from "@/lib/paths";
 import "@/styles/globals.css";
 
 const vazirmatn = Vazirmatn({
@@ -45,13 +44,9 @@ export const metadata: Metadata = {
     "عسل کوهستان",
     "ژل رویال",
   ],
-  alternates: {
-    canonical: hajiasalAbsoluteUrl(),
-  },
   openGraph: {
     type: "website",
     locale: "fa_IR",
-    url: hajiasalAbsoluteUrl(),
     siteName: siteData.brand.name,
     title: `${siteData.brand.name} | عسل طبیعی و اصل`,
     description: siteData.brand.tagline,

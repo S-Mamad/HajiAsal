@@ -14,7 +14,9 @@ interface EnvStatus {
   mysqlPing: boolean;
   mysqlError?: string | null;
   sms: boolean;
+  orderSms: boolean;
   zarinpal: boolean;
+  zarinpalRefund: boolean;
   authSecret: boolean;
   adminPassword: boolean;
   siteUrl: boolean;
@@ -24,7 +26,9 @@ const LABELS: Record<keyof Omit<EnvStatus, "mysqlError">, string> = {
   mysql: "MySQL (پیکربندی)",
   mysqlPing: "MySQL (اتصال)",
   sms: "پیامک (OTP)",
+  orderSms: "پیامک وضعیت سفارش",
   zarinpal: "زرین‌پال",
+  zarinpalRefund: "استرداد زرین‌پال (ACCESS_TOKEN)",
   authSecret: "AUTH_SESSION_SECRET",
   adminPassword: "ADMIN_PASSWORD",
   siteUrl: "NEXT_PUBLIC_SITE_URL",
@@ -59,7 +63,9 @@ export default function AdminSettingsPage() {
         mysqlPing: Boolean(rawEnv.mysqlPing ?? rawEnv.supabasePing),
         mysqlError: rawEnv.mysqlError ?? rawEnv.supabaseError ?? null,
         sms: Boolean(rawEnv.sms),
+        orderSms: Boolean(rawEnv.orderSms),
         zarinpal: Boolean(rawEnv.zarinpal),
+        zarinpalRefund: Boolean(rawEnv.zarinpalRefund),
         authSecret: Boolean(rawEnv.authSecret),
         adminPassword: Boolean(rawEnv.adminPassword),
         siteUrl: Boolean(rawEnv.siteUrl),

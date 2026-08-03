@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { checkoutApiSchema } from "@/lib/validations/checkout";
-import { createOrder, computeOrderTotal } from "@/lib/server/orders";
 import {
-  validateCouponAsync,
-  incrementSellerDiscountUsage,
-} from "@/lib/server/coupons";
+  createOrder,
+  computeOrderTotal,
+  expireStalePendingOrders,
+} from "@/lib/server/orders";
+import { validateCouponAsync } from "@/lib/server/coupons";
 import {
   rebuildOrderItems,
   calcShippingCost,
 } from "@/lib/server/order-pricing";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { getProductByIdAsync } from "@/lib/server/products-store";
 import {
   applySnappayFee,
@@ -27,7 +28,7 @@ function isZarinpalConfigured(): boolean {
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const limited = checkRateLimit(`orders:${ip}`, 8, 15 * 60 * 1000);
+    const limited = await checkRateLimitAsync(`orders:${ip}`, 8, 15 * 60 * 1000);
     if (!limited.ok) {
       return NextResponse.json(
         {
@@ -50,6 +51,13 @@ export async function POST(request: Request) {
         },
         { status: 401 },
       );
+    }
+
+    // Soft-expire orphan unpaid orders (best-effort; never blocks checkout).
+    try {
+      await expireStalePendingOrders();
+    } catch {
+      /* ignore */
     }
 
     const body = await request.json();
@@ -120,16 +128,22 @@ export async function POST(request: Request) {
     const shipping = await calcShippingCost(shippingMethod, subtotal);
 
     const sellerIdsInCart: string[] = [];
+    const sellerLineSubtotals: Record<string, number> = {};
     for (const line of rebuilt.items) {
       const product = await getProductByIdAsync(line.productId);
-      if (product?.sellerId) sellerIdsInCart.push(product.sellerId);
+      if (product?.sellerId) {
+        sellerIdsInCart.push(product.sellerId);
+        const lineTotal = line.weight.price * line.quantity;
+        sellerLineSubtotals[product.sellerId] =
+          (sellerLineSubtotals[product.sellerId] ?? 0) + lineTotal;
+      }
     }
 
     let discount = 0;
-    let appliedCouponSellerId: string | undefined;
     if (couponCode) {
       const couponResult = await validateCouponAsync(couponCode, subtotal, {
         sellerIdsInCart,
+        sellerLineSubtotals,
       });
       if (!couponResult.valid) {
         return NextResponse.json(
@@ -138,7 +152,6 @@ export async function POST(request: Request) {
         );
       }
       discount = couponResult.discount;
-      appliedCouponSellerId = couponResult.coupon?.sellerId;
     }
 
     const cashTotal = computeOrderTotal(subtotal, shipping, discount);
@@ -158,9 +171,7 @@ export async function POST(request: Request) {
       totalOverride: total,
     });
 
-    if (appliedCouponSellerId && couponCode) {
-      await incrementSellerDiscountUsage(couponCode);
-    }
+    // used_count increments on payment confirm (pending_payment → confirmed)
 
     return NextResponse.json({
       success: true,
@@ -182,6 +193,22 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const limited = await checkRateLimitAsync(
+    `orders-track:${ip}`,
+    40,
+    15 * 60 * 1000,
+  );
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "تعداد درخواست‌ها زیاد است" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get("id");
   const tracking = searchParams.get("tracking");

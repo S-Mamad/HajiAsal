@@ -1,5 +1,63 @@
+import type { Metadata } from "next";
 import type { Product, SiteConfig } from "@/types";
-import { hajiasalAbsoluteUrl } from "@/lib/paths";
+import { hajiasalAbsoluteUrl, hajiasalCanonical } from "@/lib/paths";
+
+/** Parse admin SEO robots string like "index,follow" / "noindex,nofollow". */
+export function parseSeoRobots(
+  value?: string,
+): NonNullable<Metadata["robots"]> | undefined {
+  if (!value?.trim()) return undefined;
+  const tokens = value
+    .toLowerCase()
+    .split(/[,\s]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (tokens.length === 0) return undefined;
+  return {
+    index: !tokens.includes("noindex"),
+    follow: !tokens.includes("nofollow"),
+  };
+}
+
+export function buildProductMetadata(product: Product): Metadata {
+  const seo = product.seo;
+  const title = seo?.title || product.title;
+  const description = seo?.description || product.shortDescription;
+  const ogTitle = seo?.ogTitle || title;
+  const ogDescription = seo?.ogDescription || description;
+  const ogImage = seo?.ogImage || product.images[0];
+  const twTitle = seo?.twitterTitle || ogTitle;
+  const twDescription = seo?.twitterDescription || ogDescription;
+  const twImage = seo?.twitterImage || ogImage;
+  const canonical =
+    seo?.canonical?.trim() ||
+    hajiasalCanonical(`/product/${product.slug}`);
+  const robots = parseSeoRobots(seo?.robots);
+
+  return {
+    title,
+    description,
+    ...(robots ? { robots } : {}),
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title: ogTitle,
+      description: ogDescription,
+      url: canonical.startsWith("http")
+        ? canonical
+        : hajiasalAbsoluteUrl(`/product/${product.slug}`),
+      ...(ogImage
+        ? { images: [{ url: ogImage, alt: product.title }] }
+        : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: twTitle,
+      description: twDescription,
+      ...(twImage ? { images: [twImage] } : {}),
+    },
+  };
+}
 
 export function buildOrganizationJsonLd(site: SiteConfig) {
   return {
