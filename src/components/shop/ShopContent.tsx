@@ -8,7 +8,7 @@ import {
   useMemo,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Faders } from "@phosphor-icons/react";
+import { Faders, MagnifyingGlass, X } from "@phosphor-icons/react";
 import type { Product, ProductCategory, SortOption } from "@/types";
 import { getPriceRange } from "@/lib/products";
 import site from "@/data/site.json";
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { hajiasalPath } from "@/lib/paths";
 
 const siteData = site as SiteConfig;
-const priceRange = getPriceRange();
+const seedPriceRange = getPriceRange();
 const PAGE_SIZE = 12;
 
 const sortOptions: { value: SortOption; label: string }[] = [
@@ -49,6 +49,9 @@ function FiltersPanel({
   updateParams: (updates: Record<string, string | null>) => void;
   onClose?: () => void;
 }) {
+  const sliderMax = Math.max(priceBounds.max, priceBounds.min);
+  const sliderValue = Math.min(Math.max(maxPrice, priceBounds.min), sliderMax);
+
   return (
     <div className="space-y-6">
       {onClose ? (
@@ -102,14 +105,14 @@ function FiltersPanel({
         <input
           type="range"
           min={priceBounds.min}
-          max={priceBounds.max}
+          max={sliderMax}
           step={50000}
-          value={maxPrice}
+          value={sliderValue}
           onChange={(e) => updateParams({ maxPrice: e.target.value })}
           className="w-full accent-[var(--gold)]"
         />
         <p className="mt-2 text-xs text-secondary tabular-nums">
-          تا {maxPrice.toLocaleString("fa-IR")} تومان
+          تا {sliderValue.toLocaleString("fa-IR")} تومان
         </p>
       </div>
 
@@ -150,13 +153,21 @@ function ShopContentInner() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [priceMeta, setPriceMeta] = useState(priceRange);
+  const [priceMeta, setPriceMeta] = useState(seedPriceRange);
 
   const category = (searchParams.get("category") as ProductCategory) || null;
   const sort = (searchParams.get("sort") as SortOption) || "popular";
-  const maxPrice = Number(searchParams.get("maxPrice") || priceRange.max);
+  const maxPriceParam = searchParams.get("maxPrice");
+  const maxPrice = maxPriceParam
+    ? Number(maxPriceParam)
+    : priceMeta.max || seedPriceRange.max;
   const inStockOnly = searchParams.get("inStock") === "1";
   const pageParam = Number(searchParams.get("page") || "1");
+  const searchQuery = (
+    searchParams.get("q") ||
+    searchParams.get("search") ||
+    ""
+  ).trim();
 
   const updateParams = useCallback(
     (
@@ -192,14 +203,19 @@ function ShopContentInner() {
         const qs = new URLSearchParams();
         if (category) qs.set("category", category);
         if (sort) qs.set("sort", sort);
-        if (maxPrice) qs.set("maxPrice", String(maxPrice));
+        // Only constrain price when the user set maxPrice in the URL.
+        if (maxPriceParam) qs.set("maxPrice", maxPriceParam);
         if (inStockOnly) qs.set("inStock", "1");
+        if (searchQuery) qs.set("q", searchQuery);
         const res = await fetch(`/api/products?${qs.toString()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری فروشگاه");
         if (!cancelled) {
           setProducts(data.products ?? []);
-          if (data.meta?.priceRange?.min != null && data.meta?.priceRange?.max != null) {
+          if (
+            data.meta?.priceRange?.min != null &&
+            data.meta?.priceRange?.max != null
+          ) {
             setPriceMeta({
               min: Number(data.meta.priceRange.min),
               max: Number(data.meta.priceRange.max),
@@ -219,7 +235,7 @@ function ShopContentInner() {
     return () => {
       cancelled = true;
     };
-  }, [category, sort, maxPrice, inStockOnly]);
+  }, [category, sort, maxPriceParam, inStockOnly, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, pageParam || 1), totalPages);
@@ -240,19 +256,18 @@ function ShopContentInner() {
     [totalPages, updateParams],
   );
 
+  const subtitle = loading
+    ? "در حال بارگذاری..."
+    : searchQuery
+      ? `${products.length.toLocaleString("fa-IR")} نتیجه برای «${searchQuery}»`
+      : products.length > PAGE_SIZE
+        ? `${products.length.toLocaleString("fa-IR")} محصول · صفحه ${page.toLocaleString("fa-IR")} از ${totalPages.toLocaleString("fa-IR")}`
+        : `${products.length.toLocaleString("fa-IR")} محصول`;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-14">
       <div className="mb-6 flex items-end justify-between gap-4 md:mb-8">
-        <SectionHeading
-          title="فروشگاه"
-          subtitle={
-            loading
-              ? "در حال بارگذاری..."
-              : products.length > PAGE_SIZE
-                ? `${products.length.toLocaleString("fa-IR")} محصول · صفحه ${page.toLocaleString("fa-IR")} از ${totalPages.toLocaleString("fa-IR")}`
-                : `${products.length.toLocaleString("fa-IR")} محصول`
-          }
-        />
+        <SectionHeading title="فروشگاه" subtitle={subtitle} />
         <button
           type="button"
           onClick={() => setFiltersOpen(true)}
@@ -262,6 +277,24 @@ function ShopContentInner() {
           فیلتر
         </button>
       </div>
+
+      {searchQuery ? (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-elevated px-3 py-2.5 text-sm">
+          <MagnifyingGlass size={16} className="text-gold" />
+          <span className="text-secondary">
+            جستجو:{" "}
+            <span className="font-medium text-primary">{searchQuery}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => updateParams({ q: null, search: null })}
+            className="ms-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-secondary hover:bg-surface-muted hover:text-primary"
+          >
+            <X size={14} />
+            پاک کردن
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         <ErrorState
@@ -298,7 +331,7 @@ function ShopContentInner() {
               />
             </>
           ) : (
-            <ShopEmptyState />
+            <ShopEmptyState searchQuery={searchQuery || undefined} />
           )}
         </div>
       </div>

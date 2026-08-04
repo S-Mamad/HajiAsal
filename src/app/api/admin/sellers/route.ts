@@ -1,6 +1,7 @@
 import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { isValidIranPhone } from "@/lib/auth/phone";
 
 import { logAdminAction } from "@/lib/server/audit-log";
 import {
@@ -9,12 +10,17 @@ import {
   getSellerProducts,
   toPublicSeller,
 } from "@/lib/server/sellers";
+import { isSellerProductAwaitingReview } from "@/lib/product-approval";
 
 const createSchema = z.object({
   shopName: z.string().min(2).max(120),
   ownerName: z.string().min(2).max(120),
-  phone: z.string().min(10).max(20),
-  password: z.string().min(6).max(128),
+  phone: z
+    .string()
+    .min(10)
+    .max(20)
+    .refine(isValidIranPhone, "شماره موبایل نامعتبر است"),
+  password: z.string().min(6).max(128).optional(),
   city: z.string().max(80).optional().default(""),
   status: z
     .enum(["pending", "active", "suspended", "rejected"])
@@ -32,8 +38,8 @@ export async function GET(request: Request) {
   const withStats = await Promise.all(
     sellers.map(async (seller) => {
       const products = await getSellerProducts(seller.id);
-      const pendingProducts = products.filter(
-        (p) => p.approvalStatus === "pending",
+      const pendingProducts = products.filter((p) =>
+        isSellerProductAwaitingReview(p),
       ).length;
       return {
         ...toPublicSeller(seller),

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/server/mysql", () => ({
   isMysqlConfigured: vi.fn(() => true),
+  isMysqlUsable: vi.fn(() => true),
   mysqlExecute: vi.fn(),
   mysqlQueryOne: vi.fn(),
   newId: vi.fn(() => "otp-id-1"),
@@ -15,13 +16,16 @@ import {
   createOtpChallenge,
   verifyOtpChallenge,
 } from "./otp-store";
+import { normalizeOtpDigits } from "./otp-digits";
 import {
   isMysqlConfigured,
+  isMysqlUsable,
   mysqlExecute,
   mysqlQueryOne,
 } from "@/lib/server/mysql";
 
 const mockedConfigured = vi.mocked(isMysqlConfigured);
+const mockedUsable = vi.mocked(isMysqlUsable);
 const mockedExecute = vi.mocked(mysqlExecute);
 const mockedQueryOne = vi.mocked(mysqlQueryOne);
 
@@ -29,6 +33,7 @@ afterEach(() => {
   __resetOtpMemoryForTests();
   vi.clearAllMocks();
   mockedConfigured.mockReturnValue(true);
+  mockedUsable.mockReturnValue(true);
 });
 
 describe("otp-store MySQL resilience", () => {
@@ -59,5 +64,19 @@ describe("otp-store MySQL resilience", () => {
     await createOtpChallenge("09120000000", "1111");
     const result = await verifyOtpChallenge("09120000000", "9999");
     expect(result.valid).toBe(false);
+  });
+
+  it("skips MySQL when circuit is open (usable=false)", async () => {
+    mockedUsable.mockReturnValue(false);
+    const code = await createOtpChallenge("09123334455", "4321");
+    expect(code).toBe("4321");
+    expect(mockedExecute).not.toHaveBeenCalled();
+    const result = await verifyOtpChallenge("09123334455", "4321");
+    expect(result.valid).toBe(true);
+  });
+
+  it("normalizes Persian digits", () => {
+    expect(normalizeOtpDigits("۱۲۳۴")).toBe("1234");
+    expect(normalizeOtpDigits("٠١٢٣")).toBe("0123");
   });
 });

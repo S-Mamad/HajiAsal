@@ -4,7 +4,7 @@ import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { RowDataPacket } from "mysql2/promise";
-import { gateSeller, clientIpFromRequest } from "@/lib/server/seller-gate";
+import { gateSeller, gateSellerAny, clientIpFromRequest } from "@/lib/server/seller-gate";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import {
   isMysqlConfigured,
@@ -38,7 +38,10 @@ function extForMime(mime: string): string {
 }
 
 export async function GET(request: Request) {
-  const gated = await gateSeller(request, "media.manage");
+  const gated = await gateSellerAny(request, [
+    "media.manage",
+    "products.manage",
+  ]);
   if (!gated.ok) return gated.response;
 
   if (isMysqlConfigured()) {
@@ -114,7 +117,10 @@ async function persistMediaMeta(input: {
 }
 
 export async function POST(request: Request) {
-  const gated = await gateSeller(request, "media.manage");
+  const gated = await gateSellerAny(request, [
+    "media.manage",
+    "products.manage",
+  ]);
   if (!gated.ok) return gated.response;
 
   const contentType = request.headers.get("content-type") ?? "";

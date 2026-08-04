@@ -1,12 +1,14 @@
+import type { ReactNode } from "react";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 import type { TrustPageContent } from "@/types";
 
 interface TrustPageLayoutProps {
   content: TrustPageContent;
+  children?: ReactNode;
 }
 
-export function TrustPageLayout({ content }: TrustPageLayoutProps) {
+export function TrustPageLayout({ content, children }: TrustPageLayoutProps) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-14 md:px-6 md:py-24">
       <Reveal>
@@ -30,6 +32,7 @@ export function TrustPageLayout({ content }: TrustPageLayoutProps) {
           </Reveal>
         ))}
       </div>
+      {children}
     </div>
   );
 }

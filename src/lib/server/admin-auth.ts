@@ -12,6 +12,7 @@ import {
   type AdminPermission,
   type AdminRole,
 } from "@/lib/admin/permissions";
+import { normalizePhone } from "@/lib/auth/phone";
 import {
   createAdminSession,
   validateAdminSessionTokenDetailed,
@@ -20,6 +21,8 @@ import {
 import { isMysqlConfigured, mysqlExecute, mysqlQuery, mysqlQueryOne } from "./mysql";
 import { readJsonFile, writeJsonFile } from "./db";
 import { canUseFilesystemPersistence } from "./production";
+
+const DEFAULT_PRIMARY_ADMIN_PHONES = ["09351925900", "09135201973"] as const;
 
 const USERS_FILE = "admin-users.json";
 const SCRYPT_PREFIX = "scrypt$";
@@ -182,13 +185,19 @@ export async function findAdminUserByLogin(
   const normalized = login.trim().toLowerCase();
   if (!normalized) return null;
 
+  const phoneNorm = normalizePhone(login);
+  if (phoneNorm) {
+    const byPhone = await findAdminUserByPhone(phoneNorm);
+    if (byPhone) return byPhone;
+  }
+
   if (isMysqlConfigured()) {
     try {
       const row = await mysqlQueryOne<RowDataPacket>(
         `SELECT * FROM admin_users
-         WHERE LOWER(email) = ? OR phone = ?
+         WHERE LOWER(email) = ?
          LIMIT 1`,
-        [normalized, login.trim()],
+        [normalized],
       );
       if (row) return mapUserRow(row);
     } catch {
@@ -198,14 +207,78 @@ export async function findAdminUserByLogin(
   if (canUseFilesystemPersistence()) {
     const users = await listUsersFs();
     return (
+      users.find((u) => u.email && u.email.toLowerCase() === normalized) ?? null
+    );
+  }
+  return null;
+}
+
+export async function findAdminUserByPhone(
+  phone: string,
+): Promise<AdminUser | null> {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+
+  if (isMysqlConfigured()) {
+    try {
+      const rows = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM admin_users WHERE phone IS NOT NULL",
+      );
+      for (const row of rows) {
+        const user = mapUserRow(row);
+        if (user.phone && normalizePhone(user.phone) === normalized) {
+          return user;
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  if (canUseFilesystemPersistence()) {
+    const users = await listUsersFs();
+    return (
       users.find(
-        (u) =>
-          (u.email && u.email.toLowerCase() === normalized) ||
-          u.phone === login.trim(),
+        (u) => u.phone != null && normalizePhone(u.phone) === normalized,
       ) ?? null
     );
   }
   return null;
+}
+
+export function getPrimaryAdminPhones(): string[] {
+  const raw = process.env.ADMIN_PRIMARY_PHONES?.trim();
+  if (raw) {
+    const phones = raw
+      .split(",")
+      .map((p) => normalizePhone(p.trim()))
+      .filter((p): p is string => Boolean(p));
+    if (phones.length > 0) return phones;
+  }
+  return [...DEFAULT_PRIMARY_ADMIN_PHONES];
+}
+
+/** Idempotent seed of primary super_admins (OTP-only). */
+export async function ensurePrimaryAdmins(): Promise<void> {
+  for (const phone of getPrimaryAdminPhones()) {
+    const existing = await findAdminUserByPhone(phone);
+    if (existing) {
+      const patch: Parameters<typeof updateAdminUser>[1] = {};
+      if (existing.status !== "active") patch.status = "active";
+      if (existing.role !== "super_admin") patch.role = "super_admin";
+      if (normalizePhone(existing.phone ?? "") !== phone) patch.phone = phone;
+      if (Object.keys(patch).length > 0) {
+        await updateAdminUser(existing.id, patch);
+      }
+      continue;
+    }
+    await createAdminUser({
+      fullName: `ادمین ${phone.slice(-4)}`,
+      email: null,
+      phone,
+      password: randomBytes(32).toString("hex"),
+      role: "super_admin",
+    });
+  }
 }
 
 export async function listAdminUsers(): Promise<AdminUser[]> {
@@ -229,16 +302,22 @@ export async function createAdminUser(input: {
   fullName: string;
   email?: string | null;
   phone?: string | null;
-  password: string;
+  /** Unused for OTP login; placeholder hash when omitted. */
+  password?: string;
   role: AdminRole;
 }): Promise<AdminUser> {
   const now = new Date().toISOString();
+  const phone = input.phone?.trim()
+    ? normalizePhone(input.phone) ?? input.phone.trim()
+    : null;
   const user: AdminUser = {
     id: randomUUID(),
     fullName: input.fullName.trim(),
     email: (input.email?.trim() || null) as string | null,
-    phone: (input.phone?.trim() || null) as string | null,
-    passwordHash: hashPassword(input.password),
+    phone,
+    passwordHash: hashPassword(
+      input.password?.trim() || randomBytes(32).toString("hex"),
+    ),
     role: input.role,
     status: "active",
     lastLoginAt: null,

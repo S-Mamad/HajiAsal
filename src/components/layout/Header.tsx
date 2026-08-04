@@ -29,9 +29,6 @@ export function Header() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const openCart = useCartStore((s) => s.openCart);
-  const closeCart = useCartStore((s) => s.closeCart);
-  const cartOpen = useCartStore((s) => s.isOpen);
   const itemCount = useCartStore((s) => s.getItemCount());
   const hasHydrated = useCartStore((s) => s._hasHydrated);
   const wishlistCount = useWishlistStore((s) => s.count());
@@ -46,47 +43,34 @@ export function Header() {
 
   const openSearch = () => {
     setMobileOpen(false);
-    closeCart();
     setSearchOpen(true);
   };
 
   const toggleMobile = () => {
     setSearchOpen(false);
-    closeCart();
     setMobileOpen((v) => !v);
   };
-
-  const handleOpenCart = () => {
-    setSearchOpen(false);
-    setMobileOpen(false);
-    openCart();
-  };
-
-  useEffect(() => {
-    if (cartOpen) {
-      setSearchOpen(false);
-      setMobileOpen(false);
-    }
-  }, [cartOpen]);
 
   return (
     <>
       <header
         className={cn(
-          "site-header fixed inset-x-0 top-0 h-14 border-b backdrop-blur-xl sm:h-16",
+          "site-header fixed inset-x-0 top-0 h-16 border-b backdrop-blur-xl sm:h-[4.75rem]",
           mobileOpen ? "z-[100]" : "z-50",
         )}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-4 md:px-8">
           <Link
             href={hajiasalPath()}
-            className="min-w-0"
+            className="group/logo -ms-0.5 flex shrink-0 items-center rounded-xl px-1 py-0.5 transition-transform duration-300 hover:opacity-95 active:scale-[0.98]"
             onClick={() => setMobileOpen(false)}
             aria-label={siteData.brand.name}
           >
             <BrandLogo
               name={siteData.brand.name}
-              className="[&>span:last-child]:hidden lg:[&>span:last-child]:inline"
+              size="header"
+              priority
+              markClassName="transition-transform duration-300 group-hover/logo:scale-[1.04]"
             />
           </Link>
 
@@ -110,7 +94,7 @@ export function Header() {
             })}
           </nav>
 
-          {/* Mobile: search + cart + menu only */}
+          {/* Mobile: search + wishlist + menu (cart lives in FloatingBottomNav) */}
           <div className="flex shrink-0 items-center gap-0.5 lg:hidden">
             <button
               type="button"
@@ -120,15 +104,14 @@ export function Header() {
             >
               <Icon icon={MagnifyingGlass} size={18} />
             </button>
-            <button
-              type="button"
-              onClick={handleOpenCart}
+            <Link
+              href={hajiasalPath("/wishlist")}
               className={cn("relative", iconBtn)}
-              aria-label="سبد خرید"
+              aria-label="علاقه‌مندی‌ها"
             >
-              <Icon icon={ShoppingBag} size={18} />
-              {hasHydrated ? <CountBadge count={itemCount} /> : null}
-            </button>
+              <Icon icon={Heart} size={18} />
+              {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
+            </Link>
             <button
               type="button"
               onClick={toggleMobile}
@@ -161,19 +144,21 @@ export function Header() {
               {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
             </Link>
             <UserMenu compact />
-            <button
-              type="button"
-              onClick={handleOpenCart}
+            <Link
+              href={hajiasalPath("/cart")}
               className={cn("relative", iconBtn)}
               aria-label="سبد خرید"
+              aria-current={
+                pathname?.startsWith(hajiasalPath("/cart")) ? "page" : undefined
+              }
             >
               <Icon icon={ShoppingBag} size={18} />
               {hasHydrated ? <CountBadge count={itemCount} /> : null}
-            </button>
+            </Link>
           </div>
         </div>
       </header>
-      <div className="h-14 sm:h-16" aria-hidden />
+      <div className="h-16 sm:h-[4.75rem]" aria-hidden />
       <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>

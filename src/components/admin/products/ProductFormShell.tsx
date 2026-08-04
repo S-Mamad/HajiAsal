@@ -44,9 +44,14 @@ const formSchema = z.object({
       }),
     )
     .min(1, "حداقل یک گزینه وزن لازم است"),
-  discountPrice: z.coerce.number().optional().or(z.literal("")),
+  // Literal "" must come first — z.coerce.number() turns "" into 0.
+  discountPrice: z
+    .union([z.literal(""), z.coerce.number().nonnegative()])
+    .optional(),
   inStock: z.boolean().default(true),
-  stockQty: z.coerce.number().optional().or(z.literal("")),
+  stockQty: z
+    .union([z.literal(""), z.coerce.number().int().nonnegative()])
+    .optional(),
   isBestseller: z.boolean().default(false),
   isNew: z.boolean().default(false),
   ingredients: z.string().optional(),
@@ -73,6 +78,15 @@ const formSchema = z.object({
 });
 
 export type ProductFormValues = z.infer<typeof formSchema>;
+
+function slugifyTitle(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\u0600-\u06FF]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
 
 const CATEGORY_OPTIONS = [
   { id: "mountain", label: "کوهستان" },
@@ -157,6 +171,9 @@ export function ProductFormShell({
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [fields, setFields] = useState<ProductFieldDefinition[]>([]);
   const lastSaved = useRef("");
+  const saveGen = useRef(0);
+  const slugTouched = useRef(Boolean(initialProduct?.slug));
+  const initialSnapshotDone = useRef(false);
 
   const form = useForm<ProductFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -192,12 +209,15 @@ export function ProductFormShell({
     ) => {
       const discount =
         data.discountPrice === "" || data.discountPrice == null
-          ? undefined
+          ? null
           : Number(data.discountPrice);
-      const stockQty =
-        data.stockQty === "" || data.stockQty == null
-          ? undefined
-          : Number(data.stockQty);
+      const hasQty =
+        data.stockQty !== "" && data.stockQty != null && data.stockQty !== undefined;
+      const stockQty = hasQty ? Number(data.stockQty) : null;
+      const inStock =
+        typeof stockQty === "number"
+          ? stockQty > 0 && data.inStock
+          : data.inStock;
       const base = {
         title: data.title,
         slug: data.slug,
@@ -209,7 +229,7 @@ export function ProductFormShell({
           CATEGORY_OPTIONS.find((c) => c.id === data.category)?.label ||
           data.category,
         images: data.images,
-        inStock: data.inStock,
+        inStock,
         stockQty,
         isBestseller: data.isBestseller,
         isNew: data.isNew,
@@ -235,6 +255,15 @@ export function ProductFormShell({
     [canEditPrice],
   );
 
+  // Snapshot baseline once so the first edits within 3s still autosave.
+  useEffect(() => {
+    if (mode !== "edit" || initialSnapshotDone.current) return;
+    lastSaved.current = JSON.stringify(
+      buildPayload(form.getValues(), { autosave: true }),
+    );
+    initialSnapshotDone.current = true;
+  }, [mode, buildPayload, form]);
+
   const persist = useCallback(
     async (
       data: ProductFormValues,
@@ -242,6 +271,7 @@ export function ProductFormShell({
     ) => {
       setError("");
       const payload = buildPayload(data, opts);
+      const gen = ++saveGen.current;
 
       if (mode === "create") {
         setSaving(true);
@@ -276,14 +306,17 @@ export function ProductFormShell({
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "خطا در ذخیره");
+        // Ignore stale responses from overlapping saves.
+        if (gen !== saveGen.current) return;
         lastSaved.current = JSON.stringify(payload);
         if (opts?.autosave) setAutosave("saved");
         if (opts?.redirect) router.push(hajiasalPath("/admin/products"));
       } catch (err) {
+        if (gen !== saveGen.current) return;
         setError(err instanceof Error ? err.message : "خطا");
         if (opts?.autosave) setAutosave("error");
       } finally {
-        setSaving(false);
+        if (gen === saveGen.current) setSaving(false);
       }
     },
     [buildPayload, mode, productId, router],
@@ -295,22 +328,32 @@ export function ProductFormShell({
       const data = form.getValues();
       const payload = buildPayload(data, { autosave: true });
       const serialized = JSON.stringify(payload);
-      if (!lastSaved.current) {
-        lastSaved.current = serialized;
-        return;
-      }
-      if (serialized === lastSaved.current) return;
+      if (!lastSaved.current || serialized === lastSaved.current) return;
       void persist(data, { autosave: true });
     }, 3000);
     return () => clearTimeout(timer);
   }, [values, mode, productId, form, buildPayload, persist]);
+
+  const applyRestoredProduct = useCallback(
+    (product: Product) => {
+      const next = toFormValues(product);
+      form.reset(next);
+      lastSaved.current = JSON.stringify(
+        buildPayload(next, { autosave: true }),
+      );
+      saveGen.current += 1;
+      setAutosave("idle");
+      setError("");
+    },
+    [buildPayload, form],
+  );
 
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     void form.handleSubmit(
       (data) =>
         persist(data, {
           redirect: true,
-          status: data.status === "draft" ? "active" : data.status,
+          status: data.status,
         }),
       (errs) => {
         const fieldToTab: Record<string, ProductFormTabId> = {
@@ -362,8 +405,26 @@ export function ProductFormShell({
       case "basic":
         return (
           <div className="grid gap-4 md:grid-cols-2">
-            <Input label="عنوان" {...form.register("title")} error={form.formState.errors.title?.message} />
-            <Input label="اسلاگ" {...form.register("slug")} error={form.formState.errors.slug?.message} />
+            <Input
+              label="عنوان"
+              {...form.register("title", {
+                onChange: (e) => {
+                  if (slugTouched.current) return;
+                  const next = slugifyTitle(e.target.value);
+                  if (next) form.setValue("slug", next, { shouldDirty: true });
+                },
+              })}
+              error={form.formState.errors.title?.message}
+            />
+            <Input
+              label="اسلاگ"
+              {...form.register("slug", {
+                onChange: () => {
+                  slugTouched.current = true;
+                },
+              })}
+              error={form.formState.errors.slug?.message}
+            />
             <div className="md:col-span-2">
               <Input label="توضیح کوتاه" {...form.register("shortDescription")} />
             </div>
@@ -435,7 +496,22 @@ export function ProductFormShell({
       case "inventory":
         return (
           <div className="space-y-3">
-            <Input label="تعداد موجودی" type="number" {...form.register("stockQty")} />
+            <Input
+              label="تعداد موجودی (خالی = نامحدود)"
+              type="number"
+              {...form.register("stockQty", {
+                onChange: (e) => {
+                  const raw = e.target.value;
+                  if (raw === "") return;
+                  const n = Number(raw);
+                  if (!Number.isNaN(n) && n <= 0) {
+                    form.setValue("inStock", false);
+                  } else if (!Number.isNaN(n) && n > 0) {
+                    form.setValue("inStock", true);
+                  }
+                },
+              })}
+            />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...form.register("inStock")} />
               موجود در انبار
@@ -549,7 +625,7 @@ export function ProductFormShell({
       default:
         return null;
     }
-  }, [tab, form, weightFields, append, remove, values, fields]);
+  }, [tab, form, weightFields, append, remove, values, fields, canEditPrice]);
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -576,11 +652,21 @@ export function ProductFormShell({
                 تاریخچه
               </AdminButton>
               <AdminButton
-                href={hajiasalPath(`/product/${values.slug}`)}
+                href={
+                  values.status === "active"
+                    ? hajiasalPath(`/product/${values.slug}`)
+                    : undefined
+                }
                 variant="ghost"
                 size="sm"
                 target="_blank"
                 external
+                disabled={values.status !== "active"}
+                title={
+                  values.status !== "active"
+                    ? "فقط محصولات فعال در فروشگاه دیده می‌شوند"
+                    : "مشاهده در فروشگاه"
+                }
               >
                 <Icon icon={Eye} size={16} />
                 مشاهده
@@ -622,7 +708,10 @@ export function ProductFormShell({
           productId={productId}
           open={revisionsOpen}
           onClose={() => setRevisionsOpen(false)}
-          onRestored={() => router.refresh()}
+          onRestored={(product) => {
+            if (product) applyRestoredProduct(product);
+            else router.refresh();
+          }}
         />
       ) : null}
     </form>

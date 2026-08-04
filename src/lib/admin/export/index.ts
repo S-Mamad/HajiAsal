@@ -1,3 +1,5 @@
+import { brandLogoPrintSrc } from "@/lib/brand-assets";
+
 export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -5,6 +7,16 @@ export function downloadBlob(filename: string, blob: Blob) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Escape text before interpolating into printHtml / document.write. */
+export function escapeHtml(value: string | number | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function exportToCsv(
@@ -44,14 +56,29 @@ export function exportToJson(filename: string, data: unknown) {
 export function printHtml(title: string, bodyHtml: string) {
   const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
   if (!win) return;
+  const safeTitle = escapeHtml(title);
+  const logo = brandLogoPrintSrc();
   win.document.write(`<!doctype html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <title>${title}</title>
+  <title>${safeTitle}</title>
   <style>
     body { font-family: Tahoma, sans-serif; padding: 24px; color: #1c1917; }
-    h1 { font-size: 18px; margin-bottom: 16px; }
+    .print-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #e7e5e4;
+    }
+    .print-brand img {
+      height: 56px;
+      width: auto;
+      object-fit: contain;
+    }
+    .print-brand h1 { font-size: 18px; margin: 0; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { border: 1px solid #d6d3d1; padding: 8px; text-align: right; }
     th { background: #f5f5f4; }
@@ -59,7 +86,10 @@ export function printHtml(title: string, bodyHtml: string) {
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
+  <div class="print-brand">
+    <img src="${logo}" alt="حاجی عسل" width="38" height="56" />
+    <h1>${safeTitle}</h1>
+  </div>
   ${bodyHtml}
   <script>window.onload = () => { window.print(); };<\/script>
 </body>

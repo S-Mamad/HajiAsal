@@ -7,11 +7,16 @@ test.describe("Haji Asal admin platform smoke", () => {
   test("brands page requires auth redirect", async ({ page }) => {
     await page.goto("/admin/brands");
     await page.waitForURL(LOGIN_URL, { timeout: 10_000 });
-    await expect(page.locator('input[type="password"]')).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /دریافت کد/i }),
+    ).toBeVisible();
   });
 
   test("after login, brands nav is reachable", async ({ page }) => {
-    test.skip(!process.env.ADMIN_PASSWORD, "ADMIN_PASSWORD not set");
+    test.skip(
+      !process.env.AUTH_TEST_OTP && !process.env.ADMIN_TEST_PHONE,
+      "AUTH_TEST_OTP / ADMIN_TEST_PHONE not set",
+    );
     const ok = await loginAsAdmin(page);
     expect(ok).toBe(true);
 

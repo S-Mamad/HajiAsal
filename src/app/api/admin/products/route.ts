@@ -22,11 +22,19 @@ export async function GET(request: Request) {
     | "disabled"
     | "all"
     | null;
+  const approval = url.searchParams.get("approval") as
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "awaiting"
+    | "all"
+    | null;
 
   const products = await getAllProductsAsync({
     scope: "admin",
     includeTrash: trash,
     status: status ?? "all",
+    approvalStatus: approval ?? "all",
   });
   return NextResponse.json({ products });
 }
@@ -61,9 +69,9 @@ export async function POST(request: Request) {
       categoryLabel: data.categoryLabel || data.category,
       images: data.images,
       weightOptions: data.weightOptions,
-      discountPrice: data.discountPrice,
+      discountPrice: data.discountPrice ?? undefined,
       inStock: data.inStock,
-      stockQty: data.stockQty,
+      stockQty: data.stockQty ?? undefined,
       isBestseller: data.isBestseller,
       isNew: data.isNew,
       ingredients: data.ingredients,

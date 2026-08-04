@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
 import { TrustPageLayout } from "@/components/layout/TrustPageLayout";
+import { LabCertificateDownload } from "@/components/trust/LabCertificateDownload";
 import { hajiasalPath } from "@/lib/paths";
 
 const siteData = site as SiteConfig;
@@ -14,5 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default function AuthenticityPage() {
-  return <TrustPageLayout content={content} />;
+  return (
+    <TrustPageLayout content={content}>
+      <LabCertificateDownload />
+    </TrustPageLayout>
+  );
 }

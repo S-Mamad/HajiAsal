@@ -7,34 +7,58 @@ cd "$ROOT"
 
 export NODE_ENV=production
 
-# Prefer CloudLinux / cPanel Node binaries when present
-for candidate in \
-  /opt/cpanel/ea-nodejs22/bin \
-  /opt/cpanel/ea-nodejs20/bin \
-  /opt/cpanel/ea-nodejs18/bin \
-  "$HOME/nodevenv/hajiasal"/*/bin
-do
-  if [ -d "$candidate" ] && [ -x "$candidate/node" ]; then
-    export PATH="$candidate:$PATH"
-    break
-  fi
-done
+# Exact venv from Setup Node.js App (hajiasal / Node 22), then fallbacks
+activate_node() {
+  local activate
+  for activate in \
+    "$HOME/nodevenv/hajiasal/22/bin/activate" \
+    "$HOME/nodevenv/hajiasal/20/bin/activate" \
+    "$HOME/nodevenv/hajiasal-admin/22/bin/activate" \
+    "$HOME/nodevenv/hajiasal-seller/22/bin/activate" \
+    "$HOME/nodevenv/hajiasal"/*/bin/activate \
+    "$HOME/nodevenv/hajiasal-admin"/*/bin/activate \
+    "$HOME/nodevenv/hajiasal-seller"/*/bin/activate
+  do
+    if [ -f "$activate" ]; then
+      # shellcheck disable=SC1090
+      source "$activate"
+      echo "[cpanel-deploy] activated: $activate"
+      return 0
+    fi
+  done
 
+  for candidate in \
+    /opt/cpanel/ea-nodejs22/bin \
+    /opt/cpanel/ea-nodejs20/bin \
+    /opt/cpanel/ea-nodejs18/bin
+  do
+    if [ -d "$candidate" ] && [ -x "$candidate/node" ]; then
+      export PATH="$candidate:$PATH"
+      echo "[cpanel-deploy] PATH prepend: $candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+activate_node || true
+
+echo "[cpanel-deploy] cwd=$ROOT"
 echo "[cpanel-deploy] node=$(command -v node || true) $(node -v 2>/dev/null || echo missing)"
 echo "[cpanel-deploy] npm=$(command -v npm || true) $(npm -v 2>/dev/null || echo missing)"
 
 if ! command -v npm >/dev/null 2>&1; then
-  echo "[cpanel-deploy] npm not found in PATH."
-  echo "[cpanel-deploy] Open cPanel → Setup Node.js App → Run NPM Install, then npm run build."
-  mkdir -p tmp
-  exit 0
+  echo "[cpanel-deploy] ERROR: npm not found."
+  echo "[cpanel-deploy] In Terminal run:"
+  echo "  source /home/uabkxfzi/nodevenv/hajiasal/22/bin/activate && cd /home/uabkxfzi/hajiasal"
+  echo "  npm install && npm run build && mkdir -p tmp && touch tmp/restart.txt"
+  exit 1
 fi
 
-# Full install: Next build needs some dev tooling on host
 npm install --no-audit --no-fund
 npm run build
 
-# Prepare standalone layout for Passenger (server.js at project root)
 if [ -d .next/standalone ]; then
   mkdir -p .next/standalone/.next
   if [ -d .next/static ]; then
@@ -45,7 +69,9 @@ if [ -d .next/standalone ]; then
     rm -rf .next/standalone/public
     cp -R public .next/standalone/public
   fi
-  # Keep root .env available to standalone process via chdir in server.js
+else
+  echo "[cpanel-deploy] ERROR: .next/standalone missing after build."
+  exit 1
 fi
 
 mkdir -p tmp

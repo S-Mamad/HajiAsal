@@ -28,6 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/admin/qa")]: "پرسش و پاسخ",
   [hajiasalPath("/admin/tickets")]: "تیکت‌ها",
   [hajiasalPath("/admin/notifications")]: "اعلان‌ها",
+  [hajiasalPath("/admin/sms")]: "پیامک",
   [hajiasalPath("/admin/users")]: "کاربران پنل",
   [hajiasalPath("/admin/content")]: "محتوا",
   [hajiasalPath("/admin/reports")]: "گزارش‌ها",

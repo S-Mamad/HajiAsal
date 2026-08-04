@@ -10,12 +10,16 @@ export async function GET(request: Request) {
   const limit = Number(searchParams.get("limit") ?? 25);
   const offset = Number(searchParams.get("offset") ?? 0);
   const action = searchParams.get("action") ?? undefined;
+  const entityType = searchParams.get("entityType") ?? undefined;
+  const entityId = searchParams.get("entityId") ?? undefined;
 
   const data = await listSellerActivity({
     sellerId: gated.ctx.seller.id,
     limit,
     offset,
     action: action || undefined,
+    entityType: entityType || undefined,
+    entityId: entityId || undefined,
   });
   return NextResponse.json(data);
 }

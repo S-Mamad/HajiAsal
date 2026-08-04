@@ -14,24 +14,30 @@ interface EnvStatus {
   mysqlPing: boolean;
   mysqlError?: string | null;
   sms: boolean;
+  transactionalSms: boolean;
   orderSms: boolean;
   zarinpal: boolean;
   zarinpalRefund: boolean;
   authSecret: boolean;
-  adminPassword: boolean;
+  adminOtp: boolean;
   siteUrl: boolean;
+  adminUrl: boolean;
+  sellerUrl: boolean;
 }
 
 const LABELS: Record<keyof Omit<EnvStatus, "mysqlError">, string> = {
   mysql: "MySQL (پیکربندی)",
   mysqlPing: "MySQL (اتصال)",
-  sms: "پیامک (OTP)",
-  orderSms: "پیامک وضعیت سفارش",
+  sms: "پیامک (OTP ورود)",
+  transactionalSms: "پیامک آزاد (ارسال دستی ادمین)",
+  orderSms: "پیامک خودکار سفارش",
   zarinpal: "زرین‌پال",
   zarinpalRefund: "استرداد زرین‌پال (ACCESS_TOKEN)",
   authSecret: "AUTH_SESSION_SECRET",
-  adminPassword: "ADMIN_PASSWORD",
+  adminOtp: "ورود ادمین با OTP",
   siteUrl: "NEXT_PUBLIC_SITE_URL",
+  adminUrl: "NEXT_PUBLIC_ADMIN_URL",
+  sellerUrl: "NEXT_PUBLIC_SELLER_URL",
 };
 
 export default function AdminSettingsPage() {
@@ -63,12 +69,15 @@ export default function AdminSettingsPage() {
         mysqlPing: Boolean(rawEnv.mysqlPing ?? rawEnv.supabasePing),
         mysqlError: rawEnv.mysqlError ?? rawEnv.supabaseError ?? null,
         sms: Boolean(rawEnv.sms),
+        transactionalSms: Boolean(rawEnv.transactionalSms),
         orderSms: Boolean(rawEnv.orderSms),
         zarinpal: Boolean(rawEnv.zarinpal),
         zarinpalRefund: Boolean(rawEnv.zarinpalRefund),
         authSecret: Boolean(rawEnv.authSecret),
-        adminPassword: Boolean(rawEnv.adminPassword),
+        adminOtp: Boolean(rawEnv.adminOtp ?? true),
         siteUrl: Boolean(rawEnv.siteUrl),
+        adminUrl: Boolean(rawEnv.adminUrl),
+        sellerUrl: Boolean(rawEnv.sellerUrl),
       });
       setMissing(data.missing ?? []);
       setProductionReady(Boolean(data.productionReady));

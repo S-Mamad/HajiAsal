@@ -15,21 +15,43 @@ export default function SellerSettingsPage() {
   const [lowStockThreshold, setLowStockThreshold] = useState("10");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/seller/profile");
-    if (res.status === 401) {
-      router.push(hajiasalPath("/seller"));
-      return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/seller/settings");
+      if (res.status === 401) {
+        router.push(hajiasalPath("/seller"));
+        return;
+      }
+      if (res.status === 403) {
+        setError("دسترسی به تنظیمات ندارید");
+        return;
+      }
+      if (res.status === 503) {
+        setError("سرویس تنظیمات موقتاً در دسترس نیست. کمی بعد دوباره تلاش کنید.");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "خطا در بارگذاری تنظیمات");
+        return;
+      }
+      const s = data.shopSettings ?? {};
+      if (s.workingHours) setWorkingHours(s.workingHours);
+      if (s.prepTimeHours != null) setPrepTimeHours(String(s.prepTimeHours));
+      if (s.autoMessage) setAutoMessage(s.autoMessage);
+      if (s.shippingNotes) setShippingNotes(s.shippingNotes);
+      if (s.lowStockThreshold != null)
+        setLowStockThreshold(String(s.lowStockThreshold));
+    } catch {
+      setError("خطا در بارگذاری تنظیمات");
+    } finally {
+      setLoading(false);
     }
-    const data = await res.json();
-    const s = data.seller?.shopSettings ?? {};
-    if (s.workingHours) setWorkingHours(s.workingHours);
-    if (s.prepTimeHours != null) setPrepTimeHours(String(s.prepTimeHours));
-    if (s.autoMessage) setAutoMessage(s.autoMessage);
-    if (s.shippingNotes) setShippingNotes(s.shippingNotes);
-    if (s.lowStockThreshold != null)
-      setLowStockThreshold(String(s.lowStockThreshold));
   }, [router]);
 
   useEffect(() => {
@@ -39,26 +61,45 @@ export default function SellerSettingsPage() {
   const save = async () => {
     setError("");
     setMessage("");
-    const res = await fetch("/api/seller/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        shopSettings: {
-          workingHours,
-          prepTimeHours: Number(prepTimeHours) || 24,
-          autoMessage,
-          shippingNotes,
-          lowStockThreshold: Number(lowStockThreshold) || 10,
-        },
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "خطا");
-      return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/seller/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shopSettings: {
+            workingHours,
+            prepTimeHours: Number(prepTimeHours) || 24,
+            autoMessage,
+            shippingNotes,
+            lowStockThreshold: Number(lowStockThreshold) || 10,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (res.status === 403) {
+        setError("دسترسی به ویرایش تنظیمات ندارید");
+        return;
+      }
+      if (res.status === 503) {
+        setError("ذخیره تنظیمات موقتاً ممکن نیست. کمی بعد دوباره تلاش کنید.");
+        return;
+      }
+      if (!res.ok) {
+        setError(data.error ?? "خطا");
+        return;
+      }
+      setMessage("تنظیمات ذخیره شد");
+    } catch {
+      setError("خطا در ذخیره تنظیمات");
+    } finally {
+      setSaving(false);
     }
-    setMessage("تنظیمات ذخیره شد");
   };
+
+  if (loading) {
+    return <p className="text-sm text-stone-500">در حال بارگذاری...</p>;
+  }
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -71,7 +112,9 @@ export default function SellerSettingsPage() {
         <Input label="پیام خودکار" value={autoMessage} onChange={(e) => setAutoMessage(e.target.value)} />
         <Input label="تنظیمات ارسال" value={shippingNotes} onChange={(e) => setShippingNotes(e.target.value)} />
       </div>
-      <AdminButton onClick={() => void save()}>ذخیره تنظیمات</AdminButton>
+      <AdminButton onClick={() => void save()} disabled={saving}>
+        {saving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
+      </AdminButton>
     </div>
   );
 }

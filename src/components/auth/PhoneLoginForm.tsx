@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { Phone } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { Icon } from "@/components/ui/Icon";
-import { hajiasalPath } from "@/lib/paths";
 import { useOtpTimer } from "@/hooks/useOtpTimer";
 import { syncWishlistBidirectional } from "@/lib/client/wishlist-sync";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,26 +15,25 @@ import {
   maskPhone,
   normalizePhoneInput,
 } from "@/lib/auth/phone-mask";
-import { safeInternalRedirect } from "@/lib/safe-redirect";
+import { getOrCreateDeviceId } from "@/lib/auth/device-id";
 
 const DEFAULT_OTP_LENGTH = 4;
 
+export type AuthWelcomeUser = {
+  fullName: string;
+  phone: string;
+};
+
 interface PhoneLoginFormProps {
-  mode?: "login" | "register";
   onNeedsRegister?: (phone: string) => void;
+  onWelcome?: (user: AuthWelcomeUser) => void;
 }
 
 export function PhoneLoginForm({
-  mode = "login",
   onNeedsRegister,
+  onWelcome,
 }: PhoneLoginFormProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { refresh } = useAuth();
-  const redirect = safeInternalRedirect(
-    searchParams.get("redirect"),
-    hajiasalPath("/account"),
-  );
 
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -45,7 +42,7 @@ export function PhoneLoginForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const { seconds, canResend, start: startTimer } = useOtpTimer(90);
+  const { seconds, canResend, start: startTimer } = useOtpTimer(120);
   const verifyingRef = useRef(false);
 
   const normalizedPhone = normalizePhoneInput(phone);
@@ -62,8 +59,15 @@ export function PhoneLoginForm({
     try {
       const res = await fetch("/api/auth/otp/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: normalizedPhone }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": getOrCreateDeviceId(),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          deviceId: getOrCreateDeviceId(),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -71,9 +75,12 @@ export function PhoneLoginForm({
         return;
       }
       setMessage(
-        typeof data.message === "string" && !String(data.message).includes("تست")
-          ? data.message
-          : "کد تأیید ارسال شد",
+        step === "otp"
+          ? "کد جدید ارسال شد؛ کد قبلی دیگر معتبر نیست"
+          : typeof data.message === "string" &&
+              !String(data.message).includes("تست")
+            ? data.message
+            : "کد تأیید ارسال شد",
       );
       const length =
         typeof data.codeLength === "number" &&
@@ -84,7 +91,11 @@ export function PhoneLoginForm({
       setOtpLength(length);
       setOtp("");
       setStep("otp");
-      startTimer();
+      const wait =
+        typeof data.resendAfterSec === "number" && data.resendAfterSec > 0
+          ? data.resendAfterSec
+          : 120;
+      startTimer(wait);
     } catch {
       setError("اتصال برقرار نشد. دوباره تلاش کنید");
     } finally {
@@ -102,33 +113,35 @@ export function PhoneLoginForm({
       const res = await fetch("/api/auth/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ phone: normalizedPhone, code: otp }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         setError(data.message ?? "کد نادرست است");
-        setOtp("");
         verifyingRef.current = false;
         return;
       }
 
       await refresh();
 
-      if (mode === "register" && !data.isNewUser) {
-        await syncWishlistBidirectional();
-        router.push(redirect);
-        router.refresh();
-        return;
-      }
-
-      if (data.isNewUser || mode === "register") {
+      if (data.isNewUser) {
         onNeedsRegister?.(normalizedPhone);
         return;
       }
 
+      const fullName =
+        typeof data.user?.fullName === "string" && data.user.fullName.trim()
+          ? data.user.fullName.trim()
+          : "";
       await syncWishlistBidirectional();
-      router.push(redirect);
-      router.refresh();
+      onWelcome?.({
+        fullName,
+        phone:
+          typeof data.user?.phone === "string"
+            ? data.user.phone
+            : normalizedPhone,
+      });
     } catch {
       setError("اتصال برقرار نشد. دوباره تلاش کنید");
       verifyingRef.current = false;
@@ -138,7 +151,12 @@ export function PhoneLoginForm({
   };
 
   useEffect(() => {
-    if (step === "otp" && otp.length === otpLength && !loading && !verifyingRef.current) {
+    if (
+      step === "otp" &&
+      otp.length === otpLength &&
+      !loading &&
+      !verifyingRef.current
+    ) {
       void verifyOtp();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire when OTP completes
@@ -151,7 +169,7 @@ export function PhoneLoginForm({
           e.preventDefault();
           void sendOtp();
         }}
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-5"
       >
         <Input
           label="شماره موبایل"
@@ -177,13 +195,17 @@ export function PhoneLoginForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-center text-xs text-muted">مرحله ۲ از ۲</p>
-      <p className="text-center text-sm text-muted">
-        کد تأیید ارسال‌شده به{" "}
-        <span dir="ltr" className="font-medium text-primary">
-          {maskPhone(normalizedPhone)}
-        </span>
-      </p>
+      <div className="space-y-1.5 text-center">
+        <p className="text-sm text-muted">
+          کد تأیید ارسال‌شده به{" "}
+          <span dir="ltr" className="font-medium text-primary">
+            {maskPhone(normalizedPhone)}
+          </span>
+        </p>
+        <p className="text-[11px] text-dim">
+          معمولاً چند ثانیه طول می‌کشد. کد تا ۱۰ دقیقه معتبر است.
+        </p>
+      </div>
       {message ? <p className="text-center text-xs text-gold">{message}</p> : null}
       <OtpInput
         value={otp}
@@ -198,7 +220,7 @@ export function PhoneLoginForm({
         disabled={loading || otp.length < otpLength}
         className="w-full"
       >
-        {loading ? "در حال تأیید..." : mode === "register" ? "ادامه ثبت‌نام" : "ورود"}
+        {loading ? "در حال تأیید..." : "ادامه"}
       </Button>
       <div className="flex items-center justify-between text-xs text-muted">
         <button

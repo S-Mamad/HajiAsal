@@ -16,7 +16,10 @@ export function getProductById(id: string): Product | undefined {
 }
 
 export function getBestsellers(limit = 8): Product[] {
-  return products.filter((p) => p.isBestseller && p.inStock).slice(0, limit);
+  return products
+    .filter((p) => p.isBestseller && p.inStock)
+    .sort((a, b) => b.reviewCount - a.reviewCount)
+    .slice(0, limit);
 }
 
 export function getNewProducts(limit = 6): Product[] {
@@ -80,18 +83,62 @@ export function getPriceRange(): { min: number; max: number } {
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }
 
+/** Normalize Arabic/Persian yeh/kaf so search matches typed variants. */
+export function normalizeSearchText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک");
+}
+
+export function scoreProductSearch(product: Product, normalizedQuery: string): number {
+  if (!normalizedQuery) return 0;
+  const title = normalizeSearchText(product.title);
+  const slug = product.slug.toLowerCase();
+  const category = normalizeSearchText(
+    `${product.categoryLabel} ${product.category}`,
+  );
+  const body = normalizeSearchText(
+    `${product.shortDescription} ${product.longDescription}`,
+  );
+  let score = 0;
+  if (title === normalizedQuery) score += 100;
+  else if (title.startsWith(normalizedQuery)) score += 80;
+  else if (title.includes(normalizedQuery)) score += 60;
+  if (slug.includes(normalizedQuery)) score += 40;
+  if (category.includes(normalizedQuery)) score += 30;
+  if (body.includes(normalizedQuery)) score += 10;
+  return score;
+}
+
+function productRecencyTs(product: Product): number {
+  const raw = product.publishedAt ?? product.createdAt;
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : 0;
+}
+
 function sortProducts(items: Product[], sort: SortOption): Product[] {
   const sorted = [...items];
   switch (sort) {
     case "price-asc":
-      return sorted.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+      return sorted.sort((a, b) => getDisplayPrice(a) - getDisplayPrice(b));
     case "price-desc":
-      return sorted.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+      return sorted.sort((a, b) => getDisplayPrice(b) - getDisplayPrice(a));
     case "newest":
-      return sorted.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+      return sorted.sort((a, b) => {
+        const byDate = productRecencyTs(b) - productRecencyTs(a);
+        if (byDate !== 0) return byDate;
+        return (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0);
+      });
     case "popular":
     default:
-      return sorted.sort((a, b) => b.reviewCount - a.reviewCount);
+      return sorted.sort((a, b) => {
+        const byReviews = b.reviewCount - a.reviewCount;
+        if (byReviews !== 0) return byReviews;
+        return (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0);
+      });
   }
 }
 
@@ -110,17 +157,17 @@ export function filterProducts(
   }
 
   if (filters.minPrice !== undefined) {
-    result = result.filter((p) => getMinPrice(p) >= filters.minPrice!);
+    result = result.filter((p) => getDisplayPrice(p) >= filters.minPrice!);
   }
 
   if (filters.maxPrice !== undefined) {
-    result = result.filter((p) => getMinPrice(p) <= filters.maxPrice!);
+    result = result.filter((p) => getDisplayPrice(p) <= filters.maxPrice!);
   }
 
   return sortProducts(result, filters.sort ?? "popular");
 }
 
-export function getRelatedProducts(slug: string, limit = 4): Product[] {
+export function getRelatedProducts(slug: string, limit = 8): Product[] {
   const product = getProductBySlug(slug);
   if (!product) return [];
   return products
@@ -130,6 +177,7 @@ export function getRelatedProducts(slug: string, limit = 4): Product[] {
         p.slug !== slug &&
         p.inStock,
     )
+    .sort((a, b) => b.reviewCount - a.reviewCount)
     .slice(0, limit);
 }
 
@@ -137,14 +185,12 @@ export function getAllSlugs(): string[] {
   return products.map((p) => p.slug);
 }
 
-export function searchProducts(query: string): Product[] {
-  const q = query.trim().toLowerCase();
+export function searchProducts(query: string, catalog?: Product[]): Product[] {
+  const q = normalizeSearchText(query);
   if (!q) return [];
-  return products.filter(
-    (p) =>
-      p.title.toLowerCase().includes(q) ||
-      p.slug.toLowerCase().includes(q) ||
-      p.categoryLabel.toLowerCase().includes(q) ||
-      p.shortDescription.toLowerCase().includes(q),
-  );
+  return (catalog ?? products)
+    .map((p) => ({ p, score: scoreProductSearch(p, q) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.p);
 }

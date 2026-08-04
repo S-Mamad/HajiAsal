@@ -11,7 +11,12 @@ vi.mock("@/lib/server/sellers", async (importOriginal) => {
     ...actual,
     getSellerFromRequest: vi.fn(),
     getSellerProducts: vi.fn(),
-    setSellerProductStock: vi.fn(async () => undefined),
+    setSellerProductStock: vi.fn(async (_s, id, inStock, stockQty) => ({
+      id,
+      inStock,
+      stockQty: stockQty ?? (inStock ? 1 : 0),
+      title: "عسل",
+    })),
   };
 });
 
@@ -41,11 +46,9 @@ import { GET, PATCH } from "@/app/api/seller/inventory/route";
 import {
   getSellerFromRequest,
   getSellerProducts,
+  setSellerProductStock,
 } from "@/lib/server/sellers";
-import {
-  getProductByIdAsync,
-  updateProductAsync,
-} from "@/lib/server/products-store";
+import { updateProductAsync } from "@/lib/server/products-store";
 
 const sellerMock = installGetSellerFromRequestMock(
   getSellerFromRequest as unknown as ReturnType<typeof vi.fn>,
@@ -56,6 +59,14 @@ const ownProduct = {
   sellerId: "s1",
   title: "عسل",
   stockQty: 10,
+  inStock: true,
+  weightOptions: [{ label: "1kg", grams: 1000, price: 100000 }],
+};
+
+const assignedProduct = {
+  id: "p-assigned",
+  title: "عسل کاتالوگ",
+  stockQty: 5,
   inStock: true,
   weightOptions: [{ label: "1kg", grams: 1000, price: 100000 }],
 };
@@ -78,7 +89,6 @@ describe("seller inventory behavior", () => {
   });
 
   it("PATCH updates own product stock", async () => {
-    vi.mocked(getProductByIdAsync).mockResolvedValue(ownProduct as never);
     const res = await PATCH(
       authedSellerRequest("http://localhost/api/seller/inventory", {
         method: "PATCH",
@@ -90,11 +100,27 @@ describe("seller inventory behavior", () => {
     expect(updateProductAsync).toHaveBeenCalled();
   });
 
+  it("PATCH adjusts assigned catalog product via override", async () => {
+    vi.mocked(getSellerProducts).mockResolvedValue([assignedProduct as never]);
+    const res = await PATCH(
+      authedSellerRequest("http://localhost/api/seller/inventory", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: "p-assigned", delta: 1 }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(setSellerProductStock).toHaveBeenCalledWith(
+      "s1",
+      "p-assigned",
+      true,
+      6,
+    );
+    expect(updateProductAsync).not.toHaveBeenCalled();
+  });
+
   it("PATCH rejects other seller product", async () => {
-    vi.mocked(getProductByIdAsync).mockResolvedValue({
-      ...ownProduct,
-      sellerId: "s2",
-    } as never);
+    vi.mocked(getSellerProducts).mockResolvedValue([]);
     const res = await PATCH(
       authedSellerRequest("http://localhost/api/seller/inventory", {
         method: "PATCH",
@@ -104,6 +130,7 @@ describe("seller inventory behavior", () => {
     );
     expect(res.status).toBe(404);
     expect(updateProductAsync).not.toHaveBeenCalled();
+    expect(setSellerProductStock).not.toHaveBeenCalled();
   });
 
   it("denied without inventory.manage", async () => {

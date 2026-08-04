@@ -1,5 +1,6 @@
 import type { SiteConfig } from "@/types";
 import type { StoredOrder } from "@/lib/server/orders";
+import { getBrandLogoDataUri } from "@/lib/server/brand-logo";
 
 export type InvoiceAudience = "customer" | "admin" | "seller";
 
@@ -118,6 +119,8 @@ export function buildProfessionalInvoiceHtml(
     .filter(Boolean)
     .join(" · ");
 
+  const logoSrc = getBrandLogoDataUri();
+
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -185,9 +188,20 @@ export function buildProfessionalInvoiceHtml(
       background: linear-gradient(180deg, #fff 0%, var(--soft) 100%);
       border-bottom: 1px solid var(--line);
     }
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand-logo {
+      height: 72px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
     .brand-name {
       margin: 0;
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 800;
       letter-spacing: -0.02em;
       color: var(--ink);
@@ -335,6 +349,10 @@ export function buildProfessionalInvoiceHtml(
         border-radius: 0;
         max-width: none;
       }
+      .brand-logo {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   </style>
 </head>
@@ -346,8 +364,19 @@ export function buildProfessionalInvoiceHtml(
   <div class="sheet">
     <div class="head">
       <div>
-        <h1 class="brand-name">${escapeHtml(site.brand.name)}</h1>
-        <p class="brand-tag">${escapeHtml(site.brand.tagline)}</p>
+        <div class="brand-lockup">
+          <img
+            class="brand-logo"
+            src="${logoSrc}"
+            alt="${escapeHtml(site.brand.name)}"
+            width="48"
+            height="72"
+          />
+          <div>
+            <h1 class="brand-name">${escapeHtml(site.brand.name)}</h1>
+            <p class="brand-tag">${escapeHtml(site.brand.tagline)}</p>
+          </div>
+        </div>
         <div class="badge">${escapeHtml(titlePrefix)}</div>
       </div>
       <div class="meta-box">

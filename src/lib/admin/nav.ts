@@ -22,6 +22,7 @@ import {
   ChatCircleDots,
   Headset,
   Bell,
+  ChatText,
   UserGear,
   Scroll,
 } from "@phosphor-icons/react";
@@ -205,6 +206,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: "اعلان‌ها",
         icon: Bell,
         permission: "notifications.view",
+      },
+      {
+        href: hajiasalPath("/admin/sms"),
+        label: "پیامک",
+        icon: ChatText,
+        permission: "sms.view",
       },
       {
         href: hajiasalPath("/admin/reports"),

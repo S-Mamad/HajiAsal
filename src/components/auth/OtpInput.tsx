@@ -6,6 +6,7 @@ import {
   type ClipboardEvent,
 } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
 
 interface OtpInputProps {
   value: string;
@@ -32,7 +33,7 @@ export function OtpInput({
   };
 
   const handleChange = (index: number, raw: string) => {
-    const char = raw.replace(/\D/g, "").slice(-1);
+    const char = normalizeOtpDigits(raw).slice(-1);
     if (!char) return;
     updateAt(index, char);
     if (index < length - 1) inputsRef.current[index + 1]?.focus();
@@ -53,7 +54,10 @@ export function OtpInput({
 
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    const pasted = normalizeOtpDigits(e.clipboardData.getData("text")).slice(
+      0,
+      length,
+    );
     onChange(pasted);
     const focusIndex = Math.min(pasted.length, length - 1);
     inputsRef.current[focusIndex]?.focus();
@@ -80,8 +84,9 @@ export function OtpInput({
             aria-label={`رقم ${i + 1}`}
             aria-invalid={Boolean(error)}
             className={cn(
-              "h-14 w-12 rounded-xl border border-border bg-surface-elevated text-center text-xl font-bold text-primary",
-              "focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/20",
+              "h-14 w-12 rounded-lg border border-border/80 bg-surface-elevated/80 text-center text-xl font-bold text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+              "transition-[border-color,box-shadow] duration-200",
+              "focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25",
               error && "border-red-400",
             )}
           />

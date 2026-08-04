@@ -28,7 +28,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
 
   useBodyScrollLock(open);
 
-  const search = useCallback(async (q: string) => {
+  const search = useCallback(async (q: string, signal?: AbortSignal) => {
     const trimmed = q.trim();
     if (trimmed.length < 2) {
       setResults([]);
@@ -41,23 +41,32 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     try {
       const res = await fetch(
         `/api/search?q=${encodeURIComponent(trimmed)}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal },
       );
       if (!res.ok) throw new Error("search failed");
       const data = await res.json();
+      if (signal?.aborted) return;
       setResults(Array.isArray(data.results) ? data.results : []);
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setResults([]);
       setError("جستجو انجام نشد. دوباره تلاش کنید.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!open) return;
-    const timer = window.setTimeout(() => search(query), 280);
-    return () => window.clearTimeout(timer);
+    const controller = new AbortController();
+    const timer = window.setTimeout(
+      () => void search(query, controller.signal),
+      280,
+    );
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [query, search, open]);
 
   useEffect(() => {
@@ -102,7 +111,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-            className="fixed inset-x-0 top-0 z-[90] flex max-h-[100dvh] flex-col bg-surface sm:inset-x-4 sm:top-16 sm:mx-auto sm:max-h-[min(80dvh,36rem)] sm:max-w-2xl sm:rounded-2xl sm:border sm:border-border-bright sm:shadow-2xl"
+            className="fixed inset-x-0 top-0 z-[90] flex max-h-[100dvh] flex-col bg-surface sm:inset-x-4 sm:top-[4.75rem] sm:mx-auto sm:max-h-[min(80dvh,36rem)] sm:max-w-2xl sm:rounded-2xl sm:border sm:border-border-bright sm:shadow-2xl"
           >
             <div className="flex items-center gap-3 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5">
               <MagnifyingGlass size={20} className="shrink-0 text-gold" />

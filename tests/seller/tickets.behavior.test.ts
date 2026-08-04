@@ -15,6 +15,7 @@ vi.mock("@/lib/server/sellers", async (importOriginal) => {
 
 vi.mock("@/lib/server/mysql", () => ({
   isMysqlConfigured: () => false,
+  isMysqlUsable: () => false,
   mysqlExecute: vi.fn(),
   mysqlQuery: vi.fn(),
   mysqlQueryOne: vi.fn(),

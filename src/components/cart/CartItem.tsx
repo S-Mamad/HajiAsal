@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { Minus, Plus, Trash } from "@phosphor-icons/react";
 import { useCartStore } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
+import { hajiasalPath } from "@/lib/paths";
 import { ProductImage } from "@/components/ui/ProductImage";
 
 export function CartItemRow() {
@@ -23,9 +25,12 @@ export function CartItemRow() {
       {items.map((item) => (
         <li
           key={`${item.productId}-${item.weight.grams}`}
-          className="flex gap-3 rounded-xl border border-border bg-surface-elevated/40 p-2.5 sm:border-0 sm:bg-transparent sm:p-0"
+          className="flex gap-3 rounded-xl border border-border bg-surface-elevated/40 p-2.5 sm:rounded-2xl sm:p-3"
         >
-          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-muted sm:h-20 sm:w-20">
+          <Link
+            href={hajiasalPath(`/product/${item.slug}`)}
+            className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-muted sm:h-20 sm:w-20"
+          >
             <ProductImage
               src={item.image}
               alt={item.title}
@@ -33,14 +38,19 @@ export function CartItemRow() {
               sizes="80px"
               className="object-cover"
             />
-          </div>
+          </Link>
           <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-primary">
+                <Link
+                  href={hajiasalPath(`/product/${item.slug}`)}
+                  className="block truncate text-sm font-medium text-primary hover:text-gold"
+                >
                   {item.title}
+                </Link>
+                <p className="mt-0.5 text-xs text-secondary">
+                  {item.weight.label}
                 </p>
-                <p className="text-xs text-secondary">{item.weight.label}</p>
               </div>
               <button
                 type="button"

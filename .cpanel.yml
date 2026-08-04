@@ -2,14 +2,19 @@
 # Deploy برای cPanel Git Version Control
 # Docs: https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/
 #
-# مسیر اپ Node.js (Setup Node.js App → Application Root)
+# برای سه اپ (فروشگاه / ادمین / فروشنده) ترجیحاً از scripts/cpanel-deploy-all.sh
+# یا سه Deployment جدا با DEPLOYPATH متفاوت استفاده کنید.
+# راهنما: docs/SUBDOMAIN-DEPLOY-FA.md
+#
+# مسیر اپ Node.js فروشگاه (Setup Node.js App → Application Root)
 # اگر مسیر اپ فرق دارد، فقط DEPLOYPATH را عوض کن.
 deployment:
   tasks:
     - export DEPLOYPATH=/home/uabkxfzi/hajiasal
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/tmp
-    - /usr/bin/rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='.next' --exclude='.env' --exclude='.env.*' --exclude='data' --exclude='test-results' --exclude='playwright-report' --exclude='FINISH-GITHUB-SECURITY.ps1' ./ $DEPLOYPATH/
+    - /usr/bin/rsync -a --delete --exclude='.git' --exclude='node_modules' --exclude='.next' --exclude='.env' --exclude='.env.*' --exclude='data' --exclude='public/uploads' --exclude='test-results' --exclude='playwright-report' --exclude='FINISH-GITHUB-SECURITY.ps1' ./ $DEPLOYPATH/
     - /bin/chmod +x $DEPLOYPATH/scripts/cpanel-deploy.sh
+    - /bin/chmod +x $DEPLOYPATH/scripts/cpanel-deploy-all.sh || true
     - /bin/bash $DEPLOYPATH/scripts/cpanel-deploy.sh
     - /bin/touch $DEPLOYPATH/tmp/restart.txt

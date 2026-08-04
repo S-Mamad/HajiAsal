@@ -14,10 +14,17 @@ vi.mock("@/lib/server/admin-auth", async (importOriginal) => {
 });
 
 vi.mock("@/lib/server/products-store", () => ({
-  getProductByIdAsync: vi.fn(async () => ({ id: "p1", title: "P" })),
+  getProductByIdAsync: vi.fn(async () => ({
+    id: "p1",
+    title: "P",
+    status: "active",
+    weightOptions: [{ label: "1kg", grams: 1000, price: 1000 }],
+    discountPrice: 900,
+  })),
   updateProductAsync: vi.fn(async (_id: string, updates: Record<string, unknown>) => ({
     id: "p1",
     title: "P",
+    status: "active",
     ...updates,
   })),
   softDeleteProductAsync: vi.fn(async () => true),
@@ -29,7 +36,10 @@ vi.mock("@/lib/server/audit-log", () => ({
 }));
 
 import { requireAdminPermission } from "@/lib/server/admin-auth";
-import { updateProductAsync } from "@/lib/server/products-store";
+import {
+  getProductByIdAsync,
+  updateProductAsync,
+} from "@/lib/server/products-store";
 import { PATCH, DELETE } from "@/app/api/admin/products/[id]/route";
 
 const authMock = installRequireAdminPermissionMock(
@@ -76,10 +86,11 @@ describe("admin products secondary gates", () => {
     expect(res.status).toBe(403);
   });
 
-  it("warehouse cannot publish (status active)", async () => {
+  it("warehouse re-saving active status does not require publish", async () => {
     authMock.asRole("warehouse");
     const res = await PATCH(patchReq({ status: "active" }), ctx);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(updateProductAsync).toHaveBeenCalled();
   });
 
   it("content cannot edit_price either", async () => {
@@ -99,6 +110,33 @@ describe("admin products secondary gates", () => {
       ctx,
     );
     expect(res.status).toBe(200);
+  });
+
+  it("warehouse can autosave active product without publish permission", async () => {
+    authMock.asRole("warehouse");
+    const res = await PATCH(
+      patchReq({
+        title: "updated",
+        status: "active",
+        autosave: true,
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    expect(updateProductAsync).toHaveBeenCalled();
+  });
+
+  it("warehouse cannot transition draft to active", async () => {
+    authMock.asRole("warehouse");
+    vi.mocked(getProductByIdAsync).mockResolvedValueOnce({
+      id: "p1",
+      title: "P",
+      status: "draft",
+      weightOptions: [{ label: "1kg", grams: 1000, price: 1000 }],
+    } as never);
+    const res = await PATCH(patchReq({ status: "active" }), ctx);
+    expect(res.status).toBe(403);
+    expect(updateProductAsync).not.toHaveBeenCalled();
   });
 
   it("warehouse cannot delete", async () => {

@@ -9,16 +9,23 @@ import { Can } from "@/components/admin/auth/AdminAuthProvider";
 import { useAdminToast } from "@/components/admin/ui/AdminToast";
 import { getMinPrice } from "@/lib/products";
 import { hajiasalPath } from "@/lib/paths";
-import type { Product, ProductStatus } from "@/types";
+import type { Product, ProductApprovalStatus, ProductStatus } from "@/types";
 
 type StockFilter = "all" | "in_stock" | "out_of_stock";
 type ListMode = "active" | "trash";
+type ApprovalFilter = "all" | "awaiting" | ProductApprovalStatus;
 
 const STATUS_LABEL: Record<ProductStatus, string> = {
   active: "فعال",
   draft: "پیش‌نویس",
   archived: "آرشیو",
   disabled: "غیرفعال",
+};
+
+const APPROVAL_LABEL: Record<ProductApprovalStatus, string> = {
+  pending: "در انتظار",
+  approved: "تأیید شده",
+  rejected: "رد شده",
 };
 
 export default function AdminProductsPage() {
@@ -30,6 +37,7 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>("all");
   const [listMode, setListMode] = useState<ListMode>("active");
   const [selected, setSelected] = useState<string[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -39,6 +47,7 @@ export default function AdminProductsPage() {
     const params = new URLSearchParams();
     if (listMode === "trash") params.set("trash", "1");
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (approvalFilter !== "all") params.set("approval", approvalFilter);
     const res = await fetch(`/api/admin/products?${params}`, {
       credentials: "include",
     });
@@ -49,7 +58,7 @@ export default function AdminProductsPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری");
     return data.products ?? [];
-  }, [router, listMode, statusFilter]);
+  }, [router, listMode, statusFilter, approvalFilter]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -243,6 +252,22 @@ export default function AdminProductsPage() {
                 <option value="disabled">غیرفعال</option>
               </select>
             ) : null}
+            {listMode === "active" ? (
+              <select
+                value={approvalFilter}
+                onChange={(e) =>
+                  setApprovalFilter(e.target.value as ApprovalFilter)
+                }
+                className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm"
+                aria-label="فیلتر تأیید"
+              >
+                <option value="all">همه تأییدها</option>
+                <option value="awaiting">در صف بررسی فروشنده</option>
+                <option value="pending">در انتظار (همه)</option>
+                <option value="approved">تأیید شده</option>
+                <option value="rejected">رد شده</option>
+              </select>
+            ) : null}
             <Can permission="products.create">
               <AdminButton href={hajiasalPath("/admin/products/new")}>
                 محصول جدید
@@ -349,6 +374,25 @@ export default function AdminProductsPage() {
             render: (row) => STATUS_LABEL[row.status ?? "active"],
           },
           {
+            key: "approval",
+            header: "تأیید",
+            hideOnMobile: true,
+            sortable: true,
+            getSortValue: (row) =>
+              row.sellerId
+                ? (row.approvalStatus ?? "approved")
+                : "platform",
+            render: (row) => {
+              if (!row.sellerId) return "پلتفرم";
+              const st = row.approvalStatus ?? "approved";
+              const label = APPROVAL_LABEL[st];
+              if (st === "pending" && !row.submittedAt) {
+                return "پیش‌نویس فروشنده";
+              }
+              return label;
+            },
+          },
+          {
             key: "category",
             header: "دسته",
             hideOnMobile: true,
@@ -399,6 +443,17 @@ export default function AdminProductsPage() {
                 >
                   ویرایش
                 </AdminButton>
+                {row.sellerId &&
+                row.approvalStatus === "pending" &&
+                row.submittedAt ? (
+                  <AdminButton
+                    href={hajiasalPath(`/admin/sellers/${row.sellerId}`)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    بررسی
+                  </AdminButton>
+                ) : null}
                 <AdminButton
                   href={hajiasalPath(`/product/${row.slug}`)}
                   variant="ghost"

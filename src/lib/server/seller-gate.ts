@@ -12,9 +12,8 @@ export type SellerAuthContext = {
   seller: Seller;
 };
 
-export async function gateSeller(
+async function gateSellerBase(
   request: Request,
-  capability?: SellerCapability,
 ): Promise<
   | { ok: true; ctx: SellerAuthContext }
   | { ok: false; response: NextResponse }
@@ -40,7 +39,20 @@ export async function gateSeller(
     };
   }
 
-  if (capability && !canSeller(seller.capabilities, capability)) {
+  return { ok: true, ctx: { seller } };
+}
+
+export async function gateSeller(
+  request: Request,
+  capability?: SellerCapability,
+): Promise<
+  | { ok: true; ctx: SellerAuthContext }
+  | { ok: false; response: NextResponse }
+> {
+  const base = await gateSellerBase(request);
+  if (!base.ok) return base;
+
+  if (capability && !canSeller(base.ctx.seller.capabilities, capability)) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -50,7 +62,34 @@ export async function gateSeller(
     };
   }
 
-  return { ok: true, ctx: { seller } };
+  return base;
+}
+
+/** Accept if the seller has at least one of the listed capabilities. */
+export async function gateSellerAny(
+  request: Request,
+  capabilities: SellerCapability[],
+): Promise<
+  | { ok: true; ctx: SellerAuthContext }
+  | { ok: false; response: NextResponse }
+> {
+  const base = await gateSellerBase(request);
+  if (!base.ok) return base;
+
+  if (
+    capabilities.length > 0 &&
+    !capabilities.some((cap) => canSeller(base.ctx.seller.capabilities, cap))
+  ) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "این قابلیت برای فروشگاه شما فعال نیست", success: false },
+        { status: 403 },
+      ),
+    };
+  }
+
+  return base;
 }
 
 export function clientIpFromRequest(request: Request): string {

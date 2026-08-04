@@ -1,131 +1,28 @@
 import { NextResponse } from "next/server";
-import {
-  adminCookieOptions,
-  loginAdmin,
-} from "@/lib/server/admin";
-import {
-  authenticateAdminCredentials,
-  touchAdminLogin,
-} from "@/lib/server/admin-auth";
-import {
-  checkAdminLoginRateLimit,
-  recordAdminLoginAttempt,
-} from "@/lib/server/admin-rate-limit";
-import { getTrustedClientIp } from "@/lib/server/client-ip";
-import { logAdminAction } from "@/lib/server/audit-log";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
+import { ensurePrimaryAdmins } from "@/lib/server/admin-auth";
 
-export async function POST(request: Request) {
-  try {
-    const ip = getTrustedClientIp(request);
-    const rate = await checkAdminLoginRateLimit(ip);
-    if (!rate.allowed) {
-      return NextResponse.json(
-        { success: false, message: rate.message },
-        { status: 429 },
-      );
-    }
-
-    const body = await request.json();
-    const password = body.password as string | undefined;
-    const login = (body.login as string | undefined)?.trim();
-
-    if (!password) {
-      await recordAdminLoginAttempt(ip, false);
-      return NextResponse.json(
-        { success: false, message: "رمز عبور الزامی است" },
-        { status: 401 },
-      );
-    }
-
-    const result = await authenticateAdminCredentials({ password, login });
-    if (!result) {
-      await recordAdminLoginAttempt(ip, false);
-      return NextResponse.json(
-        { success: false, message: "اطلاعات ورود نادرست است" },
-        { status: 401 },
-      );
-    }
-
-    const token = await loginAdmin({
-      ipAddress: ip,
-      userAgent: request.headers.get("user-agent") ?? undefined,
-      adminUserId: result.user?.id ?? null,
-    });
-
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: "پنل ادمین پیکربندی نشده است" },
-        { status: 503 },
-      );
-    }
-
-    if (result.user) {
-      await touchAdminLogin(result.user.id);
-    }
-
-    await logAdminAction({
-      action: "admin.login",
-      entityType: "admin_user",
-      entityId: result.user?.id,
-      adminUserId: result.user?.id,
-      ipAddress: ip,
-      payload: { legacy: result.legacy },
-    });
-
-    const response = NextResponse.json({
-      success: true,
-      user: result.user
-        ? {
-            id: result.user.id,
-            fullName: result.user.fullName,
-            role: result.user.role,
-          }
-        : null,
-    });
-    const cookie = adminCookieOptions(token);
-    try {
-      await clearAllAuthSessions(request, response);
-    } catch (error) {
-      console.error(
-        "[admin/auth] clear sibling sessions failed:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-    response.cookies.set(cookie.name, cookie.value, {
-      httpOnly: cookie.httpOnly,
-      secure: cookie.secure,
-      sameSite: cookie.sameSite,
-      path: cookie.path,
-      maxAge: cookie.maxAge,
-    });
-
-    try {
-      await recordAdminLoginAttempt(ip, true);
-    } catch {
-      /* ignore */
-    }
-    return response;
-  } catch (error) {
-    console.error(
-      "[admin/auth] POST failed:",
-      error instanceof Error ? error.stack ?? error.message : error,
-    );
-    return NextResponse.json(
-      {
-        success: false,
-        message: "خطای سرور",
-        detail:
-          process.env.NODE_ENV !== "production" && error instanceof Error
-            ? error.message
-            : undefined,
-      },
-      { status: 500 },
-    );
-  }
+/** Password login disabled — use OTP endpoints. */
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "ورود فقط با کد پیامکی امکان‌پذیر است",
+    },
+    { status: 401 },
+  );
 }
 
 export async function GET(request: Request) {
+  try {
+    await ensurePrimaryAdmins();
+  } catch (error) {
+    console.error(
+      "[admin/auth] ensurePrimaryAdmins:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   const { getAdminAuthFromToken } = await import("@/lib/server/admin-auth");
   const cookieHeader = request.headers.get("cookie") ?? "";
   const match = cookieHeader.match(/hajiasal_admin_session=([^;]+)/);

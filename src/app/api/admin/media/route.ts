@@ -16,6 +16,7 @@ const ALLOWED_MIME = new Set([
   "image/png",
   "image/webp",
   "image/gif",
+  "application/pdf",
 ]);
 
 const MAX_BYTES = 5_000_000;
@@ -24,6 +25,7 @@ function extForMime(mime: string): string {
   if (mime === "image/png") return ".png";
   if (mime === "image/webp") return ".webp";
   if (mime === "image/gif") return ".gif";
+  if (mime === "application/pdf") return ".pdf";
   return ".jpg";
 }
 
@@ -44,10 +46,36 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const gate = await gateAdmin(request, "media.manage");
-  if (!gate.ok) return gate.response;
-
   const contentType = request.headers.get("content-type") ?? "";
+
+  // Peek folder early for product-image uploads by editors without media.manage.
+  let folderHint = "products";
+  if (contentType.includes("multipart/form-data")) {
+    try {
+      const cloned = request.clone();
+      const form = await cloned.formData();
+      folderHint = String(form.get("folder") ?? "products").trim() || "products";
+    } catch {
+      /* fall through */
+    }
+  } else {
+    try {
+      const cloned = request.clone();
+      const body = (await cloned.json()) as { folder?: string };
+      if (body.folder) folderHint = String(body.folder);
+    } catch {
+      /* fall through */
+    }
+  }
+
+  let gate = await gateAdmin(request, "media.manage");
+  if (
+    !gate.ok &&
+    folderHint.replace(/[^\w\-آ-ی]+/gi, "_").slice(0, 64) === "products"
+  ) {
+    gate = await gateAdmin(request, "products.edit");
+  }
+  if (!gate.ok) return gate.response;
 
   try {
     if (contentType.includes("multipart/form-data")) {
@@ -58,7 +86,7 @@ export async function POST(request: Request) {
       }
       if (!ALLOWED_MIME.has(file.type)) {
         return NextResponse.json(
-          { error: "فقط تصویر JPEG/PNG/WebP/GIF" },
+          { error: "فقط تصویر JPEG/PNG/WebP/GIF یا PDF" },
           { status: 400 },
         );
       }
@@ -118,12 +146,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      parsed.data.mimeType.startsWith("image/") &&
-      !ALLOWED_MIME.has(parsed.data.mimeType)
-    ) {
+    if (!ALLOWED_MIME.has(parsed.data.mimeType)) {
       return NextResponse.json(
-        { error: "فقط تصویر JPEG/PNG/WebP/GIF" },
+        { error: "فقط تصویر JPEG/PNG/WebP/GIF یا PDF" },
         { status: 400 },
       );
     }

@@ -20,7 +20,12 @@ export async function GET(request: Request) {
       listSellerLedger(sellerId),
       listWithdrawals(sellerId),
     ]);
-    return NextResponse.json({ balance, ledger, withdrawals });
+    return NextResponse.json({
+      balance,
+      ledger,
+      withdrawals,
+      hasSheba: Boolean(gated.ctx.seller.bankSheba?.trim()),
+    });
   } catch (err) {
     return NextResponse.json(
       {

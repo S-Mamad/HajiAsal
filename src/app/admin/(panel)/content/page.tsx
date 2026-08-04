@@ -4,8 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import type { SiteConfig } from "@/types";
+import type { SiteConfig, SocialLinks } from "@/types";
 import { hajiasalPath } from "@/lib/paths";
+
+const SOCIAL_FIELDS: Array<{ key: keyof SocialLinks; label: string }> = [
+  { key: "instagram", label: "اینستاگرام" },
+  { key: "telegram", label: "تلگرام" },
+  { key: "eitaa", label: "ایتا" },
+  { key: "rubika", label: "روبیکا" },
+  { key: "bale", label: "بله" },
+  { key: "soroush", label: "سروش" },
+  { key: "supportTelegram", label: "پشتیبانی تلگرام" },
+  { key: "supportEitaa", label: "پشتیبانی ایتا" },
+];
 
 export default function AdminContentPage() {
   const router = useRouter();
@@ -50,6 +61,8 @@ export default function AdminContentPage() {
         body: JSON.stringify({
           hero: settings.hero,
           brand: settings.brand,
+          footer: settings.footer,
+          social: settings.social,
         }),
       });
       const data = await res.json();
@@ -63,6 +76,14 @@ export default function AdminContentPage() {
     }
   };
 
+  const setSocial = (key: keyof SocialLinks, value: string) => {
+    if (!settings) return;
+    setSettings({
+      ...settings,
+      social: { ...settings.social, [key]: value },
+    });
+  };
+
   if (!settings && !loading) {
     return <p className="text-sm text-slate-500">محتوایی یافت نشد</p>;
   }
@@ -70,7 +91,7 @@ export default function AdminContentPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <p className="text-sm text-slate-500">
-        ویرایش محتوای صفحه اصلی (عنوان، تبلیغ، برند)
+        ویرایش محتوای صفحه اصلی، تماس و شبکه‌های اجتماعی
       </p>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
@@ -123,6 +144,50 @@ export default function AdminContentPage() {
               })
             }
           />
+
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">تماس</h3>
+            <Input
+              label="شماره تماس"
+              value={settings.footer.phone}
+              dir="ltr"
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  footer: { ...settings.footer, phone: e.target.value },
+                })
+              }
+            />
+            <Input
+              label="ایمیل"
+              value={settings.footer.email}
+              dir="ltr"
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  footer: { ...settings.footer, email: e.target.value },
+                })
+              }
+            />
+          </div>
+
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+              شبکه‌های اجتماعی و پیام‌رسان‌ها
+            </h3>
+            <div className="space-y-3">
+              {SOCIAL_FIELDS.map(({ key, label }) => (
+                <Input
+                  key={key}
+                  label={label}
+                  value={settings.social?.[key] ?? ""}
+                  dir="ltr"
+                  onChange={(e) => setSocial(key, e.target.value)}
+                />
+              ))}
+            </div>
+          </div>
+
           <AdminButton type="button" onClick={() => void save()} disabled={saving}>
             {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
           </AdminButton>

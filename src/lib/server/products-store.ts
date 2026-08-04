@@ -17,6 +17,7 @@ import {
   getProductBySlug as getProductBySlugSync,
   getBestsellers as getBestsellersSync,
   getAllSlugs as getAllSlugsSync,
+  searchProducts as searchProductsSync,
 } from "@/lib/products";
 import { readJsonFile, writeJsonFile } from "./db";
 import {
@@ -40,6 +41,11 @@ import {
 } from "./mysql";
 import { revalidatePath } from "next/cache";
 import { getActiveSellerIdsAsync } from "./sellers-store";
+import {
+  applyStockUpdates,
+  stockDefaultsForCreate,
+  syncStockFields,
+} from "./product-stock-sync";
 
 const staticProducts = productsData as Product[];
 const PRODUCT_OVERRIDES_FILE = "product-overrides.json";
@@ -55,6 +61,7 @@ export type ProductListScope =
 export type AdminProductListOptions = ProductListScope & {
   includeTrash?: boolean;
   status?: ProductStatus | "all";
+  approvalStatus?: ProductApprovalStatus | "all" | "awaiting";
 };
 
 const categoryLabels: Record<string, string> = {};
@@ -73,19 +80,18 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     shortDescription: (row.short_description as string) ?? "",
     longDescription: (row.description as string) ?? "",
     category: categoryId,
-    categoryLabel: categoryLabels[categoryId] ?? categoryId,
+    categoryLabel:
+      (honeyMeta.categoryLabel as string) ||
+      categoryLabels[categoryId] ||
+      categoryId,
     images: parseJsonField<string[]>(row.images, []),
     weightOptions: parseJsonField<WeightOption[]>(row.weight_options, []),
     discountPrice: row.discount_price
       ? Number(row.discount_price)
       : undefined,
     inStock: toBool(row.in_stock),
-    stockQty:
-      row.stock_qty != null
-        ? Number(row.stock_qty)
-        : toBool(row.in_stock)
-          ? 1
-          : 0,
+    // null stock_qty = unlimited; never invent a quantity on read
+    stockQty: row.stock_qty != null ? Number(row.stock_qty) : undefined,
     status: (row.status as ProductStatus) ?? "active",
     sku: row.sku ? String(row.sku) : undefined,
     brandId: row.brand_id ? String(row.brand_id) : null,
@@ -134,6 +140,7 @@ function mapProductToRow(
     honey_meta: {
       ingredients: product.ingredients,
       shippingInfo: product.shippingInfo,
+      categoryLabel: product.categoryLabel,
     },
     seller_id: product.sellerId ?? null,
     approval_status: product.approvalStatus ?? "approved",
@@ -143,7 +150,12 @@ function mapProductToRow(
     deleted_at: product.deletedAt ?? null,
     published_at: product.publishedAt ?? null,
     status: product.status ?? "active",
-    stock_qty: product.stockQty ?? (product.inStock === false ? 0 : 1),
+    stock_qty:
+      typeof product.stockQty === "number"
+        ? product.stockQty
+        : product.inStock === false
+          ? 0
+          : null,
     sku: product.sku ?? null,
     brand_id: product.brandId ?? null,
     updated_at: new Date().toISOString(),
@@ -214,38 +226,7 @@ async function upsertProductRow(row: ProductRow, createdAt: string): Promise<voi
         reviewed_at = VALUES(reviewed_at), deleted_at = VALUES(deleted_at),
         published_at = VALUES(published_at), status = VALUES(status), stock_qty = VALUES(stock_qty),
         sku = VALUES(sku), brand_id = VALUES(brand_id), updated_at = VALUES(updated_at)`,
-      [
-        row.id,
-        row.slug,
-        row.title,
-        row.short_description,
-        row.description,
-        row.category_id,
-        asJson(row.images),
-        asJson(row.weight_options),
-        row.discount_price,
-        row.in_stock,
-        row.featured,
-        row.bestseller,
-        row.rating,
-        row.review_count,
-        asJson(row.seo),
-        asJson(row.custom_fields),
-        asJson(row.honey_meta),
-        row.seller_id,
-        row.approval_status,
-        row.review_note,
-        row.submitted_at,
-        row.reviewed_at,
-        row.deleted_at,
-        row.published_at,
-        row.status,
-        row.stock_qty,
-        row.sku,
-        row.brand_id,
-        row.updated_at,
-        createdAt,
-      ],
+      productRowParamsFull(row, createdAt),
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -266,6 +247,112 @@ async function upsertProductRow(row: ProductRow, createdAt: string): Promise<voi
     }
     throw err;
   }
+}
+
+/** Insert-only — never UPDATE another row on slug collision. */
+async function insertProductRow(row: ProductRow, createdAt: string): Promise<void> {
+  try {
+    await mysqlExecute(
+      `INSERT INTO products (
+        id, slug, title, short_description, description, category_id, images, weight_options,
+        discount_price, in_stock, featured, bestseller, rating, review_count, seo, custom_fields, honey_meta,
+        seller_id, approval_status, review_note, submitted_at, reviewed_at, deleted_at, published_at,
+        status, stock_qty, sku, brand_id, updated_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      productRowParamsFull(row, createdAt),
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Unknown column")) {
+      await mysqlExecute(
+        `INSERT INTO products (
+          id, slug, title, short_description, description, category_id, images, weight_options,
+          discount_price, in_stock, featured, bestseller, rating, review_count, honey_meta,
+          seller_id, approval_status, review_note, submitted_at, reviewed_at, updated_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [...productRowParamsLegacy(row), createdAt],
+      );
+      try {
+        await mysqlExecute(
+          `UPDATE products SET stock_qty = ?, status = ?, in_stock = ? WHERE id = ?`,
+          [row.stock_qty, row.status, row.in_stock ? 1 : 0, row.id],
+        );
+      } catch {
+        /* optional columns */
+      }
+      return;
+    }
+    throw err;
+  }
+}
+
+function productRowParamsFull(row: ProductRow, createdAt: string): unknown[] {
+  return [
+    row.id,
+    row.slug,
+    row.title,
+    row.short_description,
+    row.description,
+    row.category_id,
+    asJson(row.images),
+    asJson(row.weight_options),
+    row.discount_price,
+    row.in_stock,
+    row.featured,
+    row.bestseller,
+    row.rating,
+    row.review_count,
+    asJson(row.seo),
+    asJson(row.custom_fields),
+    asJson(row.honey_meta),
+    row.seller_id,
+    row.approval_status,
+    row.review_note,
+    row.submitted_at,
+    row.reviewed_at,
+    row.deleted_at,
+    row.published_at,
+    row.status,
+    row.stock_qty,
+    row.sku,
+    row.brand_id,
+    row.updated_at,
+    createdAt,
+  ];
+}
+
+async function findProductIdBySlugAny(slug: string): Promise<string | null> {
+  if (isMysqlConfigured()) {
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        `SELECT id FROM products
+         WHERE slug = ? AND deleted_at IS NULL
+         LIMIT 1`,
+        [slug],
+      );
+      if (row?.id) return String(row.id);
+    } catch (err) {
+      // Older schemas without deleted_at
+      try {
+        const row = await mysqlQueryOne<RowDataPacket>(
+          "SELECT id FROM products WHERE slug = ? LIMIT 1",
+          [slug],
+        );
+        if (row?.id) return String(row.id);
+      } catch (inner) {
+        console.warn(
+          "[products] slug lookup failed:",
+          inner instanceof Error ? inner.message : inner,
+        );
+      }
+      void err;
+    }
+  }
+  const runtime = await readRuntimeProducts();
+  const fromRuntime = runtime.find((p) => p.slug === slug && !p.deletedAt);
+  if (fromRuntime) return fromRuntime.id;
+  const fromStatic = staticProducts.find((p) => p.slug === slug);
+  return fromStatic?.id ?? null;
 }
 
 async function fetchAllFromMysql(): Promise<Product[] | null> {
@@ -322,20 +409,84 @@ async function writeProductOverride(
   id: string,
   patch: Partial<Product>,
 ): Promise<void> {
+  // Persist explicit nulls so cleared fields (submittedAt, reviewNote, …)
+  // are not resurrected from a previous override on the next read.
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    sanitized[key] = value === undefined ? null : value;
+  }
   if (canUseFilesystemPersistence()) {
     const all = await readProductOverrides();
-    all[id] = { ...(all[id] ?? {}), ...patch };
+    all[id] = { ...(all[id] ?? {}), ...sanitized } as Partial<Product>;
     await writeJsonFile(PRODUCT_OVERRIDES_FILE, all);
     return;
   }
-  memorySetProductOverride(id, patch as Record<string, unknown>);
+  memorySetProductOverride(id, sanitized);
 }
 
-async function readStockOverrides(): Promise<Record<string, boolean>> {
+type StockOverrideValue = boolean | { inStock: boolean; stockQty?: number };
+
+async function readStockOverrides(): Promise<Record<string, StockOverrideValue>> {
   if (canUseFilesystemPersistence()) {
-    return readJsonFile<Record<string, boolean>>(STOCK_OVERRIDES_FILE, {});
+    return readJsonFile<Record<string, StockOverrideValue>>(
+      STOCK_OVERRIDES_FILE,
+      {},
+    );
   }
   return memoryGetStockOverrides();
+}
+
+function normalizeStockOverrideValue(
+  value: StockOverrideValue,
+  fallback: Product,
+): { inStock: boolean; stockQty?: number } {
+  if (typeof value === "boolean") {
+    if (!value) {
+      return {
+        inStock: false,
+        ...(typeof fallback.stockQty === "number" ? { stockQty: 0 } : {}),
+      };
+    }
+    if (typeof fallback.stockQty === "number" && fallback.stockQty <= 0) {
+      return { inStock: true, stockQty: 1 };
+    }
+    return { inStock: true, stockQty: fallback.stockQty };
+  }
+  const qty =
+    typeof value.stockQty === "number"
+      ? Math.max(0, value.stockQty)
+      : fallback.stockQty;
+  const inStock =
+    value.inStock !== false && (typeof qty !== "number" || qty > 0);
+  return { inStock, stockQty: qty };
+}
+
+function applyStockOverridePatch(
+  merged: Product,
+  override: StockOverrideValue,
+): Product {
+  const next = normalizeStockOverrideValue(override, merged);
+  return syncStockFields({
+    ...merged,
+    inStock: next.inStock,
+    stockQty: next.stockQty,
+  });
+}
+
+function applyProductOverridePatch(
+  base: Product,
+  patch: Partial<Product> & Record<string, unknown>,
+): Product {
+  const merged: Product = { ...base, id: base.id };
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === "id") continue;
+    if (value === null) {
+      (merged as unknown as Record<string, unknown>)[key] = undefined;
+    } else {
+      (merged as unknown as Record<string, unknown>)[key] = value;
+    }
+  }
+  return merged;
 }
 
 async function applyLocalOverrides(products: Product[]): Promise<Product[]> {
@@ -344,12 +495,14 @@ async function applyLocalOverrides(products: Product[]): Promise<Product[]> {
     readStockOverrides(),
   ]);
   return products.map((p) => {
-    const patch = productOverrides[p.id];
-    const merged = patch ? { ...p, ...patch, id: p.id } : p;
+    const patch = productOverrides[p.id] as
+      | (Partial<Product> & Record<string, unknown>)
+      | undefined;
+    let merged = patch ? applyProductOverridePatch(p, patch) : p;
     if (p.id in stockOverrides) {
-      return { ...merged, inStock: stockOverrides[p.id]! };
+      merged = applyStockOverridePatch(merged, stockOverrides[p.id]!);
     }
-    return merged;
+    return syncStockFields(merged);
   });
 }
 
@@ -393,6 +546,20 @@ export async function getAllProductsAsync(
     }
     if (options?.status && options.status !== "all") {
       list = list.filter((p) => (p.status ?? "active") === options.status);
+    }
+    if (options?.approvalStatus && options.approvalStatus !== "all") {
+      if (options.approvalStatus === "awaiting") {
+        list = list.filter(
+          (p) =>
+            Boolean(p.sellerId) &&
+            p.approvalStatus === "pending" &&
+            Boolean(p.submittedAt),
+        );
+      } else {
+        list = list.filter(
+          (p) => (p.approvalStatus ?? "approved") === options.approvalStatus,
+        );
+      }
     }
     return list;
   }
@@ -496,12 +663,15 @@ export async function filterProductsAsync(
 
 export async function getBestsellersAsync(limit = 8): Promise<Product[]> {
   const catalog = await getAllProductsAsync();
-  return catalog.filter((p) => p.isBestseller && p.inStock).slice(0, limit);
+  return catalog
+    .filter((p) => p.isBestseller && p.inStock)
+    .sort((a, b) => b.reviewCount - a.reviewCount)
+    .slice(0, limit);
 }
 
 export async function getRelatedProductsAsync(
   product: Product,
-  limit = 4,
+  limit = 8,
 ): Promise<Product[]> {
   const catalog = await getAllProductsAsync();
   return catalog
@@ -509,37 +679,13 @@ export async function getRelatedProductsAsync(
       (p) =>
         p.category === product.category && p.id !== product.id && p.inStock,
     )
+    .sort((a, b) => b.reviewCount - a.reviewCount)
     .slice(0, limit);
 }
 
 export async function searchProductsAsync(query: string): Promise<Product[]> {
-  const q = query.trim().toLowerCase().replace(/ي/g, "ی").replace(/ك/g, "ک");
-  if (!q) return [];
   const catalog = await getAllProductsAsync();
-  const scored = catalog
-    .map((p) => {
-      const title = p.title.toLowerCase().replace(/ي/g, "ی").replace(/ك/g, "ک");
-      const slug = p.slug.toLowerCase();
-      const category = `${p.categoryLabel} ${p.category}`
-        .toLowerCase()
-        .replace(/ي/g, "ی")
-        .replace(/ك/g, "ک");
-      const body = `${p.shortDescription} ${p.longDescription}`
-        .toLowerCase()
-        .replace(/ي/g, "ی")
-        .replace(/ك/g, "ک");
-      let score = 0;
-      if (title === q) score += 100;
-      else if (title.startsWith(q)) score += 80;
-      else if (title.includes(q)) score += 60;
-      if (slug.includes(q)) score += 40;
-      if (category.includes(q)) score += 30;
-      if (body.includes(q)) score += 10;
-      return { p, score };
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score);
-  return scored.map((x) => x.p);
+  return searchProductsSync(query, catalog);
 }
 
 async function readLocalRevisions(): Promise<ProductRevision[]> {
@@ -638,13 +784,32 @@ export async function restoreProductRevisionAsync(
 
 export async function updateProductAsync(
   id: string,
-  updates: Partial<Product>,
+  updates: Partial<Omit<Product, "stockQty">> & {
+    stockQty?: number | null;
+  },
   options?: { createRevision?: boolean; actor?: string; revisionNote?: string },
 ): Promise<Product | null> {
   const existing = await getProductByIdAsync(id, { allowHidden: true });
   if (!existing) return null;
 
-  const merged = { ...existing, ...updates, id };
+  const stockPatch = applyStockUpdates(existing, {
+    ...(typeof updates.inStock === "boolean"
+      ? { inStock: updates.inStock }
+      : {}),
+    ...(typeof updates.stockQty === "number"
+      ? { stockQty: updates.stockQty }
+      : updates.stockQty === null
+        ? { stockQty: null }
+        : {}),
+  });
+
+  const merged: Product = {
+    ...existing,
+    ...updates,
+    id,
+    inStock: stockPatch.inStock,
+    stockQty: stockPatch.stockQty,
+  };
 
   if (
     updates.status === "active" &&
@@ -653,6 +818,8 @@ export async function updateProductAsync(
   ) {
     merged.publishedAt = new Date().toISOString();
   }
+
+  const previousSlug = existing.slug;
 
   if (isMysqlConfigured()) {
     const row = mapProductToRow(merged);
@@ -666,7 +833,7 @@ export async function updateProductAsync(
           note: options?.revisionNote,
         });
       }
-      revalidateProductPaths(merged.slug);
+      revalidateProductPaths(merged.slug, previousSlug);
       const saved = await mysqlQueryOne<RowDataPacket>(
         "SELECT * FROM products WHERE id = ? LIMIT 1",
         [id],
@@ -681,29 +848,55 @@ export async function updateProductAsync(
         "[products] upsert failed:",
         err instanceof Error ? err.message : err,
       );
-      await writeProductOverride(id, updates);
-      if (typeof updates.inStock === "boolean") {
+      await writeProductOverride(id, {
+        ...updates,
+        inStock: merged.inStock,
+        stockQty: merged.stockQty,
+      });
+      if (typeof merged.inStock === "boolean") {
         if (canUseFilesystemPersistence()) {
           const stock = await readStockOverrides();
-          stock[id] = updates.inStock;
+          stock[id] = {
+            inStock: merged.inStock,
+            ...(typeof merged.stockQty === "number"
+              ? { stockQty: merged.stockQty }
+              : {}),
+          };
           await writeJsonFile(STOCK_OVERRIDES_FILE, stock);
         } else {
-          memorySetStockOverride(id, updates.inStock);
+          memorySetStockOverride(id, {
+            inStock: merged.inStock,
+            stockQty:
+              typeof merged.stockQty === "number" ? merged.stockQty : 0,
+          });
         }
       }
-      revalidateProductPaths(merged.slug);
+      revalidateProductPaths(merged.slug, previousSlug);
       return merged;
     }
   }
 
-  await writeProductOverride(id, updates);
-  if (typeof updates.inStock === "boolean") {
+  await writeProductOverride(id, {
+    ...updates,
+    inStock: merged.inStock,
+    stockQty: merged.stockQty,
+  });
+  if (typeof merged.inStock === "boolean") {
     if (canUseFilesystemPersistence()) {
       const stock = await readStockOverrides();
-      stock[id] = updates.inStock;
+      stock[id] = {
+        inStock: merged.inStock,
+        ...(typeof merged.stockQty === "number"
+          ? { stockQty: merged.stockQty }
+          : {}),
+      };
       await writeJsonFile(STOCK_OVERRIDES_FILE, stock);
     } else {
-      memorySetStockOverride(id, updates.inStock);
+      memorySetStockOverride(id, {
+        inStock: merged.inStock,
+        stockQty:
+          typeof merged.stockQty === "number" ? merged.stockQty : 0,
+      });
     }
   }
 
@@ -722,16 +915,19 @@ export async function updateProductAsync(
     });
   }
 
-  revalidateProductPaths(merged.slug);
+  revalidateProductPaths(merged.slug, previousSlug);
   return merged;
 }
 
 export async function createProductAsync(
   product: Product,
 ): Promise<Product | null> {
+  const stock = stockDefaultsForCreate(product);
   const withDefaults: Product = {
     ...product,
     status: product.status ?? "draft",
+    inStock: stock.inStock,
+    stockQty: stock.stockQty,
     customFields: product.customFields ?? {},
     seo: product.seo ?? {},
     deletedAt: null,
@@ -741,12 +937,28 @@ export async function createProductAsync(
         : null,
   };
 
+  const clash = await findProductIdBySlugAny(withDefaults.slug);
+  if (clash && clash !== withDefaults.id) {
+    throw new Error("محصولی با این اسلاگ از قبل وجود دارد");
+  }
+  const existingId = await getProductByIdAsync(withDefaults.id, {
+    allowHidden: true,
+  });
+  if (existingId) {
+    throw new Error("محصولی با این شناسه از قبل وجود دارد");
+  }
+
   if (isMysqlConfigured()) {
     const row = mapProductToRow(withDefaults);
     const createdAt = withDefaults.createdAt ?? new Date().toISOString();
     try {
-      await upsertProductRow(row, createdAt);
-    } catch {
+      await insertProductRow(row, createdAt);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/duplicate|er_dup_entry/i.test(msg)) {
+        throw new Error("محصولی با این شناسه یا اسلاگ از قبل وجود دارد");
+      }
+      console.error("[products] create insert failed:", msg);
       return null;
     }
     const saved = await mysqlQueryOne<RowDataPacket>(
@@ -768,6 +980,10 @@ export async function createProductAsync(
   ) {
     throw new Error("محصولی با این شناسه یا اسلاگ از قبل وجود دارد");
   }
+  // Also clash with static catalog slugs
+  if (staticProducts.some((p) => p.slug === withDefaults.slug || p.id === withDefaults.id)) {
+    throw new Error("محصولی با این شناسه یا اسلاگ از قبل وجود دارد");
+  }
   await writeRuntimeProducts([withDefaults, ...runtime]);
   revalidateProductPaths(withDefaults.slug);
   await createProductRevisionAsync(withDefaults, { note: "ایجاد محصول" });
@@ -780,10 +996,24 @@ export async function setProductApprovalAsync(
   reviewNote?: string,
 ): Promise<Product | null> {
   const now = new Date().toISOString();
-  return updateProductAsync(id, {
+  const updates: Partial<Product> = {
     approvalStatus,
     reviewNote: reviewNote?.trim() || undefined,
     reviewedAt: now,
+  };
+  // Approved seller products must become publicly eligible (active + approved).
+  // Rejected / returned-to-review products leave the storefront.
+  if (approvalStatus === "approved") {
+    updates.status = "active";
+  } else {
+    updates.status = "draft";
+  }
+  // Rejected products leave the awaiting queue until the seller resubmits.
+  if (approvalStatus === "rejected") {
+    updates.submittedAt = undefined;
+  }
+  return updateProductAsync(id, updates, {
+    revisionNote: `تغییر وضعیت تأیید: ${approvalStatus}`,
   });
 }
 
@@ -856,13 +1086,28 @@ export async function bulkUpdateProductsAsync(
             { revisionNote: "bulk stock" },
           );
           break;
-        case "set_status":
+        case "set_status": {
+          const existing = await getProductByIdAsync(id, { allowHidden: true });
+          if (!existing) {
+            failed += 1;
+            continue;
+          }
+          // Do not mark unapproved seller products as publicly "active".
+          if (
+            op.status === "active" &&
+            existing.sellerId &&
+            (existing.approvalStatus ?? "approved") !== "approved"
+          ) {
+            failed += 1;
+            continue;
+          }
           result = await updateProductAsync(
             id,
             { status: op.status },
             { revisionNote: "bulk status" },
           );
           break;
+        }
         case "set_category":
           result = await updateProductAsync(
             id,
@@ -917,9 +1162,12 @@ export async function bulkUpdateProductsAsync(
   return { ok, failed };
 }
 
-function revalidateProductPaths(slug: string) {
+function revalidateProductPaths(slug: string, previousSlug?: string) {
   revalidatePath("/shop");
   revalidatePath(`/product/${slug}`);
+  if (previousSlug && previousSlug !== slug) {
+    revalidatePath(`/product/${previousSlug}`);
+  }
   revalidatePath("/");
 }
 

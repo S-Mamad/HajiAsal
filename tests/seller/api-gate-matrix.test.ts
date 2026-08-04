@@ -146,7 +146,7 @@ describe("seller API gate matrix (401/403)", () => {
           expect([401, 403]).not.toContain(res.status);
           return;
         }
-        sellerMock.asSellerWithout(ep.capability);
+        sellerMock.asSellerWithout(ep.anyOfCapabilities ?? ep.capability);
         const res = await invokeEndpoint(ep, buildRequest(ep, true));
         expect(res.status).toBe(403);
       });

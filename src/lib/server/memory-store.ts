@@ -21,7 +21,7 @@ type MemoryRoot = {
   sellerSessions: MemorySession[];
   sellers: Record<string, unknown>[];
   createdProducts: Record<string, unknown>[];
-  stockOverrides: Record<string, boolean>;
+  stockOverrides: Record<string, boolean | { inStock: boolean; stockQty: number }>;
   productOverrides: Record<string, Record<string, unknown>>;
   siteOverrides: Record<string, unknown> | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,11 +88,17 @@ export function memorySetCreatedProducts(
   root().createdProducts = products;
 }
 
-export function memoryGetStockOverrides(): Record<string, boolean> {
+export function memoryGetStockOverrides(): Record<
+  string,
+  boolean | { inStock: boolean; stockQty: number }
+> {
   return { ...root().stockOverrides };
 }
 
-export function memorySetStockOverride(productId: string, inStock: boolean): void {
+export function memorySetStockOverride(
+  productId: string,
+  inStock: boolean | { inStock: boolean; stockQty: number },
+): void {
   root().stockOverrides[productId] = inStock;
 }
 

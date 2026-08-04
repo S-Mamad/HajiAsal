@@ -7,6 +7,7 @@ import { logSellerActivity } from "@/lib/server/seller-activity";
 import {
   createMemoryTicket,
   listMemoryTickets,
+  loadSellerTicketsFs,
 } from "@/lib/server/seller-tickets-memory";
 import {
   isMysqlConfigured,
@@ -14,6 +15,8 @@ import {
   mysqlQuery,
   toIso,
 } from "@/lib/server/mysql";
+import { allowTicketMysqlFallthrough } from "@/lib/server/production";
+import { maskSensitiveText } from "@/lib/tickets/types";
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "tickets.manage");
@@ -37,11 +40,26 @@ export async function GET(request: Request) {
           updatedAt: toIso(r.updated_at),
         })),
       });
-    } catch {
-      /* fallthrough to memory */
+    } catch (error) {
+      console.error(
+        "[seller/tickets] GET mysql failed:",
+        error instanceof Error ? error.message : error,
+      );
+      if (!allowTicketMysqlFallthrough()) {
+        return NextResponse.json(
+          { error: "پایگاه داده در دسترس نیست" },
+          { status: 503 },
+        );
+      }
     }
+  } else if (!allowTicketMysqlFallthrough()) {
+    return NextResponse.json(
+      { error: "پایگاه داده در دسترس نیست" },
+      { status: 503 },
+    );
   }
 
+  await loadSellerTicketsFs();
   return NextResponse.json({
     tickets: listMemoryTickets(sellerId).map(
       ({ messages: _m, sellerId: _s, ...t }) => t,
@@ -69,29 +87,37 @@ export async function POST(request: Request) {
   const id = randomUUID();
   const now = new Date().toISOString();
   const msgId = randomUUID();
+  const maskedBody = maskSensitiveText(parsed.data.body.trim());
 
   if (isMysqlConfigured()) {
     try {
-      await mysqlExecute(
-        `INSERT INTO seller_tickets
-          (id, seller_id, subject, category, priority, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`,
-        [
-          id,
-          gated.ctx.seller.id,
-          parsed.data.subject,
-          parsed.data.category,
-          parsed.data.priority,
-          now,
-          now,
-        ],
-      );
-      await mysqlExecute(
-        `INSERT INTO seller_ticket_messages
-          (id, ticket_id, sender_type, body, created_at)
-         VALUES (?, ?, 'seller', ?, ?)`,
-        [msgId, id, parsed.data.body, now],
-      );
+      await mysqlExecute("START TRANSACTION");
+      try {
+        await mysqlExecute(
+          `INSERT INTO seller_tickets
+            (id, seller_id, subject, category, priority, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`,
+          [
+            id,
+            gated.ctx.seller.id,
+            parsed.data.subject,
+            parsed.data.category,
+            parsed.data.priority,
+            now,
+            now,
+          ],
+        );
+        await mysqlExecute(
+          `INSERT INTO seller_ticket_messages
+            (id, ticket_id, sender_type, body, created_at)
+           VALUES (?, ?, 'seller', ?, ?)`,
+          [msgId, id, maskedBody, now],
+        );
+        await mysqlExecute("COMMIT");
+      } catch (inner) {
+        await mysqlExecute("ROLLBACK").catch(() => undefined);
+        throw inner;
+      }
 
       await logSellerActivity({
         sellerId: gated.ctx.seller.id,
@@ -103,19 +129,30 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ success: true, id });
     } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "خطا" },
-        { status: 500 },
+      console.error(
+        "[seller/tickets] MySQL create failed, falling back:",
+        error instanceof Error ? error.message : error,
       );
+      if (!allowTicketMysqlFallthrough()) {
+        return NextResponse.json(
+          { error: "پایگاه داده در دسترس نیست" },
+          { status: 503 },
+        );
+      }
     }
+  } else if (!allowTicketMysqlFallthrough()) {
+    return NextResponse.json(
+      { error: "پایگاه داده در دسترس نیست" },
+      { status: 503 },
+    );
   }
 
-  const ticket = createMemoryTicket({
+  const ticket = await createMemoryTicket({
     sellerId: gated.ctx.seller.id,
     subject: parsed.data.subject,
     category: parsed.data.category,
     priority: parsed.data.priority,
-    body: parsed.data.body,
+    body: maskedBody,
   });
 
   await logSellerActivity({

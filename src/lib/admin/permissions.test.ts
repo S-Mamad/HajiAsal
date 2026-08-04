@@ -23,6 +23,7 @@ describe("admin permissions", () => {
 
   it("allows support refunds but not settings", () => {
     expect(can("support", "orders.refund")).toBe(true);
+    expect(can("support", "sms.send")).toBe(true);
     expect(can("support", "settings.edit")).toBe(false);
     expect(can("support", "admin_users.manage")).toBe(false);
   });

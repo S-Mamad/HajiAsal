@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Heart } from "@phosphor-icons/react";
 import type { Product } from "@/types";
 import { getMinPrice } from "@/lib/products";
+import { isProductPurchasable } from "@/lib/product-availability";
 import { PriceDisplay } from "@/components/ui/PriceDisplay";
 import { RatingStars } from "@/components/ui/RatingStars";
 import { ProductImage } from "@/components/ui/ProductImage";
@@ -16,7 +17,7 @@ interface ProductCardProps {
 }
 
 function ProductMark({ product }: { product: Product }) {
-  if (!product.inStock) {
+  if (!isProductPurchasable(product)) {
     return (
       <span className="rounded-md bg-red-600/90 px-2 py-0.5 text-[10px] font-medium text-white sm:text-[11px]">
         ناموجود

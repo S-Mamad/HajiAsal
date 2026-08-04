@@ -8,19 +8,16 @@ function redirectMatcher(redirectPath: string): RegExp {
   return new RegExp(pathOnly.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 }
 
-export async function loginAsTestUser(
-  page: Page,
-  redirect = "/account",
-): Promise<void> {
-  const redirectPath = redirect.startsWith("/") ? redirect : `/${redirect}`;
-  await page.goto(`/login?redirect=${encodeURIComponent(redirectPath)}`);
-  const phoneField = page.getByLabel("شماره موبایل");
-  await expect(phoneField).toBeVisible({ timeout: 30_000 });
-  await phoneField.fill(TEST_PHONE);
+async function completeOtpOnPage(page: Page, phone: string, otp: string) {
+  const phoneField = page
+    .getByLabel("شماره موبایل")
+    .or(page.locator('input[inputmode="numeric"], input[autocomplete="tel"]').first());
+  await expect(phoneField.first()).toBeVisible({ timeout: 30_000 });
+  await phoneField.first().fill(phone);
   await page.getByRole("button", { name: /دریافت کد/ }).click();
 
   const otpDigit = page.getByLabel("رقم 1");
-  const sendError = page.locator("p.text-red-500, p.text-sm.text-red-500").first();
+  const sendError = page.locator("p.text-red-500, p.text-sm.text-red-600").first();
   await expect(otpDigit.or(sendError)).toBeVisible({ timeout: 15_000 });
   if (
     (await sendError.isVisible().catch(() => false)) &&
@@ -30,12 +27,20 @@ export async function loginAsTestUser(
   }
   await expect(otpDigit).toBeVisible();
 
-  const digits = TEST_OTP.replace(/\D/g, "").slice(0, 4).split("");
+  const digits = otp.replace(/\D/g, "").slice(0, 10).split("");
   for (let i = 0; i < digits.length; i++) {
     await page.getByLabel(`رقم ${i + 1}`).fill(digits[i]!);
   }
+}
 
-  // OTP auto-submits when complete; avoid clicking the "ورود" tab.
+export async function loginAsTestUser(
+  page: Page,
+  redirect = "/account",
+): Promise<void> {
+  const redirectPath = redirect.startsWith("/") ? redirect : `/${redirect}`;
+  await page.goto(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+  await completeOtpOnPage(page, TEST_PHONE, TEST_OTP);
+
   const nameField = page.getByLabel("نام و نام خانوادگی");
   const pathRe = redirectMatcher(redirectPath);
 
@@ -48,9 +53,20 @@ export async function loginAsTestUser(
     await nameField.fill("علی تستی");
     await page
       .locator("form")
-      .getByRole("button", { name: /ثبت‌نام|ادامه/ })
+      .getByRole("button", { name: /ثبت|ادامه/ })
       .click();
   }
+
+  // Returning users may briefly see welcome before redirect.
+  const welcomeContinue = page.getByRole("button", { name: "ادامه" });
+  await Promise.race([
+    page.waitForURL(pathRe, { timeout: 20_000 }),
+    welcomeContinue.waitFor({ state: "visible", timeout: 5_000 }).then(async () => {
+      if (await welcomeContinue.isVisible().catch(() => false)) {
+        await welcomeContinue.click();
+      }
+    }),
+  ]).catch(() => undefined);
 
   await expect(page).toHaveURL(pathRe, { timeout: 20_000 });
   if (/coupon=/i.test(redirectPath)) {
@@ -73,63 +89,73 @@ export async function addFirstShopProductToCart(page: Page): Promise<void> {
 }
 
 export async function loginAsAdmin(page: Page): Promise<boolean> {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) return false;
+  const phone =
+    process.env.ADMIN_TEST_PHONE?.trim() ||
+    process.env.AUTH_TEST_PHONE?.trim() ||
+    "09123456789";
+  const otp = process.env.AUTH_TEST_OTP ?? "1234";
 
-  // After bootstrap, password-only login is rejected; default to known local admin.
-  const login =
-    process.env.ADMIN_LOGIN?.trim() || "admin@hajiasal.local";
-
-  // Prefer API login (shares cookie jar with the page) to avoid UI rate-limit
-  // when many admin smoke tests authenticate in one run.
   try {
-    const res = await page.request.post("/api/admin/auth", {
-      data: { password, login },
+    const send = await page.request.post("/api/admin/auth/otp/send", {
+      data: { phone },
       timeout: 30_000,
     });
-    if (res.ok()) {
+    if (!send.ok()) return false;
+    const verify = await page.request.post("/api/admin/auth/otp/verify", {
+      data: { phone, code: otp },
+      timeout: 30_000,
+    });
+    if (verify.ok()) {
       await page.goto("/admin/dashboard");
       await page.waitForURL(/\/admin\/dashboard/, { timeout: 15_000 });
       return true;
     }
   } catch {
-    // fall through to UI login
+    /* fall through to UI */
   }
 
-  // Fallback: UI login
   await page.goto("/admin");
-  const loginField = page.locator('input[autocomplete="username"]').first();
-  if (await loginField.isVisible().catch(() => false)) {
-    await loginField.fill(login);
+  try {
+    await completeOtpOnPage(page, phone, otp);
+    await page.waitForURL(/\/admin\/dashboard/, { timeout: 20_000 });
+    return true;
+  } catch {
+    return false;
   }
-  const passField = page.locator('input[type="password"]').first();
-  await passField.fill(password);
-  await page.getByRole("button", { name: /ورود/i }).click();
-  await page.waitForURL(/\/admin\/dashboard/, { timeout: 15_000 });
-  return true;
 }
 
 export async function loginAsSeller(page: Page): Promise<boolean> {
   const phone = process.env.SELLER_DEMO_PHONE ?? "09121111111";
-  const password =
-    process.env.SELLER_PASSWORD_S1 ??
-    process.env.SELLER_DEMO_PASSWORD ??
-    "seller123";
+  const otp = process.env.AUTH_TEST_OTP ?? "1234";
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.goto("/seller");
-    const phoneInput = page.locator('input[inputmode="tel"], input[type="tel"]').first();
-    const passInput = page.locator('input[type="password"]').first();
-    await phoneInput.waitFor({ state: "visible", timeout: 10_000 });
-    await phoneInput.fill(phone);
-    await passInput.fill(password);
-    await page.getByRole("button", { name: /ورود/i }).click();
     try {
+      const send = await page.request.post("/api/seller/auth/otp/send", {
+        data: { phone },
+        timeout: 30_000,
+      });
+      if (send.ok()) {
+        const verify = await page.request.post("/api/seller/auth/otp/verify", {
+          data: { phone, code: otp },
+          timeout: 30_000,
+        });
+        if (verify.ok()) {
+          await page.goto("/seller/dashboard");
+          await page.waitForURL(/\/seller\/dashboard/, { timeout: 15_000 });
+          return true;
+        }
+      }
+    } catch {
+      /* UI fallback */
+    }
+
+    await page.goto("/seller");
+    try {
+      await completeOtpOnPage(page, phone, otp);
       await page.waitForURL(/\/seller\/dashboard/, { timeout: 20_000 });
       return true;
     } catch {
-      const body = await page.locator("body").innerText().catch(() => "");
-      if (/تلاش زیاد|کمی بعد/i.test(body) && attempt < 2) {
+      if (attempt < 2) {
         await page.waitForTimeout(2_000 * (attempt + 1));
         continue;
       }

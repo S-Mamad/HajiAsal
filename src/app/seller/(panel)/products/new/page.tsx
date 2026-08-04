@@ -4,7 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { Input } from "@/components/ui/Input";
+import { SellerProductImageField } from "@/components/seller/ui/SellerProductImageField";
 import { hajiasalPath } from "@/lib/paths";
+
+const CATEGORY_OPTIONS = [
+  { id: "mountain", label: "کوهستان" },
+  { id: "thyme", label: "آویشن" },
+  { id: "multifloral", label: "چندگل" },
+  { id: "royal-jelly", label: "ژل رویال" },
+  { id: "honeycomb", label: "موم عسل" },
+  { id: "specialty", label: "ویژه" },
+  { id: "gift-set", label: "هدیه" },
+  { id: "distillates", label: "عرقیات" },
+  { id: "rice", label: "برنج" },
+  { id: "saffron", label: "زعفران" },
+];
 
 export default function SellerProductNewPage() {
   const router = useRouter();
@@ -14,7 +28,7 @@ export default function SellerProductNewPage() {
   const [price, setPrice] = useState("");
   const [grams, setGrams] = useState("1000");
   const [weightLabel, setWeightLabel] = useState("۱ کیلو");
-  const [imageUrl, setImageUrl] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [stockQty, setStockQty] = useState("1");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -23,6 +37,7 @@ export default function SellerProductNewPage() {
     setSaving(true);
     setError("");
     try {
+      const cat = CATEGORY_OPTIONS.find((c) => c.id === category);
       const res = await fetch("/api/seller/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,8 +45,8 @@ export default function SellerProductNewPage() {
           title,
           shortDescription,
           category,
-          categoryLabel: category,
-          images: imageUrl ? [imageUrl] : [],
+          categoryLabel: cat?.label ?? category,
+          images,
           weightOptions: [
             {
               label: weightLabel,
@@ -58,20 +73,36 @@ export default function SellerProductNewPage() {
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
       <Input label="عنوان" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Input label="توضیح کوتاه" value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} />
-      <Input label="دسته" value={category} onChange={(e) => setCategory(e.target.value)} />
+      <label className="block space-y-1 text-sm">
+        <span className="text-stone-600">دسته</span>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm"
+        >
+          {CATEGORY_OPTIONS.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <Input label="قیمت" value={price} onChange={(e) => setPrice(e.target.value)} type="number" />
       <Input label="گرم" value={grams} onChange={(e) => setGrams(e.target.value)} type="number" />
       <Input label="برچسب وزن" value={weightLabel} onChange={(e) => setWeightLabel(e.target.value)} />
       <Input label="موجودی" value={stockQty} onChange={(e) => setStockQty(e.target.value)} type="number" />
-      <Input label="تصویر (URL)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+      <SellerProductImageField images={images} onChange={setImages} />
       <div className="flex gap-2">
         <AdminButton onClick={() => void submit(false)} disabled={saving || !title || !price}>
           ثبت و ارسال برای تأیید
         </AdminButton>
-        <AdminButton variant="outline" onClick={() => void submit(true)} disabled={saving}>
+        <AdminButton variant="outline" onClick={() => void submit(true)} disabled={saving || !title || !price}>
           پیش‌نویس
         </AdminButton>
       </div>
+      <p className="text-xs text-stone-500">
+        پس از تأیید ادمین، محصول در فروشگاه نمایش داده می‌شود.
+      </p>
     </div>
   );
 }

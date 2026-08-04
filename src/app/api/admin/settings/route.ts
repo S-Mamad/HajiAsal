@@ -38,23 +38,26 @@ export async function GET(request: Request) {
   if (!isMysqlConfigured()) {
     missing.push("MYSQL_HOST / MYSQL_USER / MYSQL_DATABASE / MYSQL_PASSWORD");
   }
-  if (!process.env.ADMIN_PASSWORD) missing.push("ADMIN_PASSWORD");
   if (!process.env.AUTH_SESSION_SECRET) missing.push("AUTH_SESSION_SECRET");
   const smsConfigured =
     Boolean(process.env.MELIPAYAMAK_OTP_URL?.trim()) ||
     Boolean(process.env.MELIPAYAMAK_OTP_TOKEN?.trim()) ||
+    Boolean(process.env.MELIPAYAMAK_BODY_ID?.trim()) ||
+    Boolean(process.env.KAVENEGAR_OTP_TEMPLATE?.trim()) ||
     Boolean(process.env.SMS_API_KEY && process.env.SMS_SENDER);
   if (!smsConfigured) {
     missing.push("MELIPAYAMAK_OTP_URL یا SMS_API_KEY / SMS_SENDER (برای OTP واقعی)");
   }
+  if (!process.env.NEXT_PUBLIC_ADMIN_URL) missing.push("NEXT_PUBLIC_ADMIN_URL");
+  if (!process.env.NEXT_PUBLIC_SELLER_URL) missing.push("NEXT_PUBLIC_SELLER_URL");
 
-  const { isOrderSmsConfigured } = await import("@/lib/server/order-notify");
-  const orderSms = isOrderSmsConfigured();
-  if (!orderSms) {
-    missing.push(
-      "MELIPAYAMAK_SMS_URL یا SMS_API_KEY/SMS_SENDER (برای پیامک وضعیت سفارش)",
-    );
-  }
+  const { isTransactionalSmsConfigured, isOrderSmsEnabled } = await import(
+    "@/lib/server/sms"
+  );
+  const transactionalSms = isTransactionalSmsConfigured();
+  const orderSmsEnabled = isOrderSmsEnabled();
+  // Auto order SMS is opt-in; do not treat it as a production gap.
+  const orderSms = orderSmsEnabled && transactionalSms;
 
   return NextResponse.json({
     env: {
@@ -66,15 +69,19 @@ export async function GET(request: Request) {
       supabasePing: dbPing,
       supabaseError: dbError,
       sms: smsConfigured,
+      transactionalSms,
       orderSms,
+      orderSmsEnabled,
       zarinpal: Boolean(
         process.env.ZARINPAL_MERCHANT_ID &&
           process.env.ZARINPAL_MERCHANT_ID !== "your_merchant_id",
       ),
       zarinpalRefund: Boolean(process.env.ZARINPAL_ACCESS_TOKEN?.trim()),
       authSecret: Boolean(process.env.AUTH_SESSION_SECRET),
-      adminPassword: Boolean(process.env.ADMIN_PASSWORD),
+      adminOtp: true,
       siteUrl: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+      adminUrl: Boolean(process.env.NEXT_PUBLIC_ADMIN_URL),
+      sellerUrl: Boolean(process.env.NEXT_PUBLIC_SELLER_URL),
     },
     settings: {
       shippingCost: settings.shippingCost,
@@ -83,9 +90,9 @@ export async function GET(request: Request) {
     productionReady:
       isMysqlConfigured() &&
       dbPing &&
-      Boolean(process.env.ADMIN_PASSWORD) &&
       Boolean(process.env.AUTH_SESSION_SECRET) &&
-      Boolean(process.env.NEXT_PUBLIC_SITE_URL),
+      Boolean(process.env.NEXT_PUBLIC_SITE_URL) &&
+      smsConfigured,
   });
 }
 

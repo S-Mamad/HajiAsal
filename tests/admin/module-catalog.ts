@@ -517,7 +517,15 @@ export const ADMIN_API_CATALOG: AdminModuleEndpoint[] = [
     path: "/api/admin/media",
     permission: "media.manage",
     importPath: "@/app/api/admin/media/route",
-    body: { filename: "x.jpg", url: "/x.jpg", mimeType: "image/jpeg", sizeBytes: 1, originalName: "x.jpg" },
+    // Non-products folder so products.edit fallback does not open the gate
+    body: {
+      filename: "x.jpg",
+      url: "/x.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 1,
+      originalName: "x.jpg",
+      folder: "library",
+    },
     skipAllowedProbe: true,
   },
   {

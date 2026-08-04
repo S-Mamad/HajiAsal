@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ShoppingBag,
@@ -32,11 +32,17 @@ import { RatingStars } from "@/components/ui/RatingStars";
 import { useCartStore } from "@/store/cart";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { hajiasalPath } from "@/lib/paths";
+import { LAB_CERTIFICATE } from "@/lib/lab-certificate";
 
 const featureBadges = [
   { icon: Leaf, label: "۱۰۰٪ طبیعی" },
   { icon: ShieldCheck, label: "بدون افزودنی" },
-  { icon: Medal, label: "دارای گواهی" },
+  {
+    icon: Medal,
+    label: "دارای گواهی",
+    href: LAB_CERTIFICATE.href,
+    downloadName: LAB_CERTIFICATE.downloadName,
+  },
 ];
 
 interface ProductDetailClientProps {
@@ -46,24 +52,55 @@ interface ProductDetailClientProps {
 }
 
 export function ProductDetailClient({
-  product,
+  product: initialProduct,
   relatedProducts,
   initialReviews,
 }: ProductDetailClientProps) {
   const siteData = useSiteSettings();
   const addItem = useCartStore((s) => s.addItem);
   const setAnnouncement = useCartStore((s) => s.setAnnouncement);
+  const [product, setProduct] = useState(initialProduct);
   const [selectedWeight, setSelectedWeight] = useState<WeightOption>(
-    product.weightOptions[0],
+    initialProduct.weightOptions[0],
   );
   const [quantity, setQuantity] = useState(1);
   const [addedFlash, setAddedFlash] = useState(false);
   const [adding, setAdding] = useState(false);
 
+  // Refresh live stock so SSR/cache never disagrees with validate-add.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/products/${encodeURIComponent(initialProduct.slug)}`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as { product?: Product };
+      })
+      .then((data) => {
+        if (cancelled || !data?.product) return;
+        setProduct(data.product);
+      })
+      .catch(() => {
+        /* keep SSR product */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialProduct.slug]);
+
   const listPrice = selectedWeight.price;
   const salePrice = getEffectiveWeightPrice(product, selectedWeight);
   const purchasable = isProductPurchasable(product);
   const maxQty = maxPurchasableQty(product);
+
+  useEffect(() => {
+    if (!purchasable) {
+      setQuantity(1);
+      return;
+    }
+    setQuantity((q) => Math.min(q, maxQty || 1));
+  }, [purchasable, maxQty]);
 
   const handleAddToCart = async () => {
     if (!purchasable || adding) return;
@@ -81,11 +118,27 @@ export function ProductDetailClient({
         success?: boolean;
         message?: string;
         stockQty?: number;
+        inStock?: boolean;
       };
 
       if (!res.ok || !data.success) {
+        if (data.inStock === false || (data.stockQty ?? 1) <= 0) {
+          setProduct((p) => ({
+            ...p,
+            inStock: false,
+            stockQty: data.stockQty ?? 0,
+          }));
+        }
         setAnnouncement(data.message ?? "امکان افزودن به سبد وجود ندارد");
         return;
+      }
+
+      if (typeof data.stockQty === "number") {
+        setProduct((p) => ({
+          ...p,
+          inStock: true,
+          stockQty: data.stockQty,
+        }));
       }
 
       const ok = addItem(
@@ -171,15 +224,37 @@ export function ProductDetailClient({
           </p>
 
           <div className="flex flex-wrap gap-4">
-            {featureBadges.map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex items-center gap-2 text-sm text-secondary"
-              >
-                <Icon size={16} className="text-gold" />
-                <span>{label}</span>
-              </div>
-            ))}
+            {featureBadges.map(({ icon: Icon, label, href, downloadName }) => {
+              const inner = (
+                <>
+                  <Icon size={16} className="text-gold" />
+                  <span>{label}</span>
+                </>
+              );
+              if (href) {
+                return (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={downloadName}
+                    title={LAB_CERTIFICATE.label}
+                    className="flex items-center gap-2 text-sm text-secondary underline-offset-4 transition-colors hover:text-gold hover:underline"
+                  >
+                    {inner}
+                  </a>
+                );
+              }
+              return (
+                <div
+                  key={label}
+                  className="flex items-center gap-2 text-sm text-secondary"
+                >
+                  {inner}
+                </div>
+              );
+            })}
           </div>
 
           <PriceDisplay
@@ -193,7 +268,11 @@ export function ProductDetailClient({
               <Check size={16} weight="bold" />
               <span>موجود در انبار</span>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-red-400/90">
+              <span>این محصول در حال حاضر موجود نیست</span>
+            </div>
+          )}
 
           <WeightSelector
             options={product.weightOptions}
@@ -254,10 +333,13 @@ export function ProductDetailClient({
               <Truck size={14} className="text-gold" />
               <span>{shippingLabel}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <Link
+              href={hajiasalPath("/authenticity")}
+              className="flex items-center gap-2 transition-colors hover:text-gold"
+            >
               <Shield size={14} className="text-gold" />
               <span>{siteData.trustItems[0]?.title ?? "ضمانت کیفیت"}</span>
-            </div>
+            </Link>
           </div>
         </div>
 
@@ -275,7 +357,11 @@ export function ProductDetailClient({
       </div>
 
       {relatedProducts.length > 0 ? (
-        <RelatedProducts products={relatedProducts} />
+        <RelatedProducts
+          products={relatedProducts}
+          category={product.category}
+          categoryLabel={product.categoryLabel}
+        />
       ) : null}
 
       <StickyAddToCart

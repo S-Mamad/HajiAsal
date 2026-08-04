@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import sellersSeed from "@/data/sellers.json";
+import { normalizePhone as normalizeIranPhone } from "@/lib/auth/phone";
 import { readJsonFile, writeJsonFile } from "./db";
 import { memoryGetSellers, memorySetSellers } from "./memory-store";
 import { canUseFilesystemPersistence } from "./production";
@@ -66,7 +67,8 @@ export type SellerCreateInput = {
   shopName: string;
   ownerName: string;
   phone: string;
-  password: string;
+  /** Optional; OTP login does not use password. */
+  password?: string;
   city?: string;
   status?: SellerStatus;
   notes?: string;
@@ -100,7 +102,7 @@ const SELLERS_RUNTIME_FILE = "sellers-runtime.json";
 const seedSellers = sellersSeed as Seller[];
 
 function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+  return normalizeIranPhone(phone) ?? phone.replace(/\D/g, "");
 }
 
 export function hashSellerPassword(password: string): string {
@@ -410,8 +412,8 @@ function nextSellerId(existing: Seller[]): string {
 export async function createSellerAsync(
   input: SellerCreateInput,
 ): Promise<Seller> {
-  const phone = input.phone.trim();
-  if (normalizePhone(phone).length < 10) {
+  const phone = normalizePhone(input.phone.trim());
+  if (!normalizeIranPhone(phone)) {
     throw new Error("شماره موبایل معتبر نیست");
   }
 
@@ -423,12 +425,14 @@ export async function createSellerAsync(
   const all = await getAllSellersAsync();
   const now = new Date().toISOString();
   const status = input.status ?? "active";
+  const password =
+    input.password?.trim() || randomBytes(32).toString("hex");
   const seller: Seller = {
     id: nextSellerId(all),
     shopName: input.shopName.trim(),
     ownerName: input.ownerName.trim(),
     phone,
-    passwordHash: hashSellerPassword(input.password),
+    passwordHash: hashSellerPassword(password),
     city: (input.city ?? "").trim(),
     status,
     isDemo: input.isDemo ?? false,

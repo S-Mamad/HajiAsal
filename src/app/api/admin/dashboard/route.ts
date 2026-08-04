@@ -4,8 +4,8 @@ import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   getDashboardStats,
   listQuestions,
-  listTickets,
 } from "@/lib/server/admin-platform-store";
+import { countOpenUnifiedTickets } from "@/lib/server/unified-tickets";
 import { getContactMessagesBySource } from "@/lib/server/newsletter";
 import { getAllOrders } from "@/lib/server/orders";
 import { getAllProductsAsync } from "@/lib/server/products-store";
@@ -28,13 +28,13 @@ export async function GET(request: Request) {
       salesChart: [] as { date: string; total: number }[],
       ordersChart: [] as { date: string; count: number }[],
     }));
-    const [orders, messages, products, tickets, questions] = await Promise.all([
+    const [orders, messages, products, openTicketCount, questions] = await Promise.all([
       getAllOrders().catch(() => []),
       canViewMessages
         ? getContactMessagesBySource("hajiasal").catch(() => [])
         : Promise.resolve([]),
       getAllProductsAsync({ scope: "admin" }).catch(() => []),
-      listTickets().catch(() => []),
+      countOpenUnifiedTickets().catch(() => 0),
       listQuestions().catch(() => []),
     ]);
 
@@ -44,9 +44,6 @@ export async function GET(request: Request) {
     );
     const unreadMessages = messages.filter((m) => !m.readAt);
     const outOfStock = products.filter((p) => !p.inStock);
-    const openTickets = tickets.filter(
-      (t) => t.status === "open" || t.status === "new" || t.status === "pending",
-    );
     const openQa = questions.filter(
       (q) => q.status === "pending" || q.status === "open" || !q.answer,
     );
@@ -74,7 +71,7 @@ export async function GET(request: Request) {
       },
       navBadges: {
         messages: canViewMessages ? unreadMessages.length : 0,
-        tickets: openTickets.length,
+        tickets: openTicketCount,
         qa: openQa.length,
       },
       recentOrders: orders.slice(0, 8),

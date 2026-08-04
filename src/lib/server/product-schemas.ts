@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 export const weightOptionSchema = z.object({
-  label: z.string(),
-  grams: z.number(),
-  price: z.number(),
+  label: z.string().min(1),
+  grams: z.number().positive(),
+  price: z.number().nonnegative(),
 });
 
 export const productSeoSchema = z
@@ -32,18 +32,31 @@ export const productStatusSchema = z.enum([
   "disabled",
 ]);
 
+export const productCategorySchema = z.enum([
+  "mountain",
+  "thyme",
+  "multifloral",
+  "royal-jelly",
+  "honeycomb",
+  "specialty",
+  "gift-set",
+  "distillates",
+  "rice",
+  "saffron",
+]);
+
 export const productPatchSchema = z.object({
   title: z.string().min(1).optional(),
   slug: z.string().min(1).optional(),
   shortDescription: z.string().optional(),
   longDescription: z.string().optional(),
-  category: z.string().optional(),
+  category: productCategorySchema.optional(),
   categoryLabel: z.string().optional(),
-  images: z.array(z.string()).optional(),
+  images: z.array(z.string().min(1)).optional(),
   weightOptions: z.array(weightOptionSchema).optional(),
   discountPrice: z.number().nullable().optional(),
   inStock: z.boolean().optional(),
-  stockQty: z.number().optional(),
+  stockQty: z.number().int().nonnegative().nullable().optional(),
   isBestseller: z.boolean().optional(),
   isNew: z.boolean().optional(),
   ingredients: z.string().optional(),
@@ -66,13 +79,13 @@ export const productCreateSchema = z.object({
   title: z.string().min(1),
   shortDescription: z.string().default(""),
   longDescription: z.string().default(""),
-  category: z.string(),
+  category: productCategorySchema,
   categoryLabel: z.string().default(""),
-  images: z.array(z.string()).default([]),
+  images: z.array(z.string().min(1)).default([]),
   weightOptions: z.array(weightOptionSchema).min(1),
-  discountPrice: z.number().optional(),
+  discountPrice: z.number().nullable().optional(),
   inStock: z.boolean().default(true),
-  stockQty: z.number().optional(),
+  stockQty: z.number().int().nonnegative().nullable().optional(),
   isBestseller: z.boolean().optional(),
   isNew: z.boolean().optional(),
   ingredients: z.string().optional(),

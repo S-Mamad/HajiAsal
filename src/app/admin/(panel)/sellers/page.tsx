@@ -48,7 +48,6 @@ export default function AdminSellersPage() {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [city, setCity] = useState("");
   const [commission, setCommission] = useState("10");
   const [creating, setCreating] = useState(false);
@@ -92,8 +91,8 @@ export default function AdminSellersPage() {
   }, [sellers, query, statusFilter]);
 
   const createSeller = async () => {
-    if (!shopName.trim() || !ownerName.trim() || !phone.trim() || !password) {
-      setError("نام فروشگاه، صاحب، موبایل و رمز الزامی است");
+    if (!shopName.trim() || !ownerName.trim() || !phone.trim()) {
+      setError("نام فروشگاه، صاحب و موبایل الزامی است");
       return;
     }
     setCreating(true);
@@ -106,7 +105,6 @@ export default function AdminSellersPage() {
           shopName,
           ownerName,
           phone,
-          password,
           city,
           commissionPercent: Number(commission) || 10,
           status: "active",
@@ -117,7 +115,6 @@ export default function AdminSellersPage() {
       setShopName("");
       setOwnerName("");
       setPhone("");
-      setPassword("");
       setCity("");
       setCommission("10");
       await load();
@@ -164,17 +161,10 @@ export default function AdminSellersPage() {
             onChange={(e) => setOwnerName(e.target.value)}
           />
           <Input
-            placeholder="موبایل"
+            placeholder="موبایل (09123456789)"
             dir="ltr"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-          />
-          <Input
-            placeholder="رمز ورود"
-            type="password"
-            dir="ltr"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
           />
           <Input
             placeholder="شهر"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import {
+  getProductByIdAsync,
   listProductRevisionsAsync,
   restoreProductRevisionAsync,
 } from "@/lib/server/products-store";
@@ -31,6 +32,35 @@ export async function POST(request: Request, context: RouteContext) {
   const parsed = restoreSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "اطلاعات نامعتبر است" }, { status: 400 });
+  }
+
+  const revisions = await listProductRevisionsAsync(id);
+  const rev = revisions.find((r) => r.id === parsed.data.revisionId);
+  if (!rev?.snapshot) {
+    return NextResponse.json({ error: "نسخه یافت نشد" }, { status: 404 });
+  }
+
+  const existing = await getProductByIdAsync(id, { allowHidden: true });
+  if (!existing) {
+    return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
+  }
+
+  const snap = rev.snapshot;
+  if (
+    snap.status === "active" &&
+    (existing.status ?? "active") !== "active"
+  ) {
+    const pub = await gateAdmin(request, "products.publish");
+    if (!pub.ok) return pub.response;
+  }
+
+  const priceChanged =
+    JSON.stringify(snap.weightOptions ?? null) !==
+      JSON.stringify(existing.weightOptions ?? null) ||
+    snap.discountPrice !== existing.discountPrice;
+  if (priceChanged) {
+    const price = await gateAdmin(request, "products.edit_price");
+    if (!price.ok) return price.response;
   }
 
   const product = await restoreProductRevisionAsync(

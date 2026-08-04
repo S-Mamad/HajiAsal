@@ -28,10 +28,11 @@ export default function AdminUsersPage() {
       columns={[
         { key: "fullName", header: "نام", render: (r) => r.fullName },
         {
-          key: "email",
-          header: "ایمیل",
-          hideOnMobile: true,
-          render: (r) => r.email || "—",
+          key: "phone",
+          header: "موبایل",
+          render: (r) => (
+            <span dir="ltr">{r.phone || "—"}</span>
+          ),
         },
         {
           key: "role",
@@ -46,9 +47,13 @@ export default function AdminUsersPage() {
       ]}
       fields={[
         { key: "fullName", label: "نام", required: true },
-        { key: "email", label: "ایمیل", dir: "ltr" },
-        { key: "phone", label: "موبایل", dir: "ltr" },
-        { key: "password", label: "رمز عبور", dir: "ltr", required: true },
+        {
+          key: "phone",
+          label: "موبایل",
+          dir: "ltr",
+          required: true,
+        },
+        { key: "email", label: "ایمیل (اختیاری)", dir: "ltr" },
         {
           key: "role",
           label: "نقش",
@@ -65,7 +70,6 @@ export default function AdminUsersPage() {
         fullName: r.fullName,
         email: r.email ?? "",
         phone: r.phone ?? "",
-        password: "",
         role: r.role,
       })}
       toPayload={(v, editing) => {
@@ -76,14 +80,12 @@ export default function AdminUsersPage() {
             email: v.email || null,
             phone: v.phone || null,
             role: v.role,
-            ...(v.password ? { password: v.password } : {}),
           };
         }
         return {
           fullName: v.fullName,
           email: v.email || null,
           phone: v.phone || null,
-          password: v.password,
           role: v.role || "support",
         };
       }}

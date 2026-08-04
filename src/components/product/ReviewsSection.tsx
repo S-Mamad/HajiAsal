@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,27 +8,19 @@ import { z } from "zod";
 import { Star, SealCheck } from "@phosphor-icons/react";
 import type { Product } from "@/types";
 import type { Review } from "@/lib/server/reviews";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { hajiasalPath } from "@/lib/paths";
 
 const schema = z.object({
-  author: z.string().min(2, "نام را وارد کنید").max(40),
-  phone: z
-    .string()
-    .min(10, "موبایل سفارش را وارد کنید")
-    .max(15, "شماره نامعتبر است")
-    .refine((v) => {
-      const d = v.replace(/\D/g, "");
-      return (
-        (d.length === 11 && d.startsWith("09")) ||
-        (d.length === 10 && d.startsWith("9"))
-      );
-    }, { message: "موبایل را با ۰۹ وارد کنید" }),
   rating: z.number().min(1).max(5),
   comment: z.string().min(10, "حداقل چند جمله بنویسید").max(400),
   website: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+type ComposerMode = "closed" | "login" | "purchase" | "form" | "done";
 
 interface ReviewsSectionProps {
   product: Product;
@@ -41,11 +34,12 @@ export function ReviewsSection({
   product,
   initialReviews,
 }: ReviewsSectionProps) {
+  const { user, isLoggedIn, loading: authLoading } = useAuth();
   const [reviews, setReviews] = useState<Review[]>(initialReviews ?? []);
   const [loading, setLoading] = useState(initialReviews === undefined);
-  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
-    "idle",
-  );
+  const [composer, setComposer] = useState<ComposerMode>("closed");
+  const [checking, setChecking] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
 
   const {
@@ -58,8 +52,6 @@ export function ReviewsSection({
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      author: "",
-      phone: "",
       rating: 5,
       comment: "",
       website: "",
@@ -67,6 +59,8 @@ export function ReviewsSection({
   });
 
   const rating = watch("rating");
+  const productPath = hajiasalPath(`/product/${product.slug}`);
+  const loginHref = `${hajiasalPath("/login")}?redirect=${encodeURIComponent(productPath)}`;
 
   useEffect(() => {
     if (initialReviews !== undefined) return;
@@ -76,8 +70,47 @@ export function ReviewsSection({
       .finally(() => setLoading(false));
   }, [product.id, initialReviews]);
 
+  const openComposer = async () => {
+    if (authLoading || checking) return;
+    setMessage("");
+    setStatus("idle");
+
+    if (!isLoggedIn) {
+      setComposer("login");
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const res = await fetch(
+        `/api/reviews/eligibility?productId=${encodeURIComponent(product.id)}`,
+      );
+      const data = (await res.json()) as {
+        canReview?: boolean;
+        reason?: "login" | "purchase" | "ok";
+      };
+
+      if (!res.ok || data.reason === "login" || !isLoggedIn) {
+        setComposer("login");
+        return;
+      }
+      if (!data.canReview || data.reason === "purchase") {
+        setComposer("purchase");
+        return;
+      }
+
+      reset({ rating: 5, comment: "", website: "" });
+      setComposer("form");
+    } catch {
+      setComposer("purchase");
+      setMessage("بررسی واجد شرایط بودن ممکن نشد. دوباره تلاش کنید.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
-    if (status === "loading") return;
+    if (status === "loading" || !user) return;
     setStatus("loading");
     setMessage("");
     try {
@@ -85,8 +118,8 @@ export function ReviewsSection({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          author: data.author.trim(),
-          phone: data.phone.trim(),
+          author: (user.fullName || "خریدار").trim(),
+          phone: user.phone.trim(),
           rating: data.rating,
           comment: data.comment.trim(),
           productId: product.id,
@@ -95,21 +128,27 @@ export function ReviewsSection({
       });
       const result = await res.json();
       if (!res.ok || !result.success) {
+        if (res.status === 401) {
+          setComposer("login");
+          setStatus("idle");
+          return;
+        }
+        if (res.status === 403) {
+          setComposer("purchase");
+          setStatus("idle");
+          setMessage(result.message ?? "");
+          return;
+        }
         setStatus("error");
         setMessage(result.message ?? "ارسال نشد");
         return;
       }
-      setStatus("done");
+      setComposer("done");
+      setStatus("idle");
       setMessage(
         result.message ?? "ثبت شد. پس از تأیید ادمین نمایش داده می‌شود.",
       );
-      reset({
-        author: "",
-        phone: "",
-        rating: 5,
-        comment: "",
-        website: "",
-      });
+      reset({ rating: 5, comment: "", website: "" });
     } catch {
       setStatus("error");
       setMessage("ارتباط برقرار نشد.");
@@ -134,7 +173,7 @@ export function ReviewsSection({
       {loading ? (
         <p className="mb-10 text-sm text-dim">در حال بارگذاری...</p>
       ) : reviews.length > 0 ? (
-        <ul className="mb-12 flex flex-col">
+        <ul className="mb-10 flex flex-col md:mb-12">
           {reviews.map((review) => (
             <li
               key={review.id}
@@ -188,35 +227,81 @@ export function ReviewsSection({
           ))}
         </ul>
       ) : (
-        <p className="mb-12 text-sm text-dim">
+        <p className="mb-10 text-sm text-dim md:mb-12">
           هنوز نظر تأییدشده‌ای برای این محصول نیست.
         </p>
       )}
 
       <div className="max-w-md">
-        <h3 className="mb-1 text-base font-medium text-primary">
-          نظر شما درباره این محصول
-        </h3>
-        <p className="mb-6 text-[13px] leading-relaxed text-secondary">
-          فرم برای همه باز است. ارسال فقط برای خریداران است و پس از تأیید ادمین
-          نمایش داده می‌شود.
-        </p>
+        {composer === "closed" ? (
+          <button
+            type="button"
+            onClick={() => void openComposer()}
+            disabled={authLoading || checking}
+            className="text-sm text-gold transition-opacity hover:text-gold-bright disabled:opacity-50"
+          >
+            {checking ? "در حال بررسی..." : "نوشتن نظر"}
+          </button>
+        ) : null}
 
-        {status === "done" ? (
-          <div className="py-6">
-            <p className="text-sm text-secondary">{message}</p>
+        {composer === "login" ? (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-secondary">
+              برای ثبت نظر ابتدا وارد حساب کاربری شوید.
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <Link
+                href={loginHref}
+                className="text-sm text-gold hover:text-gold-bright"
+              >
+                ورود / ثبت‌نام
+              </Link>
+              <button
+                type="button"
+                onClick={() => setComposer("closed")}
+                className="text-xs text-dim hover:text-secondary"
+              >
+                بستن
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {composer === "purchase" ? (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-secondary" role="status">
+              {message || "برای ثبت نظر باید ابتدا این محصول را بخرید."}
+            </p>
             <button
               type="button"
               onClick={() => {
-                setStatus("idle");
+                setComposer("closed");
                 setMessage("");
               }}
-              className="mt-4 text-xs text-gold hover:text-gold-bright"
+              className="text-xs text-dim hover:text-secondary"
+            >
+              بستن
+            </button>
+          </div>
+        ) : null}
+
+        {composer === "done" ? (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-secondary">{message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setComposer("closed");
+                setMessage("");
+              }}
+              className="text-xs text-gold hover:text-gold-bright"
             >
               نوشتن نظر دیگر
             </button>
           </div>
-        ) : (
+        ) : null}
+
+        {composer === "form" ? (
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="relative"
@@ -229,7 +314,24 @@ export function ReviewsSection({
               <input tabIndex={-1} autoComplete="off" {...register("website")} />
             </div>
 
-            <div className="mb-6">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <p className="text-[11px] text-dim">
+                ثبت به‌نام {user?.fullName || "شما"}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setComposer("closed");
+                  setStatus("idle");
+                  setMessage("");
+                }}
+                className="text-[11px] text-dim hover:text-secondary"
+              >
+                انصراف
+              </button>
+            </div>
+
+            <div className="mb-5 mt-4">
               <p className="mb-2 text-[11px] text-dim">امتیاز شما</p>
               <div
                 className="flex items-center gap-1"
@@ -260,46 +362,6 @@ export function ReviewsSection({
               </div>
             </div>
 
-            <label className="mb-5 block">
-              <span className="mb-1 block text-[11px] text-dim">نام نمایشی</span>
-              <input
-                type="text"
-                autoComplete="name"
-                placeholder="مثلاً مریم"
-                className={fieldClass}
-                {...register("author")}
-              />
-              {errors.author ? (
-                <p className="mt-1.5 text-[11px] text-red-400/90">
-                  {errors.author.message}
-                </p>
-              ) : null}
-            </label>
-
-            <label className="mb-5 block">
-              <span className="mb-1 block text-[11px] text-dim">
-                موبایل ثبت‌شده در سفارش
-              </span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                dir="ltr"
-                placeholder="09xxxxxxxxx"
-                className={cn(fieldClass, "text-left")}
-                {...register("phone")}
-              />
-              {errors.phone ? (
-                <p className="mt-1.5 text-[11px] text-red-400/90">
-                  {errors.phone.message}
-                </p>
-              ) : (
-                <p className="mt-1.5 text-[11px] text-dim/80">
-                  فقط با شماره خریدار، نظر به ادمین ارسال می‌شود
-                </p>
-              )}
-            </label>
-
             <label className="mb-2 block">
               <span className="mb-1 block text-[11px] text-dim">متن نظر</span>
               <textarea
@@ -316,7 +378,7 @@ export function ReviewsSection({
               ) : null}
             </label>
 
-            <div className="mt-7">
+            <div className="mt-6">
               <button
                 type="submit"
                 disabled={status === "loading"}
@@ -334,8 +396,12 @@ export function ReviewsSection({
                 {message}
               </p>
             ) : null}
+
+            <p className="mt-3 text-[11px] text-dim">
+              نظر پس از بررسی ادمین منتشر می‌شود.
+            </p>
           </form>
-        )}
+        ) : null}
       </div>
     </section>
   );

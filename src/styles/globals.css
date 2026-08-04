@@ -21,11 +21,11 @@
   --border-bright: rgba(28, 25, 23, 0.2);
   --header-bg: rgba(255, 255, 255, 0.92);
   --overlay-scrim: rgba(28, 25, 23, 0.45);
-  --hero-wash-top: rgba(28, 25, 23, 0.28);
-  --hero-wash-mid: rgba(243, 241, 236, 0.08);
-  --hero-wash-bottom: rgba(243, 241, 236, 0.94);
-  --hero-wash-dark-top: rgba(28, 25, 23, 0.22);
-  --hero-wash-dark-mid: rgba(243, 241, 236, 0.12);
+  --hero-wash-top: rgba(28, 25, 23, 0.18);
+  --hero-wash-mid: rgba(243, 241, 236, 0.04);
+  --hero-wash-bottom: rgba(243, 241, 236, 0.9);
+  --hero-wash-dark-top: rgba(28, 25, 23, 0.16);
+  --hero-wash-dark-mid: rgba(243, 241, 236, 0.08);
   --hero-wash-dark-bottom: #f3f1ec;
   --mesh-a: rgba(161, 98, 7, 0.06);
   --mesh-b: rgba(161, 98, 7, 0.04);
@@ -184,13 +184,126 @@ html {
   border-bottom-color: var(--border);
 }
 
+/* Floating bottom nav — frosted glass (web approximation, not Apple Liquid Glass) */
+.floating-glass-nav {
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.38);
+  background:
+    linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.32),
+      rgb(255 251 235 / 0.1) 45%,
+      rgb(255 255 255 / 0.16)
+    ),
+    rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(22px) saturate(155%) contrast(1.03);
+  -webkit-backdrop-filter: blur(22px) saturate(155%) contrast(1.03);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -1px 0 rgb(161 98 7 / 0.05),
+    0 2px 4px rgb(28 25 23 / 0.03),
+    0 14px 40px -10px rgb(28 25 23 / 0.2),
+    0 0 0 1px rgb(161 98 7 / 0.05);
+}
+
+.floating-glass-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 0%, rgb(255 255 255 / 0.5), transparent 42%),
+    radial-gradient(ellipse 50% 40% at 88% 100%, rgb(212 160 86 / 0.12), transparent 48%);
+  pointer-events: none;
+}
+
+.floating-glass-nav::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  pointer-events: none;
+}
+
+.hajiasal-root[data-theme="dark"] .floating-glass-nav {
+  border-color: rgb(255 255 255 / 0.16);
+  background:
+    linear-gradient(
+      145deg,
+      rgb(255 255 255 / 0.14),
+      rgb(212 160 86 / 0.06) 50%,
+      rgb(255 255 255 / 0.06)
+    ),
+    rgb(20 20 20 / 0.52);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 4px 8px rgb(0 0 0 / 0.2),
+    0 22px 56px -10px rgb(0 0 0 / 0.55),
+    0 0 0 1px rgb(212 160 86 / 0.1);
+}
+
+.hajiasal-root[data-theme="dark"] .floating-glass-nav::before {
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 0%, rgb(255 255 255 / 0.18), transparent 42%),
+    radial-gradient(ellipse 50% 40% at 88% 100%, rgb(212 160 86 / 0.16), transparent 48%);
+}
+
+.hajiasal-root[data-theme="dark"] .floating-glass-nav::after {
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .floating-glass-nav {
+    background: rgb(255 255 255 / 0.94);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .hajiasal-root[data-theme="dark"] .floating-glass-nav {
+    background: rgb(28 28 28 / 0.96);
+  }
+}
+
 .hero-wash {
   background: linear-gradient(
     to bottom,
     var(--hero-wash-top) 0%,
-    var(--hero-wash-mid) 38%,
+    var(--hero-wash-mid) 42%,
     var(--hero-wash-bottom) 100%
   );
+}
+
+@keyframes hero-ken {
+  from {
+    transform: scale(1.05) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(-1.2%, 0.6%, 0);
+  }
+}
+
+.hero-ken {
+  transform-origin: center 32%;
+  will-change: transform;
+  animation: hero-ken 28s var(--ease-out) infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-ken {
+    animation: none;
+    transform: scale(1.05);
+  }
+}
+
+@media (min-width: 768px) {
+  .hero-ken {
+    transform-origin: 32% 42%;
+  }
 }
 
 .hero-wash-mobile {

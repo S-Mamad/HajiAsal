@@ -1,10 +1,11 @@
 "use client";
 
 import { getImageProps } from "next/image";
+import { motion, useReducedMotion } from "motion/react";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
 import { Button } from "@/components/ui/Button";
-import { Reveal } from "@/components/ui/Reveal";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { hajiasalPath } from "@/lib/paths";
 import { ArrowLeft } from "@phosphor-icons/react";
 
@@ -25,9 +26,9 @@ const {
 } = getImageProps({
   ...common,
   src: HERO_DESKTOP,
-  width: 1920,
-  height: 1080,
-  quality: 82,
+  width: 2400,
+  height: 1350,
+  quality: 90,
 });
 
 const {
@@ -35,15 +36,17 @@ const {
 } = getImageProps({
   ...common,
   src: HERO_MOBILE,
-  width: 1080,
-  height: 1440,
-  quality: 82,
+  width: 1200,
+  height: 1600,
+  quality: 90,
   priority: true,
 });
 
 export function Hero() {
+  const reduced = useReducedMotion();
+
   return (
-    <section className="relative -mt-14 flex min-h-[100dvh] flex-col overflow-hidden bg-void sm:-mt-16">
+    <section className="relative -mt-16 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-void sm:-mt-[4.75rem] md:h-auto md:min-h-[100dvh] md:max-h-none">
       <div className="absolute inset-0">
         <picture>
           <source media="(min-width: 768px)" srcSet={desktopSrcSet} />
@@ -52,43 +55,55 @@ export function Hero() {
             {...mobileImg}
             srcSet={mobileSrcSet}
             alt={common.alt}
-            className="absolute inset-0 h-full w-full object-cover object-[center_22%] md:object-[68%_40%]"
+            className="hero-ken absolute inset-0 h-full w-full object-cover object-[center_32%] md:object-[32%_42%]"
           />
         </picture>
         <div className="hero-wash absolute inset-0" />
-        <div className="mesh-warm pointer-events-none absolute inset-0 opacity-40 md:opacity-55" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-void/55 via-void/10 to-transparent max-md:hidden" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void from-[28%] via-void/70 via-[52%] to-transparent to-[78%] md:hidden" />
+        <div className="mesh-warm pointer-events-none absolute inset-0 opacity-30 md:opacity-40" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-end px-4 pb-11 pt-28 sm:px-6 sm:pb-14 md:px-8 md:pb-28 md:pt-24">
-        <Reveal className="max-w-xl">
-          <p className="mb-2 text-[11px] font-medium tracking-[0.2em] text-gold sm:mb-3 sm:text-xs">
-            عسل اصل ایرانی
-          </p>
-          <h1 className="mb-3 font-display text-[2.15rem] leading-[1.15] tracking-tight text-primary text-balance sm:mb-4 sm:text-5xl md:mb-5 md:text-6xl lg:text-7xl">
-            {siteData.brand.name}
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-end px-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-20 sm:px-6 sm:pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-24 md:px-8 lg:pb-28 lg:pt-24">
+        <motion.div
+          className="max-w-xl"
+          initial={reduced ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
+        >
+          <div className="mb-3 sm:mb-5 md:mb-7">
+            <BrandLogo
+              name={siteData.brand.name}
+              size="xl"
+              priority
+              markClassName="!h-[4.25rem] w-auto drop-shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:!h-[4.75rem] md:!h-40 lg:!h-44"
+            />
+          </div>
+          <h1 className="mb-2 font-display text-[1.35rem] leading-[1.2] tracking-tight text-primary text-balance sm:mb-3 sm:text-3xl md:mb-5 md:text-4xl lg:text-[2.75rem]">
+            {siteData.hero.title}
           </h1>
-          <p className="mb-7 max-w-md text-[0.95rem] leading-relaxed text-secondary sm:mb-8 sm:text-base md:text-lg">
+          <p className="mb-4 max-w-md text-[0.875rem] leading-relaxed text-secondary sm:mb-6 sm:text-base md:mb-8 md:text-lg">
             {siteData.hero.subtitle}
           </p>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
+          <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
             <Button
               href={hajiasalPath(siteData.hero.ctaHref)}
               size="lg"
-              className="w-full sm:w-auto"
+              className="w-full whitespace-nowrap px-5 sm:w-auto sm:px-8"
             >
               {siteData.hero.cta}
-              <ArrowLeft size={18} weight="bold" />
+              <ArrowLeft size={18} weight="bold" className="shrink-0" />
             </Button>
             <Button
               href={hajiasalPath("/reviews")}
               variant="outline"
               size="lg"
-              className="w-full border-border-bright bg-void/40 text-primary backdrop-blur-sm hover:border-gold/50 sm:w-auto"
+              className="w-full whitespace-nowrap border-border-bright bg-void/40 px-5 text-primary backdrop-blur-sm hover:border-gold/50 sm:w-auto sm:px-8"
             >
               نظرات مشتریان
             </Button>
           </div>
-        </Reveal>
+        </motion.div>
       </div>
     </section>
   );

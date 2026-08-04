@@ -72,14 +72,14 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-            className="fixed bottom-0 start-0 top-14 z-[90] flex w-[min(100vw-2.5rem,19rem)] flex-col border-e border-border bg-surface shadow-2xl sm:top-16 lg:hidden"
+            className="fixed bottom-0 start-0 top-16 z-[90] flex w-[min(100vw-2.5rem,19rem)] flex-col border-e border-border bg-surface shadow-2xl sm:top-[4.75rem] lg:hidden"
             aria-label="منوی موبایل"
             id="mobile-nav"
             role="dialog"
             aria-modal="true"
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <BrandLogo name={siteData.brand.name} />
+              <BrandLogo name={siteData.brand.name} size="md" />
               <div className="flex items-center gap-1">
                 <ThemeToggle />
                 <button

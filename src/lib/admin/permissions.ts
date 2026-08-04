@@ -51,6 +51,8 @@ export type AdminPermission =
   | "tickets.manage"
   | "notifications.view"
   | "notifications.manage"
+  | "sms.view"
+  | "sms.send"
   | "reports.view"
   | "reports.export"
   | "settings.view"
@@ -108,6 +110,8 @@ const ALL_PERMISSIONS: AdminPermission[] = [
   "tickets.manage",
   "notifications.view",
   "notifications.manage",
+  "sms.view",
+  "sms.send",
   "reports.view",
   "reports.export",
   "settings.view",
@@ -138,6 +142,8 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[] | "*"> = {
     "tickets.view",
     "tickets.manage",
     "notifications.view",
+    "sms.view",
+    "sms.send",
     "products.view",
   ],
   warehouse: [

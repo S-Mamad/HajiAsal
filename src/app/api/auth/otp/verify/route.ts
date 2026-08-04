@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const ip = getClientIp(request);
     const limited = await checkRateLimitAsync(
       `otp-verify:ip:${ip}`,
-      30,
+      10,
       15 * 60 * 1000,
     );
     if (!limited.ok) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     const phone = normalizePhone(parsed.data.phone)!;
     const phoneLimited = await checkRateLimitAsync(
       `otp-verify:phone:${phone}`,
-      10,
+      5,
       15 * 60 * 1000,
     );
     if (!phoneLimited.ok) {

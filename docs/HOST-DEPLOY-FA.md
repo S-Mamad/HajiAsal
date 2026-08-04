@@ -102,8 +102,10 @@ npm run seed:site-settings
 | چه | آدرس |
 |---|---|
 | فروشگاه | https://hajiasal.ir/ |
-| ادمین | https://hajiasal.ir/admin |
-| فروشنده | https://hajiasal.ir/seller |
+| ادمین | https://admin.hajiasal.ir/ |
+| فروشنده | https://seller.hajiasal.ir/ |
+
+استقرار سه اپ و ساب‌دامین: **`docs/SUBDOMAIN-DEPLOY-FA.md`**
 
 ---
 

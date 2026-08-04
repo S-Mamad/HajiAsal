@@ -53,6 +53,7 @@ cp -a docs/env.production.host.example /out/docs/ 2>/dev/null || true
 cp -a public/. /out/public/
 cp -a mysql-migrations/. /out/mysql-migrations/
 cp -a scripts/cpanel-deploy.sh /out/scripts/ 2>/dev/null || true
+cp -a scripts/host-first-boot.sh /out/scripts/ 2>/dev/null || true
 cp -a .next/standalone /out/.next/standalone
 cp -a .next/static /out/.next/static
 
@@ -61,11 +62,31 @@ printf 'ok\n' > /out/data/.gitkeep
 
 # Host instruction (short)
 cat > /out/INSTALL-ON-HOST.txt <<'EOF'
-1) Extract this zip into /home/uabkxfzi/hajiasal (files at root, not nested folder)
-2) Create .env from .env.example (fill MYSQL_* and secrets)
-3) Setup Node.js App → Application root: hajiasal → Startup file: server.js
-4) Restart app (touch tmp/restart.txt)
-5) Run mysql-migrations/008_product_management_upgrade.sql in phpMyAdmin if not yet
+حاجی‌عسل — بسته آمادهٔ هاست (استخراج و اجرا)
+
+1) Extract داخل /home/uabkxfzi/hajiasal
+   باید مستقیم کنار هم ببینید: server.js و package.json و .next و public
+   (نه پوشه تو در تو)
+
+2) File Manager → Settings → Show Hidden Files را روشن کنید
+
+3) .env را از .env.example بسازید و MYSQL_* + AUTH_SESSION_SECRET را پر کنید
+   (یا همان‌ها را در Setup Node.js App → Environment variables بگذارید)
+
+4) Setup Node.js App:
+   - Application root: hajiasal
+   - Startup file: server.js
+   - Node: 22 (یا 20)
+   - Mode: Production
+
+5) Restart:
+   mkdir -p tmp && touch tmp/restart.txt
+   یا Stop/Start در پنل Node.js
+
+نیازی به npm install / npm run build نیست — بیلد لینوکس داخل زیپ است.
+
+اگر 503 دیدید: touch tmp/restart.txt و Stop/Start اپ.
+جزئیات: README-UPLOAD-FA.md
 EOF
 
 echo "[linux-build] exported"

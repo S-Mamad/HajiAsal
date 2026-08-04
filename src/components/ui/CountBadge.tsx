@@ -7,24 +7,30 @@ interface CountBadgeProps {
   cap?: number;
 }
 
-/** Minimal cart/wishlist count pill */
+/** Cart/wishlist count pill — compact, readable Persian digits */
 export function CountBadge({ count, className, cap = 9 }: CountBadgeProps) {
   if (count <= 0) return null;
 
-  const label =
-    count > cap
-      ? `${cap.toLocaleString("fa-IR")}+`
-      : count.toLocaleString("fa-IR");
+  const capped = count > cap;
+  const label = capped
+    ? `${cap.toLocaleString("fa-IR")}+`
+    : count.toLocaleString("fa-IR");
 
   return (
     <span
       className={cn(
-        "absolute -top-0.5 -end-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-gold px-1 text-[9px] font-semibold leading-none text-ink-on-gold tabular-nums",
+        "pointer-events-none absolute -top-1 -end-1 z-[1]",
+        "inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center",
+        "rounded-full bg-gold font-bold text-ink-on-gold",
+        "text-[10px] leading-none tabular-nums",
+        "ring-2 ring-[var(--surface)]",
+        "shadow-[0_1px_3px_rgb(0_0_0/0.18)]",
+        capped ? "px-1" : "px-0.5",
         className,
       )}
       aria-hidden
     >
-      {label}
+      <span className="relative top-px select-none">{label}</span>
     </span>
   );
 }

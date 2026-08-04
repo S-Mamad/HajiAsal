@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { DotsSixVertical, Trash, Plus } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { cn } from "@/lib/utils";
+import { useAdminAuth } from "@/components/admin/auth/AdminAuthProvider";
 
 async function uploadImageFile(file: File): Promise<string> {
   const form = new FormData();
@@ -34,6 +35,11 @@ export function MediaDropzone({
   images: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { can } = useAdminAuth();
+  const canUpload = can("media.manage") || can("products.edit");
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+
   const [draftUrl, setDraftUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -44,10 +50,12 @@ export function MediaDropzone({
     const url = draftUrl.trim();
     if (!url) return;
     if (url.startsWith("blob:")) {
-      setUploadError("آدرس موقت مرورگر قابل ذخیره نیست. فایل را آپلود کنید یا URL عمومی بگذارید.");
+      setUploadError(
+        "آدرس موقت مرورگر قابل ذخیره نیست. فایل را آپلود کنید یا URL عمومی بگذارید.",
+      );
       return;
     }
-    onChange([...images, url]);
+    onChange([...imagesRef.current, url]);
     setDraftUrl("");
     setUploadError("");
   };
@@ -55,6 +63,10 @@ export function MediaDropzone({
   const onDropFiles = useCallback(
     async (files: FileList | null) => {
       if (!files?.length) return;
+      if (!canUpload) {
+        setUploadError("برای آپلود فایل دسترسی ندارید؛ URL عمومی اضافه کنید.");
+        return;
+      }
       setUploading(true);
       setUploadError("");
       try {
@@ -63,7 +75,7 @@ export function MediaDropzone({
           if (!file.type.startsWith("image/")) continue;
           uploaded.push(await uploadImageFile(file));
         }
-        if (uploaded.length) onChange([...images, ...uploaded]);
+        if (uploaded.length) onChange([...imagesRef.current, ...uploaded]);
         if (!uploaded.length) {
           setUploadError("فایل تصویری معتبری انتخاب نشد");
         }
@@ -73,12 +85,12 @@ export function MediaDropzone({
         setUploading(false);
       }
     },
-    [images, onChange],
+    [canUpload, onChange],
   );
 
   const move = (from: number, to: number) => {
-    if (to < 0 || to >= images.length) return;
-    const next = [...images];
+    if (to < 0 || to >= imagesRef.current.length) return;
+    const next = [...imagesRef.current];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item!);
     onChange(next);
@@ -110,22 +122,28 @@ export function MediaDropzone({
         <p className="mt-1 text-xs text-zinc-400">
           فایل‌ها روی سرور ثبت می‌شوند و آدرس پایدار برمی‌گردد.
         </p>
-        <label className="mt-3 inline-flex cursor-pointer">
-          <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
-            {uploading ? "در حال آپلود..." : "انتخاب فایل"}
-          </span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            disabled={uploading}
-            className="hidden"
-            onChange={(e) => {
-              void onDropFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        {canUpload ? (
+          <label className="mt-3 inline-flex cursor-pointer">
+            <span className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+              {uploading ? "در حال آپلود..." : "انتخاب فایل"}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={uploading}
+              className="hidden"
+              onChange={(e) => {
+                void onDropFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        ) : (
+          <p className="mt-3 text-xs text-amber-700">
+            آپلود فایل برای نقش شما فعال نیست؛ از URL عمومی استفاده کنید.
+          </p>
+        )}
       </div>
 
       {uploadError ? (
@@ -180,7 +198,9 @@ export function MediaDropzone({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => onChange(images.filter((_, i) => i !== index))}
+              onClick={() =>
+                onChange(imagesRef.current.filter((_, i) => i !== index))
+              }
             >
               <Icon icon={Trash} size={16} />
             </AdminButton>

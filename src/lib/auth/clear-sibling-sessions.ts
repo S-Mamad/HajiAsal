@@ -1,5 +1,4 @@
 import type { NextResponse } from "next/server";
-import { CUSTOMER_COOKIE } from "@/lib/auth/session";
 
 /** Keep in sync with admin.ts / sellers.ts — avoid heavy static imports here. */
 const ADMIN_COOKIE = "hajiasal_admin_session";
@@ -11,6 +10,7 @@ const CLEAR_OPTS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: 0,
+  // Host-only cookies (no Domain) — correct for admin/seller subdomains.
 };
 
 function readCookie(request: Request, name: string): string | null {
@@ -56,7 +56,9 @@ export async function clearAllAuthSessions(
     }
   }
 
-  clearCookie(response, CUSTOMER_COOKIE);
   clearCookie(response, ADMIN_COOKIE);
   clearCookie(response, SELLER_COOKIE);
+  // Intentionally do NOT clear CUSTOMER_COOKIE here — the caller sets the
+  // fresh customer session on the same response. Clearing then setting the
+  // same name can drop the session in some proxies / browsers.
 }

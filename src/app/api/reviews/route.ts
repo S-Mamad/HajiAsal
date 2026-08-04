@@ -6,13 +6,19 @@ import {
   getReviewsByProduct,
   createReview,
 } from "@/lib/server/reviews";
-import { hasPurchasedByPhone } from "@/lib/server/orders";
+import {
+  hasPurchasedByPhone,
+  hasPurchasedProductByPhone,
+} from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { getSessionFromRequest } from "@/lib/auth/session";
 
 const BUYER_ONLY_MESSAGE =
-  "ثبت نظر فقط برای خریداران امکان‌پذیر است. وارد حساب شوید.";
+  "ثبت نظر فقط برای خریداران امکان‌پذیر است.";
+
+const PRODUCT_BUYER_ONLY_MESSAGE =
+  "برای ثبت نظر باید ابتدا این محصول را بخرید.";
 
 const SESSION_REQUIRED_MESSAGE =
   "برای ثبت نظر ابتدا وارد حساب کاربری شوید.";
@@ -30,6 +36,10 @@ const reviewSchema = z.object({
   /** Honeypot — bots fill this; humans leave empty */
   website: z.string().optional(),
 });
+
+function isProductSpecificReview(productId: string | undefined): boolean {
+  return Boolean(productId) && productId !== GENERAL_REVIEW_PRODUCT_ID;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -97,10 +107,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const isBuyer = await hasPurchasedByPhone(phone);
+    const productId = parsed.data.productId ?? GENERAL_REVIEW_PRODUCT_ID;
+    const isBuyer = isProductSpecificReview(productId)
+      ? await hasPurchasedProductByPhone(phone, productId)
+      : await hasPurchasedByPhone(phone);
+
     if (!isBuyer) {
       return NextResponse.json(
-        { success: false, message: BUYER_ONLY_MESSAGE },
+        {
+          success: false,
+          message: isProductSpecificReview(productId)
+            ? PRODUCT_BUYER_ONLY_MESSAGE
+            : BUYER_ONLY_MESSAGE,
+        },
         { status: 403 },
       );
     }
@@ -111,7 +130,7 @@ export async function POST(request: Request) {
       "خریدار";
 
     const review = await createReview({
-      productId: parsed.data.productId ?? GENERAL_REVIEW_PRODUCT_ID,
+      productId,
       author,
       rating: parsed.data.rating,
       comment: parsed.data.comment,

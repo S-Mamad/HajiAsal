@@ -134,12 +134,29 @@ describe("seller media behavior", () => {
     expect(delRes.status).toBe(404);
   });
 
-  it("denied without media.manage", async () => {
-    sellerMock.asSellerWithout("media.manage");
+  it("denied without media.manage and products.manage", async () => {
+    sellerMock.asSellerWithout(["media.manage", "products.manage"]);
     const res = await GET(
       authedSellerRequest("http://localhost/api/seller/media"),
     );
     expect(res.status).toBe(403);
+  });
+
+  it("allows upload with products.manage only", async () => {
+    sellerMock.asSellerWithout("media.manage");
+    const res = await POST(
+      authedSellerRequest("http://localhost/api/seller/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "via-products.jpg",
+          mimeType: "image/jpeg",
+          sizeBytes: 10,
+          url: "/uploads/seller/s-media-a/via-products.jpg",
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
   });
 });
 
@@ -181,5 +198,25 @@ describe("seller tools behavior", () => {
       }),
     );
     expect(res.status).toBe(400);
+  });
+
+  it("POST CSV multipart imports rows", async () => {
+    const csv =
+      "title,category,price,grams,weightLabel,shortDescription,inStock\nعسل CSV,specialty,450000,1000,۱ کیلو,توضیح,1\n";
+    const form = new FormData();
+    form.append(
+      "file",
+      new File([csv], "products.csv", { type: "text/csv" }),
+    );
+    form.append("submitForReview", "false");
+    const res = await POST_TOOLS(
+      authedSellerRequest("http://localhost/api/seller/tools", {
+        method: "POST",
+        body: form,
+      }),
+    );
+    expect(res.status).toBe(200);
+    const json = await readJson(res);
+    expect(json.created).toBe(1);
   });
 });

@@ -11,6 +11,7 @@ import {
   toPublicSeller,
   updateSellerAsync,
 } from "@/lib/server/sellers";
+import { isSellerProductAwaitingReview } from "@/lib/product-approval";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,8 +48,9 @@ export async function GET(request: Request, { params }: Params) {
     orders: orders.slice(0, 50),
     stats: {
       productCount: products.length,
-      pendingProductCount: products.filter((p) => p.approvalStatus === "pending")
-        .length,
+      pendingProductCount: products.filter((p) =>
+        isSellerProductAwaitingReview(p),
+      ).length,
       orderCount: orders.length,
       revenue: orders
         .filter((o) => o.status !== "cancelled")

@@ -62,7 +62,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-5 py-12 md:hidden">
         <div className="text-center">
           <div className="flex justify-center">
-            <BrandLogo name={siteData.brand.name} />
+            <BrandLogo name={siteData.brand.name} size="lg" />
           </div>
           <p className="mx-auto mt-3 max-w-sm text-[13px] leading-relaxed text-secondary">
             {siteData.brand.description}
@@ -126,7 +126,7 @@ export function Footer() {
       <div className="mx-auto hidden max-w-7xl px-8 py-20 md:block">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
-            <BrandLogo name={siteData.brand.name} className="mb-3" />
+            <BrandLogo name={siteData.brand.name} size="lg" className="mb-4" />
             <p className="max-w-md text-sm leading-relaxed text-secondary">
               {siteData.brand.description}
             </p>

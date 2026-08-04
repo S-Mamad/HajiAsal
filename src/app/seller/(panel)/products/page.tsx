@@ -10,7 +10,8 @@ import {
 } from "@/components/seller/ui/SellerDataTable";
 import { SellerSavedFiltersBar } from "@/components/seller/ui/SellerSavedFiltersBar";
 import { SellerEntityHistory } from "@/components/seller/ui/SellerEntityHistory";
-import { exportToCsv, exportToJson, printHtml } from "@/lib/admin/export";
+import { StatusBadge } from "@/components/admin/ui/StatusBadge";
+import { escapeHtml, exportToCsv, exportToJson, printHtml } from "@/lib/admin/export";
 import { hajiasalPath } from "@/lib/paths";
 import type { Product, ProductApprovalStatus } from "@/types";
 
@@ -19,6 +20,15 @@ const APPROVAL_LABELS: Record<ProductApprovalStatus, string> = {
   approved: "تأیید شده",
   rejected: "رد شده",
 };
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "فعال",
+  draft: "پیش‌نویس",
+  archived: "بایگانی",
+  disabled: "غیرفعال",
+};
+
+const DEFAULT_LOW_STOCK = 10;
 
 export default function SellerProductsPage() {
   const router = useRouter();
@@ -31,12 +41,16 @@ export default function SellerProductsPage() {
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [lowStockThreshold, setLowStockThreshold] = useState(DEFAULT_LOW_STOCK);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/seller/products");
+      const [res, settingsRes] = await Promise.all([
+        fetch("/api/seller/products"),
+        fetch("/api/seller/settings"),
+      ]);
       if (res.status === 401) {
         router.push(hajiasalPath("/seller"));
         return;
@@ -44,6 +58,11 @@ export default function SellerProductsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا");
       setProducts(data.products ?? []);
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json();
+        const threshold = settings.shopSettings?.lowStockThreshold;
+        if (typeof threshold === "number") setLowStockThreshold(threshold);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
@@ -69,10 +88,15 @@ export default function SellerProductsPage() {
       const qty = p.stockQty ?? (p.inStock ? 1 : 0);
       if (stockFilter === "out" && qty > 0) return false;
       if (stockFilter === "in" && qty <= 0) return false;
-      if (stockFilter === "low" && qty > 10) return false;
+      if (
+        stockFilter === "low" &&
+        (qty <= 0 || qty > lowStockThreshold)
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [products, statusFilter, approvalFilter, stockFilter]);
+  }, [products, statusFilter, approvalFilter, stockFilter, lowStockThreshold]);
 
   const selectedRows = filtered.filter((p) => selected.includes(p.id));
 
@@ -94,11 +118,19 @@ export default function SellerProductsPage() {
 
   const remove = async (ids: string[]) => {
     if (!ids.length) return;
-    if (!window.confirm(`حذف ${ids.length} محصول؟`)) return;
+    const ownedIds = ids.filter((id) => {
+      const p = products.find((row) => row.id === id);
+      return Boolean(p?.sellerId);
+    });
+    if (!ownedIds.length) {
+      setError("محصولات کاتالوگ اختصاصی قابل حذف نیستند");
+      return;
+    }
+    if (!window.confirm(`حذف ${ownedIds.length} محصول؟`)) return;
     const res = await fetch("/api/seller/products", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productIds: ids }),
+      body: JSON.stringify({ productIds: ownedIds }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -112,17 +144,28 @@ export default function SellerProductsPage() {
 
   const bulkStatus = async (status: "archived" | "disabled" | "active") => {
     if (!selected.length) return;
+    const ownedIds = selected.filter((id) => {
+      const p = products.find((row) => row.id === id);
+      return Boolean(p?.sellerId);
+    });
+    if (!ownedIds.length) {
+      setError("محصولات کاتالوگ اختصاصی قابل تغییر وضعیت نیستند");
+      return;
+    }
     const res = await fetch("/api/seller/products", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productIds: selected, bulkStatus: status }),
+      body: JSON.stringify({ productIds: ownedIds, bulkStatus: status }),
     });
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? "خطا");
       return;
     }
-    setMessage(`${data.updated ?? 0} محصول به‌روز شد`);
+    setMessage(
+      data.message ??
+        `${data.updated ?? 0} محصول به‌روز شد`,
+    );
     setSelected([]);
     await load();
   };
@@ -153,8 +196,8 @@ export default function SellerProductsPage() {
       .map(
         (p) =>
           `<div style="margin-bottom:16px;border-bottom:1px solid #ddd;padding-bottom:8px">
-            <strong>${p.title}</strong><br/>
-            شناسه: ${p.id} · موجودی: ${p.stockQty ?? 0} · وضعیت: ${p.status ?? "active"}
+            <strong>${escapeHtml(p.title)}</strong><br/>
+            شناسه: ${escapeHtml(p.id)} · موجودی: ${p.stockQty ?? 0} · وضعیت: ${escapeHtml(STATUS_LABELS[p.status ?? "active"] ?? p.status ?? "active")}
           </div>`,
       )
       .join("");
@@ -324,13 +367,21 @@ export default function SellerProductsPage() {
             {
               key: "approval",
               header: "تأیید",
-              render: (p) =>
-                APPROVAL_LABELS[(p.approvalStatus ?? "approved") as ProductApprovalStatus],
+              render: (p) => {
+                const st = (p.approvalStatus ?? "approved") as ProductApprovalStatus;
+                if (st === "pending" && !p.submittedAt) {
+                  return "پیش‌نویس محلی";
+                }
+                if (st === "pending" && p.submittedAt) {
+                  return "در صف ادمین";
+                }
+                return APPROVAL_LABELS[st];
+              },
             },
             {
               key: "status",
               header: "انتشار",
-              render: (p) => p.status ?? "active",
+              render: (p) => <StatusBadge status={p.status ?? "active"} />,
             },
             {
               key: "stock",
@@ -353,7 +404,9 @@ export default function SellerProductsPage() {
             {
               key: "actions",
               header: "عملیات",
-              render: (p) => (
+              render: (p) => {
+                const owned = Boolean(p.sellerId);
+                return (
                 <div className="flex flex-wrap gap-1">
                   <AdminButton
                     size="sm"
@@ -362,36 +415,45 @@ export default function SellerProductsPage() {
                   >
                     مشاهده
                   </AdminButton>
-                  <AdminButton
-                    size="sm"
-                    variant="ghost"
-                    href={hajiasalPath(`/seller/products/${p.id}/edit`)}
-                  >
-                    ویرایش
-                  </AdminButton>
-                  <AdminButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void duplicate(p.id)}
-                  >
-                    کپی
-                  </AdminButton>
-                  <AdminButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setHistoryId(p.id)}
-                  >
-                    تاریخچه
-                  </AdminButton>
-                  <AdminButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void remove([p.id])}
-                  >
-                    حذف
-                  </AdminButton>
+                  {owned ? (
+                    <>
+                      <AdminButton
+                        size="sm"
+                        variant="ghost"
+                        href={hajiasalPath(`/seller/products/${p.id}/edit`)}
+                      >
+                        ویرایش
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void duplicate(p.id)}
+                      >
+                        کپی
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHistoryId(p.id)}
+                      >
+                        تاریخچه
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void remove([p.id])}
+                      >
+                        حذف
+                      </AdminButton>
+                    </>
+                  ) : (
+                    <span className="self-center text-xs text-stone-400">
+                      کاتالوگ اختصاصی
+                    </span>
+                  )}
                 </div>
-              ),
+                );
+              },
             },
           ]}
           data={filtered}

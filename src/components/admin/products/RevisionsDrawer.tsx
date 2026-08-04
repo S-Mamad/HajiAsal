@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ClockCounterClockwise } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import type { ProductRevision } from "@/types";
+import type { Product, ProductRevision } from "@/types";
 
 export function RevisionsDrawer({
   productId,
@@ -15,7 +15,7 @@ export function RevisionsDrawer({
   productId: string;
   open: boolean;
   onClose: () => void;
-  onRestored: () => void;
+  onRestored: (product?: Product) => void;
 }) {
   const [revisions, setRevisions] = useState<ProductRevision[]>([]);
   const [fetched, setFetched] = useState(false);
@@ -62,7 +62,7 @@ export function RevisionsDrawer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا");
-      onRestored();
+      onRestored(data.product as Product | undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");

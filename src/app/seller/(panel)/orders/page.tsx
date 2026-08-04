@@ -11,7 +11,7 @@ import {
 } from "@/components/seller/ui/SellerDataTable";
 import { SellerSavedFiltersBar } from "@/components/seller/ui/SellerSavedFiltersBar";
 import { SellerEntityHistory } from "@/components/seller/ui/SellerEntityHistory";
-import { exportToCsv, exportToJson, printHtml } from "@/lib/admin/export";
+import { escapeHtml, exportToCsv, exportToJson, printHtml } from "@/lib/admin/export";
 import { hajiasalPath } from "@/lib/paths";
 import type { OrderStatus } from "@/lib/server/orders";
 
@@ -27,6 +27,7 @@ interface SellerOrder {
   }>;
   createdAt: string;
   trackingCode?: string;
+  soleOwner?: boolean;
 }
 
 export default function SellerOrdersPage() {
@@ -68,10 +69,17 @@ export default function SellerOrdersPage() {
   }, [orders, statusFilter]);
 
   const selectedRows = filtered.filter((o) => selected.includes(o.id));
+  const actionableSelected = selectedRows.filter(
+    (o) =>
+      o.soleOwner !== false &&
+      o.status !== "pending_payment" &&
+      o.status !== "cancelled",
+  );
 
   const bulkAction = async (action: "bulkConfirm" | "bulkPrepare") => {
     if (!selected.length) return;
     setMessage("");
+    setError("");
     const res = await fetch("/api/seller/orders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -82,7 +90,13 @@ export default function SellerOrdersPage() {
       setError(data.error ?? "خطا");
       return;
     }
-    setMessage(`${data.updated ?? 0} سفارش به‌روز شد`);
+    const updated = data.updated ?? 0;
+    const skipped = data.skipped ?? 0;
+    setMessage(
+      skipped > 0
+        ? `${updated} سفارش به‌روز شد · ${skipped} مورد رد شد (چندفروشنده یا پرداخت‌نشده)`
+        : `${updated} سفارش به‌روز شد`,
+    );
     setSelected([]);
     await load();
   };
@@ -114,9 +128,9 @@ export default function SellerOrdersPage() {
       .map(
         (o) =>
           `<div style="margin-bottom:16px;border-bottom:1px solid #ddd;padding-bottom:8px">
-            <strong>${o.id}</strong> · ${o.customer.fullName} · ${o.customer.city}<br/>
-            مبلغ: ${o.sellerSubtotal.toLocaleString("fa-IR")} تومان · وضعیت: ${o.status}<br/>
-            ${o.sellerItems.map((i) => `${i.title} × ${i.quantity}`).join(" · ")}
+            <strong>${escapeHtml(o.id)}</strong> · ${escapeHtml(o.customer.fullName)} · ${escapeHtml(o.customer.city)}<br/>
+            مبلغ: ${o.sellerSubtotal.toLocaleString("fa-IR")} تومان · وضعیت: ${escapeHtml(o.status)}<br/>
+            ${o.sellerItems.map((i) => `${escapeHtml(i.title)} × ${i.quantity}`).join(" · ")}
           </div>`,
       )
       .join("");
@@ -164,7 +178,7 @@ export default function SellerOrdersPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">همه</option>
-            <option value="pending">در انتظار</option>
+            <option value="pending_payment">در انتظار پرداخت</option>
             <option value="confirmed">تأیید شده</option>
             <option value="processing">در حال آماده‌سازی</option>
             <option value="shipped">ارسال شده</option>
@@ -188,10 +202,14 @@ export default function SellerOrdersPage() {
         <div className="flex flex-wrap gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
           <span className="text-sm text-amber-900">
             {selected.length} انتخاب‌شده
+            {actionableSelected.length < selected.length
+              ? ` · ${actionableSelected.length} قابل اقدام`
+              : ""}
           </span>
           <AdminButton
             size="sm"
             variant="outline"
+            disabled={actionableSelected.length === 0}
             onClick={() => void bulkAction("bulkConfirm")}
           >
             تأیید گروهی
@@ -199,6 +217,7 @@ export default function SellerOrdersPage() {
           <AdminButton
             size="sm"
             variant="outline"
+            disabled={actionableSelected.length === 0}
             onClick={() => void bulkAction("bulkPrepare")}
           >
             آماده‌سازی گروهی

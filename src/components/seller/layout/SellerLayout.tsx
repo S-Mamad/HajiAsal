@@ -8,6 +8,7 @@ import { SellerSidebar } from "./SellerSidebar";
 import { SellerHeader } from "./SellerHeader";
 import { SellerShortcutsProvider } from "@/components/seller/global/SellerShortcutsProvider";
 import { SellerRouteGuard } from "./SellerRouteGuard";
+import { SellerCapabilitiesProvider } from "./SellerCapabilitiesContext";
 import type { SellerCapabilitiesMap } from "@/lib/seller/capabilities";
 
 interface SellerLayoutProps {
@@ -40,7 +41,8 @@ export function SellerLayout({
   }, [mobileNav]);
 
   return (
-    <SellerShortcutsProvider>
+    <SellerCapabilitiesProvider capabilities={capabilities}>
+      <SellerShortcutsProvider>
       <div
         className="panel-shell seller-shell flex min-h-[100dvh] text-[var(--panel-text)]"
         dir="rtl"
@@ -103,5 +105,6 @@ export function SellerLayout({
         </div>
       </div>
     </SellerShortcutsProvider>
+    </SellerCapabilitiesProvider>
   );
 }

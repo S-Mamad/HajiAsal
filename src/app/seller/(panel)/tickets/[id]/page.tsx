@@ -2,68 +2,148 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight } from "@phosphor-icons/react";
+import { TicketChat } from "@/components/tickets/TicketChat";
+import type { ChatMessage } from "@/components/tickets/chat-utils";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
 
 export default function SellerTicketDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [ticket, setTicket] = useState<{ subject: string; status: string } | null>(null);
-  const [messages, setMessages] = useState<Array<{ id: string; senderType: string; body: string; createdAt: string }>>([]);
-  const [reply, setReply] = useState("");
+  const [ticket, setTicket] = useState<{
+    subject: string;
+    status: string;
+    priority: string;
+  } | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/seller/tickets/${params.id}`);
-    if (res.status === 401) {
-      router.push(hajiasalPath("/seller"));
-      return;
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/seller/tickets/${params.id}`);
+      if (res.status === 401) {
+        router.push(hajiasalPath("/seller"));
+        return;
+      }
+      if (!res.ok) {
+        router.push(hajiasalPath("/seller/tickets"));
+        return;
+      }
+      const data = await res.json();
+      setTicket(data.ticket);
+      setMessages(data.messages ?? []);
+    } catch {
+      setError("خطا در بارگذاری تیکت");
+    } finally {
+      if (!opts?.silent) setLoading(false);
     }
-    if (!res.ok) {
-      router.push(hajiasalPath("/seller/tickets"));
-      return;
-    }
-    const data = await res.json();
-    setTicket(data.ticket);
-    setMessages(data.messages ?? []);
   }, [params.id, router]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const send = async () => {
-    await fetch(`/api/seller/tickets/${params.id}`, {
+  const send = async (input: {
+    body: string;
+    attachmentUrl?: string | null;
+    attachmentName?: string | null;
+    attachmentMime?: string | null;
+    clientMessageId: string;
+    replyToId?: string | null;
+  }) => {
+    const res = await fetch(`/api/seller/tickets/${params.id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: reply }),
+      body: JSON.stringify({
+        body: input.body,
+        attachmentUrl: input.attachmentUrl,
+        attachmentName: input.attachmentName,
+        attachmentMime: input.attachmentMime,
+        clientMessageId: input.clientMessageId,
+        replyToId: input.replyToId,
+      }),
     });
-    setReply("");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "ارسال ناموفق");
     await load();
   };
 
+  const upload = async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/seller/media", {
+      method: "POST",
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "آپلود ناموفق");
+    const url = (data.file?.url ?? data.item?.url) as string | undefined;
+    if (!url) throw new Error("آدرس فایل دریافت نشد");
+    return {
+      url,
+      name: data.file?.name ?? file.name,
+      mimeType: data.file?.mimeType ?? file.type,
+    };
+  };
+
+  const toggleClose = async () => {
+    if (!ticket) return;
+    const isClosed =
+      ticket.status === "closed" || ticket.status === "resolved";
+    const next = isClosed ? "open" : "closed";
+    const res = await fetch(`/api/seller/tickets/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    if (res.ok) await load();
+  };
+
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <h3 className="text-lg font-semibold">{ticket?.subject ?? "..."}</h3>
-      <p className="text-sm text-stone-500">وضعیت: {ticket?.status}</p>
-      <ul className="space-y-2">
-        {messages.map((m) => (
-          <li key={m.id} className="rounded-lg border border-stone-200 bg-white p-3 text-sm">
-            <p className="text-xs text-stone-400">
-              {m.senderType} · {new Date(m.createdAt).toLocaleString("fa-IR")}
-            </p>
-            <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-          </li>
-        ))}
-      </ul>
-      <textarea
-        className="min-h-24 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
-        value={reply}
-        onChange={(e) => setReply(e.target.value)}
-        placeholder="پاسخ شما..."
-      />
-      <AdminButton onClick={() => void send()} disabled={!reply.trim()}>
-        ارسال پاسخ
-      </AdminButton>
+    <div className="mx-auto max-w-3xl space-y-4">
+      <Link
+        href={hajiasalPath("/seller/tickets")}
+        className="inline-flex items-center gap-1 text-sm text-stone-600 hover:text-zinc-900"
+      >
+        <Icon icon={ArrowRight} size={16} />
+        بازگشت
+      </Link>
+
+      {ticket ? (
+        <TicketChat
+          ticketId={params.id}
+          subject={ticket.subject}
+          status={ticket.status}
+          priority={ticket.priority}
+          messages={messages}
+          selfSenderType="seller"
+          variant="admin"
+          loading={loading}
+          error={error || null}
+          onRetryLoad={() => void load()}
+          onPollUpdate={() => void load({ silent: true })}
+          pollUrl={`/api/seller/tickets/${params.id}`}
+          onSend={send}
+          onUpload={upload}
+          headerActions={
+            <AdminButton size="sm" variant="outline" onClick={() => void toggleClose()}>
+              {ticket.status === "closed" || ticket.status === "resolved"
+                ? "بازگشایی"
+                : "بستن تیکت"}
+            </AdminButton>
+          }
+        />
+      ) : loading ? (
+        <div className="h-96 animate-pulse rounded-xl bg-stone-100" />
+      ) : (
+        <p className="text-sm text-rose-600">{error || "تیکت یافت نشد"}</p>
+      )}
     </div>
   );
 }

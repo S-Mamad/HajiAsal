@@ -1,37 +1,52 @@
 import type { RowDataPacket } from "mysql2/promise";
-import { isMysqlConfigured, mysqlExecute, mysqlQueryOne, newId } from "./mysql";
+import { isMysqlUsable, mysqlExecute, mysqlQueryOne, newId } from "./mysql";
 
 const hits = new Map<string, number[]>();
 
-/** Simple sliding-window rate limit (process-local). */
+function memoryPeek(
+  key: string,
+  limit: number,
+  windowMs: number,
+): { ok: boolean; retryAfterSec: number; count: number } {
+  const now = Date.now();
+  const windowStart = now - windowMs;
+  const recent = (hits.get(key) ?? []).filter((t) => t > windowStart);
+  hits.set(key, recent);
+  if (recent.length >= limit) {
+    const oldest = recent[0] ?? now;
+    return {
+      ok: false,
+      retryAfterSec: Math.max(1, Math.ceil((oldest + windowMs - now) / 1000)),
+      count: recent.length,
+    };
+  }
+  return { ok: true, retryAfterSec: 0, count: recent.length };
+}
+
+function memoryRecord(key: string, windowMs: number): void {
+  const now = Date.now();
+  const windowStart = now - windowMs;
+  const recent = (hits.get(key) ?? []).filter((t) => t > windowStart);
+  recent.push(now);
+  hits.set(key, recent);
+}
+
+/** Simple sliding-window rate limit (process-local). Records a hit. */
 export function checkRateLimit(
   key: string,
   limit: number,
   windowMs: number,
 ): { ok: boolean; retryAfterSec: number } {
-  const now = Date.now();
-  const windowStart = now - windowMs;
-  const recent = (hits.get(key) ?? []).filter((t) => t > windowStart);
-
-  if (recent.length >= limit) {
-    const oldest = recent[0] ?? now;
-    const retryAfterSec = Math.max(
-      1,
-      Math.ceil((oldest + windowMs - now) / 1000),
-    );
-    hits.set(key, recent);
-    return { ok: false, retryAfterSec };
-  }
-
-  recent.push(now);
-  hits.set(key, recent);
+  const peek = memoryPeek(key, limit, windowMs);
+  if (!peek.ok) return peek;
+  memoryRecord(key, windowMs);
   return { ok: true, retryAfterSec: 0 };
 }
 
 let tableReady = false;
 
 async function ensureRateLimitTable(): Promise<boolean> {
-  if (!isMysqlConfigured()) return false;
+  if (!isMysqlUsable()) return false;
   if (tableReady) return true;
   try {
     await mysqlExecute(
@@ -53,55 +68,98 @@ async function ensureRateLimitTable(): Promise<boolean> {
   }
 }
 
+async function mysqlPeek(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<{ ok: boolean; retryAfterSec: number } | null> {
+  if (!(await ensureRateLimitTable())) return null;
+  try {
+    const since = new Date(Date.now() - windowMs).toISOString();
+    const row = await mysqlQueryOne<RowDataPacket>(
+      `SELECT COUNT(*) AS count,
+              MIN(hit_at) AS oldest
+       FROM rate_limit_hits
+       WHERE bucket_key = ? AND hit_at >= ?`,
+      [key, since],
+    );
+    const count = Number(row?.count ?? 0);
+    if (count >= limit) {
+      const oldestMs = row?.oldest
+        ? new Date(String(row.oldest)).getTime()
+        : Date.now();
+      return {
+        ok: false,
+        retryAfterSec: Math.max(
+          1,
+          Math.ceil((oldestMs + windowMs - Date.now()) / 1000),
+        ),
+      };
+    }
+    return { ok: true, retryAfterSec: 0 };
+  } catch (error) {
+    console.error(
+      "[rate-limit] mysql peek failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
 /**
- * Durable sliding-window rate limit when MySQL is configured; otherwise memory.
- * Safe for multi-instance production OTP / order / track endpoints.
+ * Check limit without consuming a slot.
+ * Prefer MySQL when available; fall back to process memory.
+ */
+export async function peekRateLimitAsync(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<{ ok: boolean; retryAfterSec: number }> {
+  const mysql = await mysqlPeek(key, limit, windowMs);
+  if (mysql) return mysql;
+  return memoryPeek(key, limit, windowMs);
+}
+
+/** Record one hit after a successful / billable action. */
+export async function recordRateLimitHitAsync(
+  key: string,
+  windowMs: number,
+): Promise<void> {
+  if (await ensureRateLimitTable()) {
+    try {
+      const since = new Date(Date.now() - windowMs).toISOString();
+      await mysqlExecute(
+        `INSERT INTO rate_limit_hits (id, bucket_key, hit_at) VALUES (?, ?, ?)`,
+        [newId(), key, new Date().toISOString()],
+      );
+      void mysqlExecute(
+        `DELETE FROM rate_limit_hits WHERE hit_at < ? LIMIT 500`,
+        [since],
+      ).catch(() => undefined);
+      return;
+    } catch (error) {
+      console.error(
+        "[rate-limit] mysql record failed, using memory:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  memoryRecord(key, windowMs);
+}
+
+/**
+ * Peek + record in one call (legacy / request-flood guards).
+ * Safe for multi-instance when MySQL is up.
  */
 export async function checkRateLimitAsync(
   key: string,
   limit: number,
   windowMs: number,
 ): Promise<{ ok: boolean; retryAfterSec: number }> {
-  if (await ensureRateLimitTable()) {
-    try {
-      const since = new Date(Date.now() - windowMs).toISOString();
-      const row = await mysqlQueryOne<RowDataPacket>(
-        `SELECT COUNT(*) AS count,
-                MIN(hit_at) AS oldest
-         FROM rate_limit_hits
-         WHERE bucket_key = ? AND hit_at >= ?`,
-        [key, since],
-      );
-      const count = Number(row?.count ?? 0);
-      if (count >= limit) {
-        const oldestMs = row?.oldest
-          ? new Date(String(row.oldest)).getTime()
-          : Date.now();
-        const retryAfterSec = Math.max(
-          1,
-          Math.ceil((oldestMs + windowMs - Date.now()) / 1000),
-        );
-        return { ok: false, retryAfterSec };
-      }
-      await mysqlExecute(
-        `INSERT INTO rate_limit_hits (id, bucket_key, hit_at) VALUES (?, ?, ?)`,
-        [newId(), key, new Date().toISOString()],
-      );
-      // Best-effort prune (ignore failures)
-      void mysqlExecute(
-        `DELETE FROM rate_limit_hits WHERE hit_at < ? LIMIT 500`,
-        [since],
-      ).catch(() => undefined);
-      return { ok: true, retryAfterSec: 0 };
-    } catch (error) {
-      console.error(
-        "[rate-limit] mysql path failed, using memory:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-  }
-
-  return checkRateLimit(key, limit, windowMs);
+  const peek = await peekRateLimitAsync(key, limit, windowMs);
+  if (!peek.ok) return peek;
+  await recordRateLimitHitAsync(key, windowMs);
+  return { ok: true, retryAfterSec: 0 };
 }
 
 /** @internal */

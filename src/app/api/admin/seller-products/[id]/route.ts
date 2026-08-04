@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { logAdminAction } from "@/lib/server/audit-log";
+import { isSellerProductAwaitingReview } from "@/lib/product-approval";
 import {
   getProductByIdAsync,
   setProductApprovalAsync,
@@ -35,6 +36,23 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!existing.sellerId) {
       return NextResponse.json(
         { error: "فقط محصولات فروشنده نیاز به تأیید دارند" },
+        { status: 400 },
+      );
+    }
+
+    // Approve only products the seller actually submitted for review.
+    if (
+      parsed.data.approvalStatus === "approved" &&
+      existing.approvalStatus !== "approved" &&
+      !isSellerProductAwaitingReview(existing)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            existing.approvalStatus === "rejected"
+              ? "محصول ردشده باید دوباره توسط فروشنده ارسال شود"
+              : "این محصول هنوز توسط فروشنده برای تأیید ارسال نشده است",
+        },
         { status: 400 },
       );
     }

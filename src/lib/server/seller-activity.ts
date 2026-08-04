@@ -83,6 +83,8 @@ export async function listSellerActivity(params: {
   limit?: number;
   offset?: number;
   action?: string;
+  entityType?: string;
+  entityId?: string;
 }): Promise<{ rows: SellerActivityRow[]; total: number }> {
   const limit = Math.min(Math.max(params.limit ?? 25, 1), 100);
   const offset = Math.max(params.offset ?? 0, 0);
@@ -94,6 +96,14 @@ export async function listSellerActivity(params: {
       if (params.action) {
         where.push("action = ?");
         args.push(params.action);
+      }
+      if (params.entityType) {
+        where.push("entity_type = ?");
+        args.push(params.entityType);
+      }
+      if (params.entityId) {
+        where.push("entity_id = ?");
+        args.push(params.entityId);
       }
       const whereSql = where.join(" AND ");
 
@@ -139,6 +149,12 @@ export async function listSellerActivity(params: {
   let filtered = memoryLogs.filter((r) => r.sellerId === params.sellerId);
   if (params.action) {
     filtered = filtered.filter((r) => r.action === params.action);
+  }
+  if (params.entityType) {
+    filtered = filtered.filter((r) => r.entityType === params.entityType);
+  }
+  if (params.entityId) {
+    filtered = filtered.filter((r) => r.entityId === params.entityId);
   }
   return {
     total: filtered.length,

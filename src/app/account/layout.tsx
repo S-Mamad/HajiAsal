@@ -4,6 +4,7 @@ import { getSessionFromCookies } from "@/lib/auth/session";
 import { findProfileById } from "@/lib/server/profiles";
 import { AccountSidebar } from "@/components/auth/AccountSidebar";
 import { hajiasalPath } from "@/lib/paths";
+import { isProfileComplete } from "@/lib/auth/profile-complete";
 
 export const metadata: Metadata = {
   title: "حساب کاربری",
@@ -25,8 +26,14 @@ export default async function AccountLayout({
     redirect(hajiasalPath("/login"));
   }
 
+  if (!isProfileComplete(profile.fullName)) {
+    redirect(
+      `${hajiasalPath("/login")}?step=complete&redirect=${encodeURIComponent(hajiasalPath("/account"))}`,
+    );
+  }
+
   return (
-    <div className="mx-auto flex max-w-6xl gap-10 px-4 py-24 md:px-6 md:py-32 pb-28 lg:pb-32">
+    <div className="mx-auto flex max-w-6xl gap-8 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-8 md:px-6 md:pt-10 lg:gap-10 lg:pb-16 lg:pt-12">
       <AccountSidebar />
       <div className="min-w-0 flex-1">{children}</div>
     </div>

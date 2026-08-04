@@ -24,6 +24,7 @@ import {
 import { getAllOrders, type StoredOrder } from "./orders";
 import { isMysqlConfigured, mysqlExecute, mysqlQuery, mysqlQueryOne, toIso } from "./mysql";
 import type { Product } from "@/types";
+import { isSellerProductAwaitingReview } from "@/lib/product-approval";
 import {
   getAllSellersSync,
   getSellerByIdAsync,
@@ -54,7 +55,7 @@ export {
 
 export const SELLER_COOKIE = "hajiasal_seller_session";
 const SESSIONS_FILE = "seller-sessions.json";
-const SESSION_DAYS = 7;
+const SESSION_DAYS = 30;
 
 /** Known leaked SHA-256 hashes (e.g. documented seller123) — always reject. */
 const COMPROMISED_PASSWORD_HASHES = new Set([
@@ -202,49 +203,83 @@ export async function setSellerProductStock(
   sellerId: string,
   productId: string,
   inStock: boolean,
+  stockQty?: number,
 ): Promise<Product | null> {
   const products = await getSellerProducts(sellerId);
   const product = products.find((p) => p.id === productId);
   if (!product) return null;
 
+  const qty =
+    typeof stockQty === "number"
+      ? Math.max(0, stockQty)
+      : inStock
+        ? Math.max(product.stockQty ?? 1, 1)
+        : 0;
+  const nextInStock = qty > 0;
+
   // Owned seller products: update the product row itself.
   // Catalog assignments: only seller-scoped stock overrides (never mutate global catalog).
   if (product.sellerId === sellerId) {
     try {
-      const updated = await updateProductAsync(productId, { inStock });
+      const updated = await updateProductAsync(productId, {
+        inStock: nextInStock,
+        stockQty: qty,
+      });
       if (updated) return updated;
     } catch {
       // fall through to local override
     }
   }
 
+  const overrideValue = { inStock: nextInStock, stockQty: qty };
+
   if (canUseFilesystemPersistence()) {
-    const overrides = await readJsonFile<Record<string, boolean>>(
-      "seller-stock-overrides.json",
-      {},
-    );
-    overrides[productId] = inStock;
+    const overrides = await readJsonFile<
+      Record<string, boolean | { inStock: boolean; stockQty: number }>
+    >("seller-stock-overrides.json", {});
+    overrides[productId] = overrideValue;
     await writeJsonFile("seller-stock-overrides.json", overrides);
-    return { ...product, inStock };
+    return { ...product, inStock: nextInStock, stockQty: qty };
   }
 
-  memorySetStockOverride(productId, inStock);
-  return { ...product, inStock };
+  memorySetStockOverride(productId, overrideValue);
+  return { ...product, inStock: nextInStock, stockQty: qty };
+}
+
+function normalizeStockOverride(
+  value: boolean | { inStock: boolean; stockQty: number },
+  fallbackQty: number,
+): { inStock: boolean; stockQty: number } {
+  if (typeof value === "boolean") {
+    return {
+      inStock: value,
+      stockQty: value ? Math.max(fallbackQty, 1) : 0,
+    };
+  }
+  return {
+    inStock: value.stockQty > 0 && value.inStock,
+    stockQty: Math.max(0, value.stockQty),
+  };
 }
 
 async function applyStockOverrides(products: Product[]): Promise<Product[]> {
-  let overrides: Record<string, boolean> = {};
+  let overrides: Record<
+    string,
+    boolean | { inStock: boolean; stockQty: number }
+  > = {};
   if (canUseFilesystemPersistence()) {
-    overrides = await readJsonFile<Record<string, boolean>>(
-      "seller-stock-overrides.json",
-      {},
-    );
+    overrides = await readJsonFile("seller-stock-overrides.json", {});
   } else {
     overrides = memoryGetStockOverrides();
   }
-  return products.map((p) =>
-    p.id in overrides ? { ...p, inStock: overrides[p.id]! } : p,
-  );
+  return products.map((p) => {
+    if (!(p.id in overrides)) return p;
+    const next = normalizeStockOverride(
+      overrides[p.id]!,
+      p.stockQty ?? (p.inStock ? 1 : 0),
+    );
+    return { ...p, inStock: next.inStock, stockQty: next.stockQty };
+  });
 }
 
 /**
@@ -272,8 +307,9 @@ export async function getSellerProducts(sellerId: string): Promise<Product[]> {
 
 export async function getSellerOrders(
   sellerId: string,
+  knownProducts?: Product[],
 ): Promise<SellerOrderView[]> {
-  const products = await getSellerProducts(sellerId);
+  const products = knownProducts ?? (await getSellerProducts(sellerId));
   const ids = new Set(products.map((p) => p.id));
   const orders = await getAllOrders();
   const views: SellerOrderView[] = [];
@@ -488,17 +524,18 @@ export function sellerCookieOptions(token: string) {
     value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict" as const,
+    sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 24 * 30,
   };
 }
 
-export async function buildSellerDashboard(sellerId: string) {
-  const [products, orders] = await Promise.all([
-    getSellerProducts(sellerId),
-    getSellerOrders(sellerId),
-  ]);
+export async function buildSellerDashboard(
+  sellerId: string,
+  opts?: { lowStockThreshold?: number; includeWallet?: boolean },
+) {
+  const products = await getSellerProducts(sellerId);
+  const orders = await getSellerOrders(sellerId, products);
 
   const { getSellerWalletBalance } = await import("./seller-wallet");
   const { listSellerNotifications } = await import("./seller-notifications");
@@ -509,17 +546,22 @@ export async function buildSellerDashboard(sellerId: string) {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const todayTs = startOfToday.getTime();
+  const lowStockThreshold = opts?.lowStockThreshold ?? 10;
+  const includeWallet = opts?.includeWallet !== false;
 
-  const activeOrders = orders.filter((o) => o.status !== "cancelled");
+  // Revenue KPIs exclude unpaid + cancelled — pending_payment is not money yet.
+  const revenueOrders = orders.filter(
+    (o) => o.status !== "cancelled" && o.status !== "pending_payment",
+  );
   const sumInRange = (from: number) =>
-    activeOrders
+    revenueOrders
       .filter((o) => new Date(o.createdAt).getTime() >= from)
       .reduce((s, o) => s + o.sellerSubtotal, 0);
 
   const salesToday = sumInRange(todayTs);
   const salesWeek = sumInRange(now - 7 * dayMs);
   const salesMonth = sumInRange(now - 30 * dayMs);
-  const revenueTotal = activeOrders.reduce((s, o) => s + o.sellerSubtotal, 0);
+  const revenueTotal = revenueOrders.reduce((s, o) => s + o.sellerSubtotal, 0);
 
   const pending = orders.filter(
     (o) =>
@@ -527,12 +569,12 @@ export async function buildSellerDashboard(sellerId: string) {
       o.status === "confirmed" ||
       o.status === "processing",
   );
-  const pendingProducts = products.filter(
-    (p) => p.approvalStatus === "pending",
+  const pendingProducts = products.filter((p) =>
+    isSellerProductAwaitingReview(p),
   );
   const lowStockCount = products.filter((p) => {
     const qty = p.stockQty ?? (p.inStock ? 1 : 0);
-    return qty <= 10;
+    return qty <= lowStockThreshold;
   }).length;
   const outOfStock = products.filter((p) => !p.inStock);
 
@@ -540,7 +582,7 @@ export async function buildSellerDashboard(sellerId: string) {
   for (let i = 6; i >= 0; i -= 1) {
     const d = new Date(todayTs - i * dayMs);
     const key = d.toISOString().slice(0, 10);
-    const amount = activeOrders
+    const amount = revenueOrders
       .filter((o) => o.createdAt.slice(0, 10) === key)
       .reduce((s, o) => s + o.sellerSubtotal, 0);
     salesByDay.push({ date: key, amount });
@@ -548,12 +590,14 @@ export async function buildSellerDashboard(sellerId: string) {
 
   let walletAvailable = 0;
   let walletPending = 0;
-  try {
-    const bal = await getSellerWalletBalance(sellerId);
-    walletAvailable = bal.available;
-    walletPending = bal.pending;
-  } catch {
-    /* ignore */
+  if (includeWallet) {
+    try {
+      const bal = await getSellerWalletBalance(sellerId);
+      walletAvailable = bal.available;
+      walletPending = bal.pending;
+    } catch {
+      /* ignore */
+    }
   }
 
   let recentNotifications: Array<{
@@ -620,6 +664,7 @@ export async function buildSellerDashboard(sellerId: string) {
       pendingProducts: pendingProducts.length,
       outOfStock: outOfStock.length,
       lowStockCount,
+      lowStockThreshold,
       orderCount: orders.length,
       pendingOrders: pending.length,
       revenue: revenueTotal,
@@ -627,8 +672,9 @@ export async function buildSellerDashboard(sellerId: string) {
       salesWeek,
       salesMonth,
       revenueTotal,
-      walletAvailable,
-      walletPending,
+      ...(includeWallet
+        ? { walletAvailable, walletPending }
+        : { walletAvailable: 0, walletPending: 0 }),
     },
     navBadges: {
       orders: pending.length,

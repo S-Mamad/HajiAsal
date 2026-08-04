@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/admin-auth";
 import { isAdminRole, type AdminRole } from "@/lib/admin/permissions";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { isValidIranPhone } from "@/lib/auth/phone";
 
 export async function GET(request: Request) {
   const gate = await gateAdmin(request, "admin_users.view");
@@ -31,8 +32,12 @@ export async function GET(request: Request) {
 const createSchema = z.object({
   fullName: z.string().min(1),
   email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  password: z.string().min(6),
+  phone: z
+    .string()
+    .min(10)
+    .max(20)
+    .refine(isValidIranPhone, "شماره موبایل نامعتبر است"),
+  password: z.string().min(6).optional(),
   role: z.string(),
 });
 
@@ -40,7 +45,14 @@ const patchSchema = z.object({
   id: z.string(),
   fullName: z.string().optional(),
   email: z.string().nullable().optional(),
-  phone: z.string().nullable().optional(),
+  phone: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (v) => v == null || v === "" || isValidIranPhone(v),
+      "شماره موبایل نامعتبر است",
+    ),
   password: z.string().min(6).optional(),
   role: z.string().optional(),
   status: z.enum(["active", "disabled"]).optional(),

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidIranPhone } from "@/lib/auth/phone";
+import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
 
 export const phoneSchema = z
   .string()
@@ -8,11 +9,15 @@ export const phoneSchema = z
 
 export const otpSendSchema = z.object({
   phone: phoneSchema,
+  deviceId: z.string().max(64).optional(),
 });
 
 export const otpVerifySchema = z.object({
   phone: phoneSchema,
-  code: z.string().regex(/^\d{4,10}$/, "کد تأیید نامعتبر است"),
+  code: z
+    .string()
+    .transform((v) => normalizeOtpDigits(v))
+    .refine((v) => /^\d{4,10}$/.test(v), "کد تأیید نامعتبر است"),
 });
 
 export const registerSchema = z.object({

@@ -64,6 +64,7 @@ function CheckoutPageInner() {
     ? `${hajiasalPath("/checkout")}?coupon=${encodeURIComponent(couponFromQuery)}`
     : hajiasalPath("/checkout");
   const loginHref = `${hajiasalPath("/login")}?redirect=${encodeURIComponent(checkoutRedirectPath)}`;
+  const completeHref = `${hajiasalPath("/login")}?step=complete&redirect=${encodeURIComponent(checkoutRedirectPath)}`;
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -153,8 +154,12 @@ function CheckoutPageInner() {
     if (authLoading) return;
     if (!isLoggedIn) {
       router.replace(loginHref);
+      return;
     }
-  }, [authLoading, isLoggedIn, router, loginHref]);
+    if (!user?.fullName?.trim()) {
+      router.replace(completeHref);
+    }
+  }, [authLoading, isLoggedIn, user, router, loginHref, completeHref]);
 
   useEffect(() => {
     if (authLoading || prefilled || !user) return;
@@ -189,10 +194,14 @@ function CheckoutPageInner() {
     })();
   }, [authLoading, user, prefilled, setValue]);
 
-  if (authLoading || !isLoggedIn) {
+  if (authLoading || !isLoggedIn || !user?.fullName?.trim()) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <p className="text-secondary">در حال انتقال به صفحه ورود...</p>
+        <p className="text-secondary">
+          {!isLoggedIn || authLoading
+            ? "در حال انتقال به صفحه ورود..."
+            : "در حال تکمیل ثبت‌نام..."}
+        </p>
       </div>
     );
   }

@@ -630,100 +630,11 @@ export async function updateQuestion(
   return next;
 }
 
-export interface TicketRecord {
-  id: string;
-  subject: string;
-  customerId?: string | null;
-  customerName?: string | null;
-  customerPhone?: string | null;
-  status: string;
-  priority: string;
-  assignedTo?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export async function listTickets(): Promise<TicketRecord[]> {
-  if (isMysqlConfigured()) {
-    try {
-      const rows = await mysqlQuery<RowDataPacket>(
-        "SELECT * FROM support_tickets ORDER BY updated_at DESC",
-      );
-      return rows.map((r) => ({
-        id: String(r.id),
-        subject: String(r.subject),
-        customerId: r.customer_id ? String(r.customer_id) : null,
-        customerName: r.customer_name ? String(r.customer_name) : null,
-        customerPhone: r.customer_phone ? String(r.customer_phone) : null,
-        status: String(r.status ?? "open"),
-        priority: String(r.priority ?? "normal"),
-        assignedTo: r.assigned_to ? String(r.assigned_to) : null,
-        createdAt: toIso(r.created_at),
-        updatedAt: toIso(r.updated_at),
-      }));
-    } catch {
-      return [];
-    }
-  }
-  if (canUseFilesystemPersistence()) return fsList("support-tickets.json");
-  return [];
-}
-
-export async function upsertTicket(
-  input: Partial<TicketRecord> & { subject: string },
-): Promise<TicketRecord> {
-  const now = new Date().toISOString();
-  const record: TicketRecord = {
-    id: input.id ?? newId(),
-    subject: input.subject,
-    customerId: input.customerId ?? null,
-    customerName: input.customerName ?? null,
-    customerPhone: input.customerPhone ?? null,
-    status: input.status ?? "open",
-    priority: input.priority ?? "normal",
-    assignedTo: input.assignedTo ?? null,
-    createdAt: input.createdAt ?? now,
-    updatedAt: now,
-  };
-  if (isMysqlConfigured()) {
-    try {
-      await mysqlExecute(
-        `INSERT INTO support_tickets
-          (id, subject, customer_id, customer_name, customer_phone, status, priority, assigned_to, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           subject=VALUES(subject), status=VALUES(status), priority=VALUES(priority),
-           assigned_to=VALUES(assigned_to), updated_at=VALUES(updated_at)`,
-        [
-          record.id,
-          record.subject,
-          record.customerId,
-          record.customerName,
-          record.customerPhone,
-          record.status,
-          record.priority,
-          record.assignedTo,
-          record.createdAt,
-          record.updatedAt,
-        ],
-      );
-      return record;
-    } catch (error) {
-      console.error(
-        "[admin-platform] upsertTicket mysql failed, falling back:",
-        error instanceof Error ? error.message : error,
-      );
-    }
-  }
-  if (canUseFilesystemPersistence()) {
-    const list = await fsList<TicketRecord>("support-tickets.json");
-    const idx = list.findIndex((t) => t.id === record.id);
-    if (idx >= 0) list[idx] = record;
-    else list.push(record);
-    await fsSave("support-tickets.json", list);
-  }
-  return record;
-}
+export type { SupportTicketRecord as TicketRecord } from "./support-tickets";
+export {
+  listSupportTickets as listTickets,
+  upsertSupportTicket as upsertTicket,
+} from "./support-tickets";
 
 export interface NotificationRecord {
   id: string;

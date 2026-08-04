@@ -10,6 +10,8 @@ export type SellerModuleEndpoint = {
   path: string;
   /** Capability checked by gateSeller; null = auth-only (no capability). */
   capability: SellerCapability | null;
+  /** When set, gateSellerAny accepts ANY of these (OR). Deny-tests must turn all off. */
+  anyOfCapabilities?: SellerCapability[];
   importPath: string;
   body?: unknown;
   skipAllowedProbe?: boolean;
@@ -81,6 +83,7 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     method: "GET",
     path: "/api/seller/products",
     capability: "products.manage",
+    anyOfCapabilities: ["products.manage", "print.export"],
     importPath: "@/app/api/seller/products/route",
   },
   {
@@ -125,6 +128,7 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     method: "GET",
     path: "/api/seller/orders",
     capability: "orders.manage",
+    anyOfCapabilities: ["orders.manage", "print.export"],
     importPath: "@/app/api/seller/orders/route",
   },
   {
@@ -360,6 +364,26 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     capability: "profile.manage",
     importPath: "@/app/api/seller/profile/route",
     body: { shopName: "فروشگاه جدید" },
+    skipAllowedProbe: true,
+  },
+
+  // Settings (shop hours / low-stock threshold)
+  {
+    id: "settings.GET",
+    module: "settings",
+    method: "GET",
+    path: "/api/seller/settings",
+    capability: "settings.manage",
+    importPath: "@/app/api/seller/settings/route",
+  },
+  {
+    id: "settings.PATCH",
+    module: "settings",
+    method: "PATCH",
+    path: "/api/seller/settings",
+    capability: "settings.manage",
+    importPath: "@/app/api/seller/settings/route",
+    body: { shopSettings: { lowStockThreshold: 8 } },
     skipAllowedProbe: true,
   },
 

@@ -6,7 +6,7 @@ import {
   getSellerProducts,
   setSellerProductStock,
 } from "@/lib/server/sellers";
-import { updateProductAsync, getProductByIdAsync } from "@/lib/server/products-store";
+import { updateProductAsync } from "@/lib/server/products-store";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import { createSellerNotification } from "@/lib/server/seller-notifications";
 import {
@@ -82,10 +82,9 @@ export async function PATCH(request: Request) {
     }
 
     const sellerId = gated.ctx.seller.id;
-    const existing = await getProductByIdAsync(parsed.data.productId, {
-      allowHidden: true,
-    });
-    if (!existing || existing.sellerId !== sellerId) {
+    const catalog = await getSellerProducts(sellerId);
+    const existing = catalog.find((p) => p.id === parsed.data.productId);
+    if (!existing) {
       return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
     }
 
@@ -102,20 +101,38 @@ export async function PATCH(request: Request) {
     }
 
     const inStock = stockQty > 0;
-    const updated = await updateProductAsync(parsed.data.productId, {
-      inStock,
-      stockQty,
-    } as Parameters<typeof updateProductAsync>[1]);
+    let updatedProduct = existing;
 
-    if (!updated) {
+    if (existing.sellerId === sellerId) {
+      const updated = await updateProductAsync(parsed.data.productId, {
+        inStock,
+        stockQty,
+      } as Parameters<typeof updateProductAsync>[1]);
+      if (updated) {
+        updatedProduct = updated;
+      } else {
+        const toggled = await setSellerProductStock(
+          sellerId,
+          parsed.data.productId,
+          inStock,
+          stockQty,
+        );
+        if (!toggled) {
+          return NextResponse.json({ error: "به‌روزرسانی ناموفق" }, { status: 500 });
+        }
+        updatedProduct = toggled;
+      }
+    } else {
       const toggled = await setSellerProductStock(
         sellerId,
         parsed.data.productId,
         inStock,
+        stockQty,
       );
       if (!toggled) {
         return NextResponse.json({ error: "به‌روزرسانی ناموفق" }, { status: 500 });
       }
+      updatedProduct = toggled;
     }
 
     const delta =
@@ -169,7 +186,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({
       success: true,
-      product: { ...existing, stockQty, inStock },
+      product: { ...updatedProduct, stockQty, inStock },
     });
   } catch (err) {
     return NextResponse.json(

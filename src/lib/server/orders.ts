@@ -272,16 +272,50 @@ export async function getOrdersByUserId(userId: string): Promise<StoredOrder[]> 
   return memoryGetOrders<StoredOrder>().filter((o) => o.userId === userId);
 }
 
-/** True if this phone has at least one non-cancelled order (buyer). */
+/** Paid / in-fulfillment statuses (excludes pending_payment and cancelled). */
+export const PAID_OR_FULFILLING = new Set<OrderStatus>([
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+]);
+
+function orderMatchesPhone(order: StoredOrder, phone: string): boolean {
+  return normalizePhone(order.customer?.phone ?? "") === phone;
+}
+
+function orderContainsProduct(order: StoredOrder, productId: string): boolean {
+  return order.items.some((item) => item.productId === productId);
+}
+
+/** True if this phone has at least one paid/fulfilling order (buyer). */
 export async function hasPurchasedByPhone(phone: string): Promise<boolean> {
   const normalized = normalizePhone(phone);
   if (!normalized) return false;
 
   const orders = await getAllOrders();
-  return orders.some((order) => {
-    if (order.status === "cancelled") return false;
-    return normalizePhone(order.customer?.phone ?? "") === normalized;
-  });
+  return orders.some(
+    (order) =>
+      PAID_OR_FULFILLING.has(order.status) &&
+      orderMatchesPhone(order, normalized),
+  );
+}
+
+/** True if this phone has a paid/fulfilling order that includes the product. */
+export async function hasPurchasedProductByPhone(
+  phone: string,
+  productId: string,
+): Promise<boolean> {
+  const normalized = normalizePhone(phone);
+  if (!normalized || !productId) return false;
+
+  const orders = await getAllOrders();
+  return orders.some(
+    (order) =>
+      PAID_OR_FULFILLING.has(order.status) &&
+      orderMatchesPhone(order, normalized) &&
+      orderContainsProduct(order, productId),
+  );
 }
 
 export async function updateOrderStatus(
@@ -290,13 +324,6 @@ export async function updateOrderStatus(
 ): Promise<StoredOrder | null> {
   return updateOrderAdmin(orderId, { status });
 }
-
-const PAID_OR_FULFILLING = new Set<OrderStatus>([
-  "confirmed",
-  "processing",
-  "shipped",
-  "delivered",
-]);
 
 export type ConfirmPaidResult =
   | {

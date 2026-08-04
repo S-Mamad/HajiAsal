@@ -61,9 +61,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      {
+        url: "/images/hajiasal/brand/logo-mark-512.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
       { url: "/images/hajiasal/brand/mark.svg", type: "image/svg+xml" },
     ],
-    apple: [{ url: "/images/hajiasal/brand/mark.svg" }],
+    apple: [{ url: "/images/hajiasal/brand/logo-mark-512.png" }],
   },
   twitter: {
     card: "summary_large_image",

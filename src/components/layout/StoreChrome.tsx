@@ -4,10 +4,12 @@ import { usePathname } from "next/navigation";
 import type { SiteConfig } from "@/types";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { CartDrawer } from "@/components/cart/CartDrawer";
+import { FloatingBottomNav } from "@/components/layout/FloatingBottomNav";
 import { CartLiveRegion } from "@/components/cart/CartLiveRegion";
 import { SiteSettingsProvider } from "@/context/SiteSettingsContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { shouldShowFloatingNav } from "@/lib/layout/floating-nav";
+import { cn } from "@/lib/utils";
 
 const BARE_CHROME =
   /^\/(login|register|forgot-password|admin|seller)(\/|$)/;
@@ -20,6 +22,7 @@ interface StoreChromeProps {
 export function StoreChrome({ children, siteSettings }: StoreChromeProps) {
   const pathname = usePathname();
   const isBare = BARE_CHROME.test(pathname ?? "");
+  const showFloatingNav = shouldShowFloatingNav(pathname ?? "");
 
   if (isBare) {
     return (
@@ -35,11 +38,20 @@ export function StoreChrome({ children, siteSettings }: StoreChromeProps) {
     <ThemeProvider>
       <SiteSettingsProvider settings={siteSettings}>
         <Header />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <Footer />
-        <CartDrawer />
+        <div
+          className={cn(
+            "flex flex-1 flex-col lg:pb-0",
+            showFloatingNav
+              ? "pb-[calc(5.75rem+env(safe-area-inset-bottom))]"
+              : "pb-[env(safe-area-inset-bottom)]",
+          )}
+        >
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </div>
+        <FloatingBottomNav />
         <CartLiveRegion />
       </SiteSettingsProvider>
     </ThemeProvider>

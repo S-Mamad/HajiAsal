@@ -33,10 +33,12 @@ export default function WishlistPage() {
     };
   }, []);
 
-  const products = useMemo(
-    () => catalog.filter((p) => ids.includes(p.id)),
-    [catalog, ids],
-  );
+  const products = useMemo(() => {
+    const byId = new Map(catalog.map((p) => [p.id, p]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((p): p is Product => Boolean(p));
+  }, [catalog, ids]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 md:px-8 md:py-24">

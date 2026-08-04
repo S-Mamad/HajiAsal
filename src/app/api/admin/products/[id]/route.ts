@@ -42,7 +42,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     const data = parsed.data;
     const isAutosave = Boolean(data.autosave);
 
-    if (data.status === "active") {
+    const existing = await getProductByIdAsync(id, { allowHidden: true });
+    if (!existing) {
+      return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
+    }
+
+    // Publish gate only on transition to active (autosave re-sends status).
+    if (
+      data.status === "active" &&
+      (existing.status ?? "active") !== "active"
+    ) {
       const pub = await gateAdmin(request, "products.publish");
       if (!pub.ok) return pub.response;
     }
@@ -57,15 +66,30 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { autosave, ...rest } = data;
     void autosave;
-    const updates: Partial<Product> = {
+    const updates: Omit<Partial<Product>, "stockQty"> & {
+      stockQty?: number | null;
+    } = {
       ...rest,
       category: rest.category as ProductCategory | undefined,
       weightOptions: rest.weightOptions as WeightOption[] | undefined,
       discountPrice:
         rest.discountPrice === null ? undefined : rest.discountPrice,
+      stockQty: rest.stockQty === null ? null : rest.stockQty,
     };
 
-    const product = await updateProductAsync(id, updates, {
+    // Admin forcing publish on a seller product also completes approval.
+    if (
+      updates.status === "active" &&
+      existing.sellerId &&
+      (existing.approvalStatus ?? "approved") !== "approved"
+    ) {
+      updates.approvalStatus = "approved";
+      updates.submittedAt =
+        existing.submittedAt ?? new Date().toISOString();
+      updates.reviewedAt = new Date().toISOString();
+    }
+
+    const product = await updateProductAsync(id, updates as Partial<Product>, {
       createRevision: !isAutosave,
       actor: editGate.ctx.user?.id ?? "admin",
       revisionNote: isAutosave ? "autosave" : "ویرایش دستی",

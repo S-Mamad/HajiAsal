@@ -3,8 +3,9 @@ import {
   filterProductsAsync,
   getAllCategories,
   getAllProductsAsync,
+  searchProductsAsync,
 } from "@/lib/server/products";
-import { getMinPrice } from "@/lib/products";
+import { getDisplayPrice } from "@/lib/products";
 import type { ProductCategory, SortOption } from "@/types";
 
 export async function GET(request: Request) {
@@ -18,7 +19,10 @@ export async function GET(request: Request) {
     ? Number(searchParams.get("maxPrice"))
     : undefined;
   const inStockOnly = searchParams.get("inStock") === "1";
-  const search = searchParams.get("search") ?? undefined;
+  const search =
+    searchParams.get("search")?.trim() ||
+    searchParams.get("q")?.trim() ||
+    undefined;
 
   let products = await filterProductsAsync({
     category: category ?? undefined,
@@ -29,16 +33,19 @@ export async function GET(request: Request) {
   });
 
   if (search) {
-    const q = search.toLowerCase();
-    products = products.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.shortDescription.toLowerCase().includes(q),
-    );
+    const matched = await searchProductsAsync(search);
+    const rank = new Map(matched.map((p, i) => [p.id, i]));
+    products = products.filter((p) => rank.has(p.id));
+    // Default “محبوب‌ترین” keeps search relevance; other sorts already applied.
+    if (sort === "popular") {
+      products.sort(
+        (a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0),
+      );
+    }
   }
 
   const catalog = await getAllProductsAsync();
-  const prices = catalog.map((p) => getMinPrice(p)).filter((n) => n > 0);
+  const prices = catalog.map((p) => getDisplayPrice(p)).filter((n) => n > 0);
   const priceRange = {
     min: prices.length ? Math.min(...prices) : 0,
     max: prices.length ? Math.max(...prices) : 0,
@@ -50,6 +57,7 @@ export async function GET(request: Request) {
       total: products.length,
       priceRange,
       categories: getAllCategories(),
+      query: search ?? null,
     },
   });
 }

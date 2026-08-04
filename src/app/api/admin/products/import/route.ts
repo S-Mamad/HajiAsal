@@ -44,7 +44,7 @@ function parseCsv(text: string): string[][] {
         } else inQuotes = false;
       } else cell += ch;
     } else if (ch === '"') inQuotes = true;
-    else if (ch === ",") {
+    else if (ch === "," || ch === "،") {
       row.push(cell);
       cell = "";
     } else if (ch === "\n") {

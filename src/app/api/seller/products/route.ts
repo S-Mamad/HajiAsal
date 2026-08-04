@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { gateSeller, clientIpFromRequest } from "@/lib/server/seller-gate";
+import { gateSeller, gateSellerAny, clientIpFromRequest } from "@/lib/server/seller-gate";
 import { getSellerProducts } from "@/lib/server/sellers";
 import {
   createProductAsync,
   getProductByIdAsync,
   updateProductAsync,
-  deleteProductAsync,
+  softDeleteProductAsync,
 } from "@/lib/server/products-store";
 import { logSellerActivity } from "@/lib/server/seller-activity";
+import { canSellerPublishStatus } from "@/lib/product-approval";
 import type { Product, ProductCategory } from "@/types";
+
+const PRODUCT_CATEGORIES = [
+  "mountain",
+  "thyme",
+  "multifloral",
+  "royal-jelly",
+  "honeycomb",
+  "specialty",
+  "gift-set",
+  "distillates",
+  "rice",
+  "saffron",
+] as const;
+
+const categorySchema = z.enum(PRODUCT_CATEGORIES);
 
 const weightSchema = z.object({
   label: z.string().min(1),
@@ -18,12 +34,12 @@ const weightSchema = z.object({
   price: z.number().positive(),
 });
 
-const createSchema = z.object({
+const createProductSchema = z.object({
   title: z.string().min(2).max(200),
   slug: z.string().min(2).max(200).optional(),
   shortDescription: z.string().max(500).optional().default(""),
   longDescription: z.string().max(5000).optional().default(""),
-  category: z.string().min(1),
+  category: categorySchema,
   categoryLabel: z.string().optional().default(""),
   images: z.array(z.string().min(1)).max(8).optional().default([]),
   weightOptions: z.array(weightSchema).min(1),
@@ -32,9 +48,14 @@ const createSchema = z.object({
   status: z.enum(["active", "draft", "archived", "disabled"]).optional(),
   ingredients: z.string().max(1000).optional(),
   shippingInfo: z.string().max(1000).optional(),
-  action: z.enum(["duplicate"]).optional(),
-  productId: z.string().optional(),
 });
+
+const duplicateSchema = z.object({
+  action: z.literal("duplicate"),
+  productId: z.string().min(1),
+});
+
+const createSchema = z.union([duplicateSchema, createProductSchema]);
 
 const updateSchema = z.object({
   productId: z.string().min(1).optional(),
@@ -42,9 +63,9 @@ const updateSchema = z.object({
   title: z.string().min(2).max(200).optional(),
   shortDescription: z.string().max(500).optional(),
   longDescription: z.string().max(5000).optional(),
-  category: z.string().min(1).optional(),
+  category: categorySchema.optional(),
   categoryLabel: z.string().optional(),
-  images: z.array(z.string()).max(8).optional(),
+  images: z.array(z.string().min(1)).max(8).optional(),
   weightOptions: z.array(weightSchema).min(1).optional(),
   inStock: z.boolean().optional(),
   stockQty: z.number().int().min(0).optional(),
@@ -52,8 +73,73 @@ const updateSchema = z.object({
   ingredients: z.string().max(1000).optional(),
   shippingInfo: z.string().max(1000).optional(),
   bulkStatus: z.enum(["active", "draft", "archived", "disabled"]).optional(),
+  /** Submit a local draft into the admin review queue */
+  submitForReview: z.boolean().optional(),
 });
 
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function sellerContentChanged(
+  existing: Product,
+  rest: {
+    title?: string;
+    shortDescription?: string;
+    longDescription?: string;
+    category?: string;
+    categoryLabel?: string;
+    images?: string[];
+    weightOptions?: Product["weightOptions"];
+    ingredients?: string;
+    shippingInfo?: string;
+  },
+): boolean {
+  if (rest.title !== undefined && rest.title !== existing.title) return true;
+  if (
+    rest.shortDescription !== undefined &&
+    rest.shortDescription !== (existing.shortDescription ?? "")
+  ) {
+    return true;
+  }
+  if (
+    rest.longDescription !== undefined &&
+    rest.longDescription !== (existing.longDescription ?? "")
+  ) {
+    return true;
+  }
+  if (rest.category !== undefined && rest.category !== existing.category) {
+    return true;
+  }
+  if (
+    rest.categoryLabel !== undefined &&
+    rest.categoryLabel !== (existing.categoryLabel ?? "")
+  ) {
+    return true;
+  }
+  if (rest.images !== undefined && !sameJson(rest.images, existing.images ?? [])) {
+    return true;
+  }
+  if (
+    rest.weightOptions !== undefined &&
+    !sameJson(rest.weightOptions, existing.weightOptions)
+  ) {
+    return true;
+  }
+  if (
+    rest.ingredients !== undefined &&
+    rest.ingredients !== (existing.ingredients ?? "")
+  ) {
+    return true;
+  }
+  if (
+    rest.shippingInfo !== undefined &&
+    rest.shippingInfo !== (existing.shippingInfo ?? "")
+  ) {
+    return true;
+  }
+  return false;
+}
 function slugify(input: string): string {
   return input
     .trim()
@@ -64,7 +150,10 @@ function slugify(input: string): string {
 }
 
 export async function GET(request: Request) {
-  const gated = await gateSeller(request, "products.manage");
+  const gated = await gateSellerAny(request, [
+    "products.manage",
+    "print.export",
+  ]);
   if (!gated.ok) return gated.response;
 
   const { searchParams } = new URL(request.url);
@@ -91,12 +180,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "اطلاعات محصول نامعتبر است" }, { status: 400 });
     }
 
-    if (parsed.data.action === "duplicate" && parsed.data.productId) {
+    if ("action" in parsed.data && parsed.data.action === "duplicate") {
       const existing = await getProductByIdAsync(parsed.data.productId, {
         allowHidden: true,
       });
       if (!existing || existing.sellerId !== gated.ctx.seller.id) {
-        return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
+        return NextResponse.json(
+          {
+            error: existing && !existing.sellerId
+              ? "محصول کاتالوگ اختصاصی قابل کپی نیست"
+              : "محصول یافت نشد",
+          },
+          { status: 404 },
+        );
       }
       const now = new Date().toISOString();
       const id = `sp-${gated.ctx.seller.id}-${randomUUID().slice(0, 8)}`;
@@ -106,9 +202,12 @@ export async function POST(request: Request) {
         slug: `${existing.slug}-copy-${id.slice(-4)}`,
         title: `${existing.title} (کپی)`,
         approvalStatus: "pending",
-        submittedAt: now,
+        submittedAt: undefined,
+        reviewedAt: undefined,
+        reviewNote: undefined,
         createdAt: now,
         status: "draft",
+        sellerId: gated.ctx.seller.id,
       };
       const created = await createProductAsync(copy);
       if (!created) {
@@ -124,38 +223,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, product: created });
     }
 
+    const data = parsed.data as z.infer<typeof createProductSchema>;
     const now = new Date().toISOString();
     const baseSlug =
-      parsed.data.slug?.trim() ||
-      slugify(parsed.data.title) ||
+      data.slug?.trim() ||
+      slugify(data.title) ||
       `product-${Date.now()}`;
     const id = `sp-${gated.ctx.seller.id}-${randomUUID().slice(0, 8)}`;
     const slug = `${baseSlug}-${id.slice(-6)}`;
     const stockQty =
-      parsed.data.stockQty ?? (parsed.data.inStock === false ? 0 : 1);
+      data.stockQty ?? (data.inStock === false ? 0 : 1);
+    // Seller cannot publish directly; "active" from the form means "submit for review".
+    const submitForReview = data.status !== "draft";
 
     const product: Product = {
       id,
       slug,
-      title: parsed.data.title.trim(),
-      shortDescription: parsed.data.shortDescription ?? "",
-      longDescription: parsed.data.longDescription ?? "",
-      category: parsed.data.category as ProductCategory,
+      title: data.title.trim(),
+      shortDescription: data.shortDescription ?? "",
+      longDescription: data.longDescription ?? "",
+      category: data.category as ProductCategory,
       categoryLabel:
-        parsed.data.categoryLabel?.trim() || parsed.data.category,
-      images: parsed.data.images ?? [],
-      weightOptions: parsed.data.weightOptions,
+        data.categoryLabel?.trim() || data.category,
+      images: data.images ?? [],
+      weightOptions: data.weightOptions,
       inStock: stockQty > 0,
       stockQty,
-      status: parsed.data.status ?? "active",
+      status: "draft",
       rating: 0,
       reviewCount: 0,
-      ingredients: parsed.data.ingredients,
-      shippingInfo: parsed.data.shippingInfo,
+      ingredients: data.ingredients,
+      shippingInfo: data.shippingInfo,
       createdAt: now,
       sellerId: gated.ctx.seller.id,
-      approvalStatus: parsed.data.status === "draft" ? "pending" : "pending",
-      submittedAt: now,
+      approvalStatus: "pending",
+      submittedAt: submitForReview ? now : undefined,
     };
 
     const created = await createProductAsync(product);
@@ -174,7 +276,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       product: created,
-      message: "محصول ثبت شد و در انتظار تأیید ادمین است",
+      message: submitForReview
+        ? "محصول ثبت شد و در انتظار تأیید ادمین است"
+        : "پیش‌نویس ذخیره شد",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "خطای سرور";
@@ -196,9 +300,21 @@ export async function PATCH(request: Request) {
     // Bulk status change
     if (parsed.data.bulkStatus && parsed.data.productIds?.length) {
       let updatedCount = 0;
+      let skipped = 0;
       for (const id of parsed.data.productIds) {
         const existing = await getProductByIdAsync(id, { allowHidden: true });
         if (!existing || existing.sellerId !== gated.ctx.seller.id) continue;
+        if (existing.deletedAt) {
+          skipped += 1;
+          continue;
+        }
+        if (
+          parsed.data.bulkStatus === "active" &&
+          !canSellerPublishStatus(existing.approvalStatus)
+        ) {
+          skipped += 1;
+          continue;
+        }
         const product = await updateProductAsync(id, {
           status: parsed.data.bulkStatus,
         });
@@ -214,7 +330,15 @@ export async function PATCH(request: Request) {
           });
         }
       }
-      return NextResponse.json({ success: true, updated: updatedCount });
+      return NextResponse.json({
+        success: true,
+        updated: updatedCount,
+        skipped,
+        message:
+          skipped > 0
+            ? `${updatedCount} به‌روز شد؛ ${skipped} محصول هنوز تأیید نشده و فعال نشد`
+            : undefined,
+      });
     }
 
     if (!parsed.data.productId) {
@@ -227,18 +351,36 @@ export async function PATCH(request: Request) {
     if (!existing || existing.sellerId !== gated.ctx.seller.id) {
       return NextResponse.json({ error: "محصول یافت نشد" }, { status: 404 });
     }
+    if (existing.deletedAt) {
+      return NextResponse.json(
+        { error: "محصول حذف‌شده قابل ویرایش نیست" },
+        { status: 410 },
+      );
+    }
 
-    const { productId, productIds: _ids, bulkStatus: _bulk, ...rest } =
-      parsed.data;
-    const contentChanged =
-      rest.title !== undefined ||
-      rest.shortDescription !== undefined ||
-      rest.longDescription !== undefined ||
-      rest.category !== undefined ||
-      rest.images !== undefined ||
-      rest.weightOptions !== undefined ||
-      rest.ingredients !== undefined ||
-      rest.shippingInfo !== undefined;
+    const {
+      productId,
+      productIds: _ids,
+      bulkStatus: _bulk,
+      submitForReview,
+      ...rest
+    } = parsed.data;
+
+    if (
+      rest.status === "active" &&
+      !canSellerPublishStatus(existing.approvalStatus) &&
+      !submitForReview
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "تا قبل از تأیید ادمین نمی‌توانید محصول را فعال کنید. ابتدا برای تأیید ارسال کنید.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const contentChanged = sellerContentChanged(existing, rest);
 
     const updates: Partial<Product> = {
       ...rest,
@@ -251,9 +393,21 @@ export async function PATCH(request: Request) {
       updates.inStock = rest.stockQty > 0;
     }
 
-    if (contentChanged) {
+    if (submitForReview) {
+      updates.status = "draft";
       updates.approvalStatus = "pending";
       updates.submittedAt = new Date().toISOString();
+      updates.reviewedAt = undefined;
+      updates.reviewNote = undefined;
+    } else if (contentChanged) {
+      const wasSubmitted = Boolean(existing.submittedAt);
+      const wasApproved = existing.approvalStatus === "approved";
+      updates.approvalStatus = "pending";
+      updates.status = "draft";
+      // Keep local-only drafts out of the admin queue until explicitly submitted.
+      // Already-approved or previously submitted products re-enter the queue.
+      updates.submittedAt =
+        wasSubmitted || wasApproved ? new Date().toISOString() : undefined;
       updates.reviewedAt = undefined;
       updates.reviewNote = undefined;
     }
@@ -265,7 +419,7 @@ export async function PATCH(request: Request) {
 
     await logSellerActivity({
       sellerId: gated.ctx.seller.id,
-      action: "product.update",
+      action: submitForReview ? "product.submit" : "product.update",
       entityType: "product",
       entityId: productId,
       ip: clientIpFromRequest(request),
@@ -274,9 +428,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({
       success: true,
       product,
-      message: contentChanged
-        ? "تغییرات ثبت شد و دوباره در انتظار تأیید ادمین است"
-        : "به‌روزرسانی شد",
+      message: submitForReview
+        ? "محصول برای تأیید ادمین ارسال شد"
+        : contentChanged && product.submittedAt
+          ? "تغییرات ثبت شد و دوباره در انتظار تأیید ادمین است"
+          : "به‌روزرسانی شد",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "خطای سرور";
@@ -310,7 +466,8 @@ export async function DELETE(request: Request) {
   for (const id of ids) {
     const existing = await getProductByIdAsync(id, { allowHidden: true });
     if (!existing || existing.sellerId !== gated.ctx.seller.id) continue;
-    const ok = await deleteProductAsync(id);
+    if (existing.deletedAt) continue;
+    const ok = await softDeleteProductAsync(id);
     if (ok) {
       deleted += 1;
       await logSellerActivity({

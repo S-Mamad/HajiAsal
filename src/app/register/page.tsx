@@ -7,7 +7,8 @@ interface RegisterPageProps {
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
-  const q = new URLSearchParams({ tab: "register" });
+  const q = new URLSearchParams();
   if (params.redirect) q.set("redirect", params.redirect);
-  redirect(`${hajiasalPath("/login")}?${q.toString()}`);
+  const qs = q.toString();
+  redirect(qs ? `${hajiasalPath("/login")}?${qs}` : hajiasalPath("/login"));
 }

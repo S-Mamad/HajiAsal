@@ -34,6 +34,7 @@ describe("order-notify", () => {
     delete process.env.MELIPAYAMAK_SMS_URL;
     delete process.env.MELIPAYAMAK_SMS_TOKEN;
     delete process.env.MELIPAYAMAK_OTP_TOKEN;
+    delete process.env.ORDER_SMS_ENABLED;
   });
 
   afterEach(() => {
@@ -72,14 +73,25 @@ describe("order-notify", () => {
     expect(msg).toContain("TRK-ABC");
   });
 
-  it("skips when not configured", async () => {
+  it("skips when ORDER_SMS_ENABLED is off (default)", async () => {
+    process.env.SMS_PROVIDER = "kavenegar";
+    process.env.SMS_API_KEY = "key";
+    process.env.SMS_SENDER = "1000";
+    const r = await notifyOrderStatusChange(order, "confirmed");
+    expect(r.sent).toBe(false);
+    expect(r.skipped).toBe("disabled");
+  });
+
+  it("skips when not configured even if enabled", async () => {
+    process.env.ORDER_SMS_ENABLED = "true";
     expect(isOrderSmsConfigured()).toBe(false);
     const r = await notifyOrderStatusChange(order, "confirmed");
     expect(r.sent).toBe(false);
     expect(r.skipped).toBe("not_configured");
   });
 
-  it("sends via kavenegar when configured", async () => {
+  it("sends via kavenegar when configured and enabled", async () => {
+    process.env.ORDER_SMS_ENABLED = "1";
     process.env.SMS_PROVIDER = "kavenegar";
     process.env.SMS_API_KEY = "key";
     process.env.SMS_SENDER = "1000";
@@ -93,5 +105,8 @@ describe("order-notify", () => {
     const r = await sendTransactionalSms("09121234567", "hello");
     expect(r.ok).toBe(true);
     expect(globalThis.fetch).toHaveBeenCalled();
+
+    const notify = await notifyOrderStatusChange(order, "confirmed");
+    expect(notify.sent).toBe(true);
   });
 });

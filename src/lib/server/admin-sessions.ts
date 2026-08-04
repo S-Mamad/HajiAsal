@@ -9,7 +9,7 @@ import { canUseFilesystemPersistence } from "./production";
 import { isMysqlConfigured, mysqlExecute, mysqlQueryOne, toIso } from "./mysql";
 
 const SESSIONS_FILE = "admin-sessions.json";
-const SESSION_DAYS = 7;
+const SESSION_DAYS = 30;
 
 export interface AdminSession {
   id: string;

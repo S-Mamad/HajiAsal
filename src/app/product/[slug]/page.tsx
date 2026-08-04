@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
-  getAllSlugsAsync,
   getProductBySlugAsync,
   getRelatedProductsAsync,
 } from "@/lib/server/products-store";
@@ -13,18 +12,11 @@ import {
 import { ProductDetailClient } from "@/components/product/ProductDetailClient";
 import { serializeJsonLd } from "@/lib/json-ld";
 
+/** Always render from live catalog so stock / new products match the API. */
+export const dynamic = "force-dynamic";
+
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  try {
-    const slugs = await getAllSlugsAsync();
-    return slugs.map((slug) => ({ slug }));
-  } catch {
-    // Offline / DB-down builds: skip SSG for product pages
-    return [];
-  }
 }
 
 export async function generateMetadata({

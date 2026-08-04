@@ -2,61 +2,30 @@
 
 مسیر اپ روی هاست شما: `/home/uabkxfzi/hajiasal`
 
-## علت 503
+## این زیپ چیست؟
 
-کد `503` یعنی اپ Node بالا نیامده یا موقع استارت کرش کرده.
+`hajiasal-host-upload.zip` بستهٔ **آماده اجرا** است (بیلد داخلش هست).
+نیازی به `npm install` یا `npm run build` نیست.
 
-رایج‌ترین علت با این زیپ:
-1. فقط سورس آپلود شده
-2. **`npm run build` روی هاست اجرا نشده** (پوشه `.next` نیست)
-3. یا بعد از بیلد، اپ Restart نشده (`touch tmp/restart.txt`)
-
-## مراحل سریع (ترتیب مهم است)
+## مراحل (Extract و اجرا)
 
 ### ۱) پاک‌سازی و Extract
 داخل `/home/uabkxfzi/hajiasal`:
-- `node_modules` و `.next` قدیمی را پاک کن (اگر هست)
-- `hajiasal-host-upload.zip` را Extract کن طوری که **کنار هم** این‌ها باشد:
+- در صورت وجود، `node_modules` و `.next` قدیمی را پاک کنید
+- زیپ را Extract کنید طوری که **کنار هم** این‌ها باشد:
   - `server.js`
   - `package.json`
-  - `src/`
+  - `.next/` (با `standalone` داخلش)
   - `public/`
-  - `scripts/`
 - نه داخل پوشهٔ تو در تو مثل `hajiasal/hajiasal/...`
 
-در File Manager → Settings → **Show Hidden Files** را روشن کن.
+در File Manager → Settings → **Show Hidden Files** را روشن کنید.
 
 ### ۲) متغیرهای محیطی
-در **Setup Node.js App → Environment variables** همین‌ها را داری؛ کافی است.
-اگر خواستی فایل `.env` هم کنار `server.js` بساز (اختیاری وقتی متغیرها در پنل هست).
+در **Setup Node.js App → Environment variables** همین‌ها را دارید؛ کافی است.
+اگر خواستید فایل `.env` هم کنار `server.js` بسازید (از روی `.env.example`).
 
-### ۳) بیلد روی هاست (اجباری)
-
-در **Terminal** سی‌پنل:
-
-```bash
-source /home/uabkxfzi/nodevenv/hajiasal/22/bin/activate && cd /home/uabkxfzi/hajiasal
-bash scripts/host-first-boot.sh
-```
-
-یا دستی:
-
-```bash
-source /home/uabkxfzi/nodevenv/hajiasal/22/bin/activate && cd /home/uabkxfzi/hajiasal
-npm install --no-audit --no-fund
-npm run build
-mkdir -p tmp
-touch tmp/restart.txt
-```
-
-در پنل Node.js هم می‌توانی اول **Run NPM Install** بزنی، بعد فقط `npm run build` و `touch tmp/restart.txt`.
-
-### ۴) تست
-- https://hajiasal.ir/
-- https://hajiasal.ir/admin
-- https://hajiasal.ir/seller
-
-## تنظیمات Setup Node.js App
+### ۳) تنظیمات Setup Node.js App
 
 | تنظیم | مقدار |
 |---|---|
@@ -66,13 +35,37 @@ touch tmp/restart.txt
 | Node.js version | 22 (یا 20) |
 | Application mode | Production |
 
-## عیب‌یابی
+### ۴) Restart
+```bash
+cd /home/uabkxfzi/hajiasal
+mkdir -p tmp
+touch tmp/restart.txt
+```
 
-| علامت | معنی |
+در پنل Node.js هم می‌توانید Stop → Start بزنید.
+
+### ۵) تست
+- https://hajiasal.ir/
+- https://admin.hajiasal.ir/ (پنل ادمین — ساب‌دامین)
+- https://seller.hajiasal.ir/ (پنل فروشنده — ساب‌دامین)
+
+مسیرهای قدیمی `hajiasal.ir/admin` و `/seller` باید به ساب‌دامین ریدایرکت شوند.
+جزئیات سه اپ: `docs/SUBDOMAIN-DEPLOY-FA.md`
+
+## اگر 503 دیدید
+
+| علامت | کار |
 |---|---|
-| 503 | بیلد نشده / اپ Stop است / بعد از بیلد restart نزدی |
+| 503 بعد از Extract | `touch tmp/restart.txt` و Stop/Start اپ |
 | Extract تو در تو | `server.js` باید مستقیم داخل `hajiasal` باشد |
 | لاگین/سفارش خراب | `MYSQL_*` یا migration ناقص |
 | عکس نیست | پوشه `public` کنار `server.js` نیست |
 
 لاگ خطا معمولاً در stderr اپ Node یا فایل‌های error_log دامنه است.
+
+## فقط در صورت خرابی بیلد (اختیاری)
+اگر به هر دلیل `.next/standalone` کار نکرد:
+```bash
+source /home/uabkxfzi/nodevenv/hajiasal/22/bin/activate && cd /home/uabkxfzi/hajiasal
+bash scripts/host-first-boot.sh
+```

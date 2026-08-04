@@ -10,7 +10,10 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <AuthLayout title="بازیابی رمز عبور" subtitle="به‌زودی فعال می‌شود">
+    <AuthLayout
+      title="بازیابی رمز عبور"
+      subtitle="به‌زودی فعال می‌شود"
+    >
       <p className="mb-6 text-sm text-muted">
         فعلاً از ورود با موبایل استفاده کنید. بازیابی رمز ایمیل به‌زودی اضافه می‌شود.
       </p>

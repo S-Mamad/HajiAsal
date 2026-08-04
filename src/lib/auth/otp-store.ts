@@ -2,13 +2,17 @@ import { createHash, randomInt, timingSafeEqual } from "crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   isMysqlConfigured,
+  isMysqlUsable,
   mysqlExecute,
   mysqlQueryOne,
   newId,
   toIso,
 } from "@/lib/server/mysql";
+import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
 
-/** Default OTP length for self-generated codes (test + Kavenegar/Ghasedak). */
+export { normalizeOtpDigits } from "@/lib/auth/otp-digits";
+
+/** Default OTP length for self-generated codes (test + Kavenegar/Ghasedak + Melipayamak simple). */
 export const OTP_LENGTH = 4;
 
 /**
@@ -19,11 +23,15 @@ export const OTP_LENGTH = 4;
 export const MIN_OTP_LENGTH = 4;
 export const MAX_OTP_LENGTH = 10;
 
-const OTP_TTL_MS = 5 * 60 * 1000;
+/** 10 minutes — SMS delivery on Iranian networks is often delayed. */
+const OTP_TTL_MS = 10 * 60 * 1000;
+/** Small clock/skew grace so late delivery still verifies. */
+const OTP_VERIFY_GRACE_MS = 60_000;
+
 /** Production stays strict; local/E2E need headroom for repeated test-phone logins. */
 const MAX_SENDS_PER_WINDOW =
   process.env.NODE_ENV === "production"
-    ? 3
+    ? 5
     : Number(process.env.AUTH_OTP_MAX_SENDS || 30);
 const SEND_WINDOW_MS = 10 * 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -89,7 +97,7 @@ function verifyMemoryChallenge(
     return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
   }
 
-  if (challenge.expiresAt < Date.now()) {
+  if (challenge.expiresAt + OTP_VERIFY_GRACE_MS < Date.now()) {
     getMemory().challenges.delete(phone);
     return { valid: false, message: "کد منقضی شده. دوباره درخواست دهید" };
   }
@@ -108,7 +116,8 @@ function verifyMemoryChallenge(
 }
 
 export function isValidOtpCode(code: string): boolean {
-  return new RegExp(`^\\d{${MIN_OTP_LENGTH},${MAX_OTP_LENGTH}}$`).test(code);
+  const digits = normalizeOtpDigits(code);
+  return new RegExp(`^\\d{${MIN_OTP_LENGTH},${MAX_OTP_LENGTH}}$`).test(digits);
 }
 
 /** Check whether another send is allowed (does NOT record a hit). */
@@ -148,7 +157,7 @@ export function checkSendRateLimit(
 }
 
 async function clearPreviousChallenges(phone: string): Promise<void> {
-  if (isMysqlConfigured()) {
+  if (isMysqlUsable()) {
     try {
       await mysqlExecute("DELETE FROM otp_challenges WHERE phone = ?", [phone]);
     } catch (error) {
@@ -169,7 +178,7 @@ export async function createOtpChallenge(
     throw new Error("MySQL is required for OTP in production");
   }
 
-  const code = fixedCode ?? generateCode();
+  const code = normalizeOtpDigits(fixedCode ?? generateCode());
   if (!isValidOtpCode(code)) {
     throw new Error(
       `OTP must be ${MIN_OTP_LENGTH}-${MAX_OTP_LENGTH} digits`,
@@ -181,14 +190,14 @@ export async function createOtpChallenge(
   const codeHash = hashCode(code);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-  if (isMysqlConfigured()) {
+  // Skip MySQL when circuit is open — avoids multi-second connect stalls.
+  if (isMysqlUsable()) {
     try {
       await mysqlExecute(
         `INSERT INTO otp_challenges (id, phone, code_hash, expires_at, attempts)
          VALUES (?, ?, ?, ?, 0)`,
         [newId(), phone, codeHash, expiresAt],
       );
-      // Keep a memory mirror so verify still works if MySQL drops mid-flight.
       storeMemoryChallenge(phone, codeHash);
       return code;
     } catch (error) {
@@ -213,13 +222,32 @@ export async function verifyOtpChallenge(
   phone: string,
   code: string,
 ): Promise<{ valid: boolean; message: string }> {
-  if (!isValidOtpCode(code)) {
+  const normalized = normalizeOtpDigits(code);
+  if (!isValidOtpCode(normalized)) {
     return { valid: false, message: "کد تأیید نادرست است" };
   }
 
-  const codeHash = hashCode(code);
+  const codeHash = hashCode(normalized);
 
-  if (isMysqlConfigured()) {
+  // Fast path: memory mirror (same Node process) — also covers MySQL circuit open.
+  const mem = getMemory().challenges.get(phone);
+  if (mem && safeEqualHex(mem.codeHash, codeHash)) {
+    if (mem.expiresAt + OTP_VERIFY_GRACE_MS >= Date.now()) {
+      getMemory().challenges.delete(phone);
+      if (isMysqlUsable()) {
+        try {
+          await mysqlExecute("DELETE FROM otp_challenges WHERE phone = ?", [
+            phone,
+          ]);
+        } catch {
+          /* ignore */
+        }
+      }
+      return { valid: true, message: "تأیید شد" };
+    }
+  }
+
+  if (isMysqlUsable()) {
     try {
       const data = await mysqlQueryOne<RowDataPacket>(
         "SELECT * FROM otp_challenges WHERE phone = ? ORDER BY created_at DESC LIMIT 1",
@@ -227,7 +255,8 @@ export async function verifyOtpChallenge(
       );
 
       if (data) {
-        if (new Date(toIso(data.expires_at)).getTime() < Date.now()) {
+        const expiresMs = new Date(toIso(data.expires_at)).getTime();
+        if (expiresMs + OTP_VERIFY_GRACE_MS < Date.now()) {
           try {
             await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [
               data.id,

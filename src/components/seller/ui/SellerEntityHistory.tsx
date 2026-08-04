@@ -31,14 +31,19 @@ export function SellerEntityHistory({
     void (async () => {
       setLoading(true);
       try {
-        const res = await fetch("/api/seller/activity?limit=100");
+        if (!entityId) {
+          setRows([]);
+          return;
+        }
+        const qs = new URLSearchParams({
+          limit: "100",
+          entityType,
+          entityId,
+        });
+        const res = await fetch(`/api/seller/activity?${qs.toString()}`);
         if (!res.ok) return;
         const data = (await res.json()) as { rows?: ActivityRow[] };
-        setRows(
-          (data.rows ?? []).filter(
-            (r) => r.entityType === entityType && r.entityId === entityId,
-          ),
-        );
+        setRows(data.rows ?? []);
       } finally {
         setLoading(false);
       }

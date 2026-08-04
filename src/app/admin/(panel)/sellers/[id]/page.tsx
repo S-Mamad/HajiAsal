@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowRight } from "@phosphor-icons/react";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { DataTable } from "@/components/admin/ui/DataTable";
+import { AdminModal } from "@/components/admin/ui/AdminModal";
 import { Input } from "@/components/ui/Input";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
@@ -80,9 +81,10 @@ export default function AdminSellerDetailPage() {
   const [city, setCity] = useState("");
   const [commission, setCommission] = useState("10");
   const [notes, setNotes] = useState("");
-  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<SellerStatus>("pending");
   const [reviewNote, setReviewNote] = useState("");
+  const [rejectNote, setRejectNote] = useState("");
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,7 +157,6 @@ export default function AdminSellerDetailPage() {
         status,
         reviewNote: reviewNote || null,
       };
-      if (password.trim()) payload.password = password.trim();
 
       const res = await fetch(`/api/admin/sellers/${params.id}`, {
         method: "PATCH",
@@ -164,7 +165,6 @@ export default function AdminSellerDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "ذخیره ناموفق بود");
-      setPassword("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
@@ -200,12 +200,16 @@ export default function AdminSellerDetailPage() {
   const setProductApproval = async (
     productId: string,
     approvalStatus: ProductApprovalStatus,
+    reviewNote?: string,
   ) => {
     setError("");
     const res = await fetch(`/api/admin/seller-products/${productId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approvalStatus }),
+      body: JSON.stringify({
+        approvalStatus,
+        reviewNote: reviewNote?.trim() || undefined,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -214,6 +218,7 @@ export default function AdminSellerDetailPage() {
       );
       return;
     }
+    setRejectNote("");
     void load();
   };
 
@@ -379,14 +384,6 @@ export default function AdminSellerDetailPage() {
             <option value="rejected">رد شده</option>
           </select>
           <Input
-            placeholder="رمز جدید (اختیاری)"
-            type="password"
-            dir="ltr"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="sm:col-span-2"
-          />
-          <Input
             placeholder="یادداشت داخلی ادمین"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -456,8 +453,22 @@ export default function AdminSellerDetailPage() {
               header: "وضعیت تأیید",
               render: (p) => {
                 const st = p.approvalStatus ?? "approved";
-                return APPROVAL_LABELS[st];
+                const base = APPROVAL_LABELS[st];
+                if (st === "pending" && !p.submittedAt) {
+                  return "پیش‌نویس (ارسال‌نشده)";
+                }
+                return base;
               },
+            },
+            {
+              key: "publish",
+              header: "انتشار",
+              render: (p) =>
+                p.status === "active"
+                  ? "فعال"
+                  : p.status === "draft"
+                    ? "پیش‌نویس"
+                    : (p.status ?? "draft"),
             },
             {
               key: "stock",
@@ -467,9 +478,21 @@ export default function AdminSellerDetailPage() {
             {
               key: "actions",
               header: "",
-              render: (p) => (
+              render: (p) => {
+                const awaiting =
+                  p.approvalStatus === "pending" && Boolean(p.submittedAt);
+                const isDraftLocal =
+                  p.approvalStatus === "pending" && !p.submittedAt;
+                return (
                 <div className="flex flex-wrap gap-1">
-                  {p.approvalStatus !== "approved" ? (
+                  <AdminButton
+                    href={hajiasalPath(`/admin/products/${p.id}`)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    ویرایش
+                  </AdminButton>
+                  {awaiting ? (
                     <AdminButton
                       type="button"
                       size="sm"
@@ -478,12 +501,15 @@ export default function AdminSellerDetailPage() {
                       تأیید
                     </AdminButton>
                   ) : null}
-                  {p.approvalStatus !== "rejected" ? (
+                  {awaiting || p.approvalStatus === "approved" ? (
                     <AdminButton
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => void setProductApproval(p.id, "rejected")}
+                      onClick={() => {
+                        setRejectTargetId(p.id);
+                        setRejectNote("");
+                      }}
                     >
                       رد
                     </AdminButton>
@@ -494,12 +520,24 @@ export default function AdminSellerDetailPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => void setProductApproval(p.id, "pending")}
+                      title="محصول در صف بررسی ادمین می‌ماند و بدون ارسال مجدد فروشنده قابل تأیید مجدد است"
                     >
-                      بازگشت به بررسی
+                      بازگشت به صف بررسی
                     </AdminButton>
                   ) : null}
+                  {isDraftLocal ? (
+                    <span className="self-center text-xs text-slate-400">
+                      منتظر ارسال فروشنده
+                    </span>
+                  ) : null}
+                  {p.approvalStatus === "rejected" ? (
+                    <span className="self-center text-xs text-slate-400">
+                      منتظر ارسال مجدد
+                    </span>
+                  ) : null}
                 </div>
-              ),
+                );
+              },
             },
           ]}
         />
@@ -613,6 +651,44 @@ export default function AdminSellerDetailPage() {
           ]}
         />
       </div>
+
+      <AdminModal
+        open={Boolean(rejectTargetId)}
+        onClose={() => setRejectTargetId(null)}
+        title="رد محصول فروشنده"
+      >
+        <div className="space-y-3">
+          <Input
+            label="دلیل رد (اختیاری)"
+            value={rejectNote}
+            onChange={(e) => setRejectNote(e.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <AdminButton
+              type="button"
+              variant="danger"
+              onClick={() => {
+                if (!rejectTargetId) return;
+                void setProductApproval(
+                  rejectTargetId,
+                  "rejected",
+                  rejectNote,
+                );
+                setRejectTargetId(null);
+              }}
+            >
+              تأیید رد
+            </AdminButton>
+            <AdminButton
+              type="button"
+              variant="outline"
+              onClick={() => setRejectTargetId(null)}
+            >
+              انصراف
+            </AdminButton>
+          </div>
+        </div>
+      </AdminModal>
     </div>
   );
 }

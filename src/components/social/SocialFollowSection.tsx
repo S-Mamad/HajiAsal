@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  InstagramLogo,
-  TelegramLogo,
-  ChatCircle,
-  ChatTeardropText,
-  ChatsCircle,
-  PaperPlaneTilt,
-} from "@phosphor-icons/react";
-import type { Icon } from "@phosphor-icons/react";
 import type { SocialLinks } from "@/types";
 import { cn } from "@/lib/utils";
+import {
+  SocialBrandIcon,
+  type SocialBrand,
+} from "@/components/social/SocialBrandIcon";
 
 type SocialKey = keyof Pick<
   SocialLinks,
@@ -21,15 +16,15 @@ const HANDLE = "@hajiasal_ir";
 
 const NETWORKS: Array<{
   key: SocialKey;
+  brand: SocialBrand;
   label: string;
-  Icon: Icon;
 }> = [
-  { key: "eitaa", label: "ایتا", Icon: PaperPlaneTilt },
-  { key: "telegram", label: "تلگرام", Icon: TelegramLogo },
-  { key: "instagram", label: "اینستاگرام", Icon: InstagramLogo },
-  { key: "rubika", label: "روبیکا", Icon: ChatsCircle },
-  { key: "bale", label: "بله", Icon: ChatCircle },
-  { key: "soroush", label: "سروش", Icon: ChatTeardropText },
+  { key: "eitaa", brand: "eitaa", label: "ایتا" },
+  { key: "telegram", brand: "telegram", label: "تلگرام" },
+  { key: "instagram", brand: "instagram", label: "اینستاگرام" },
+  { key: "rubika", brand: "rubika", label: "روبیکا" },
+  { key: "bale", brand: "bale", label: "بله" },
+  { key: "soroush", brand: "soroush", label: "سروش" },
 ];
 
 interface SocialFollowSectionProps {
@@ -37,6 +32,35 @@ interface SocialFollowSectionProps {
   className?: string;
   /** Icon row for tight spaces (footer). */
   compact?: boolean;
+}
+
+/** White circular pad for brands; eitaa already has its own pad baked in. */
+function SocialIconFace({
+  brand,
+  size,
+}: {
+  brand: SocialBrand;
+  size: number;
+}) {
+  // Eitaa SVG already includes the white circle + mark — no extra inset.
+  const pad = brand === "eitaa" ? 0 : Math.max(4, Math.round(size * 0.12));
+  const inner = size - pad * 2;
+
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.08]"
+      style={{ width: size, height: size, padding: pad }}
+    >
+      <SocialBrandIcon
+        brand={brand}
+        size={inner}
+        alt=""
+        className={
+          brand === "eitaa" ? "rounded-full object-cover" : "rounded-[22%] object-cover"
+        }
+      />
+    </span>
+  );
 }
 
 export function SocialFollowSection({
@@ -63,7 +87,7 @@ export function SocialFollowSection({
           </span>
         </p>
         <ul className="flex flex-wrap items-center justify-center gap-2.5 md:justify-start">
-          {items.map(({ key, label, Icon }) => (
+          {items.map(({ key, brand, label }) => (
             <li key={key}>
               <a
                 href={social[key]}
@@ -71,9 +95,9 @@ export function SocialFollowSection({
                 rel="noopener noreferrer"
                 aria-label={`${label} ${HANDLE}`}
                 title={label}
-                className="group flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface-elevated/60 text-secondary transition-colors hover:border-gold/50 hover:bg-gold/10 hover:text-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+                className="block transition duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
               >
-                <Icon size={18} weight="duotone" />
+                <SocialIconFace brand={brand} size={40} />
               </a>
             </li>
           ))}
@@ -96,19 +120,17 @@ export function SocialFollowSection({
         </p>
       </div>
 
-      <ul className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 md:grid-cols-6 md:gap-3">
-        {items.map(({ key, label, Icon }) => (
-          <li key={key} className="min-w-0">
+      <ul className="flex flex-wrap items-center justify-center gap-3 sm:justify-start sm:gap-3.5">
+        {items.map(({ key, brand, label }) => (
+          <li key={key}>
             <a
               href={social[key]}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex h-full flex-col items-center gap-2 rounded-2xl border border-border/80 bg-surface/40 px-2 py-4 text-center transition-colors hover:border-gold/40 hover:bg-gold/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 sm:px-3 sm:py-5"
+              className="group flex flex-col items-center gap-2 transition duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/10 text-gold transition-colors group-hover:bg-gold/15">
-                <Icon size={22} weight="duotone" />
-              </span>
-              <span className="text-[12px] font-medium leading-tight text-primary sm:text-[13px]">
+              <SocialIconFace brand={brand} size={48} />
+              <span className="text-[12px] text-secondary transition-colors group-hover:text-primary">
                 {label}
               </span>
             </a>

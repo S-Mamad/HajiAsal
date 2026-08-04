@@ -47,7 +47,11 @@ test.describe("admin modules smoke", () => {
     for (const href of ADMIN_NAV_HREFS) {
       await page.goto(href, { waitUntil: "domcontentloaded" });
       await page.waitForURL(LOGIN_URL, { timeout: 20_000 });
-      await expect(page.getByLabel(/رمز عبور/i)).toBeVisible({
+      await expect(
+        page
+          .getByRole("button", { name: /دریافت کد/i })
+          .or(page.locator('input[autocomplete="tel"]')),
+      ).toBeVisible({
         timeout: 10_000,
       });
     }
@@ -58,7 +62,7 @@ test.describe("admin modules smoke", () => {
   }) => {
     test.setTimeout(240_000);
     const ok = await loginAsAdmin(page);
-    test.skip(!ok, "ADMIN_PASSWORD not set or login failed");
+    test.skip(!ok, "admin OTP login failed (set AUTH_TEST_OTP / ADMIN_TEST_PHONE)");
 
     for (const href of ADMIN_NAV_HREFS) {
       await page.goto(href, { waitUntil: "domcontentloaded" });

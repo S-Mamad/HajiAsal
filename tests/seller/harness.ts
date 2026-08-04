@@ -57,15 +57,23 @@ export function installGetSellerFromRequestMock(
     asSeller(overrides: MakeSellerOptions = {}) {
       getSellerFromRequest.mockResolvedValue(makeSeller(overrides));
     },
-    /** Active seller with one capability forced off (others keep defaults). */
-    asSellerWithout(capability: SellerCapability, overrides: MakeSellerOptions = {}) {
+    /** Active seller with one or more capabilities forced off (others keep defaults). */
+    asSellerWithout(
+      capability: SellerCapability | SellerCapability[],
+      overrides: MakeSellerOptions = {},
+    ) {
+      const caps = Array.isArray(capability) ? capability : [capability];
+      const denied = Object.fromEntries(caps.map((c) => [c, false])) as Record<
+        string,
+        boolean
+      >;
       getSellerFromRequest.mockResolvedValue(
         makeSeller({
           ...overrides,
           capabilities: {
             ...DEFAULT_SELLER_CAPABILITIES,
             ...(overrides.capabilities ?? {}),
-            [capability]: false,
+            ...denied,
           },
         }),
       );
