@@ -11,15 +11,26 @@ import { GlobalSearch } from "./GlobalSearch";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { isTypingTarget, SELLER_SHORTCUTS } from "@/lib/seller/shortcuts";
 import { hajiasalPath } from "@/lib/paths";
+import { canAccessSellerPath } from "@/lib/seller/nav";
+import { useSellerCapabilities } from "@/components/seller/layout/SellerCapabilitiesContext";
 
 export function SellerShortcutsProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const capabilities = useSellerCapabilities();
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [pendingG, setPendingG] = useState(false);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const openHelp = useCallback(() => setHelpOpen(true), []);
+
+  const go = useCallback(
+    (href: string) => {
+      if (!canAccessSellerPath(capabilities, href)) return;
+      router.push(href);
+    },
+    [capabilities, router],
+  );
 
   useEffect(() => {
     const onSearch = () => openSearch();
@@ -60,7 +71,7 @@ export function SellerShortcutsProvider({ children }: { children: ReactNode }) {
         const href = map[e.key.toLowerCase()];
         if (href) {
           e.preventDefault();
-          router.push(href);
+          go(href);
         }
         return;
       }
@@ -75,13 +86,13 @@ export function SellerShortcutsProvider({ children }: { children: ReactNode }) {
         const create = SELLER_SHORTCUTS.find((s) => s.action === "create");
         if (create?.href) {
           e.preventDefault();
-          router.push(create.href);
+          go(create.href);
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openSearch, openHelp, pendingG, router]);
+  }, [openSearch, openHelp, pendingG, go]);
 
   return (
     <>

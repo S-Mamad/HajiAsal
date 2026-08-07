@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface AccountPageHeaderProps {
   title: string;
   subtitle?: string;
-  action?: React.ReactNode;
+  action?: ReactNode;
   className?: string;
 }
 
@@ -16,21 +17,23 @@ export function AccountPageHeader({
   return (
     <header
       className={cn(
-        "mb-7 flex flex-wrap items-end justify-between gap-4 sm:mb-8",
+        "mb-6 flex flex-col gap-4 border-b border-border/80 pb-5 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:pb-6",
         className,
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-3xl">
+        <h1 className="text-balance text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-[1.75rem] md:leading-tight">
           {title}
         </h1>
         {subtitle ? (
-          <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-secondary">
+          <p className="mt-1.5 max-w-xl text-pretty text-sm leading-relaxed text-secondary">
             {subtitle}
           </p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? (
+        <div className="w-full shrink-0 sm:w-auto sm:max-w-xs">{action}</div>
+      ) : null}
     </header>
   );
 }

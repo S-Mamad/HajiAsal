@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { confirmPaidOrder, getOrderById } from "@/lib/server/orders";
-import { getSessionFromRequest } from "@/lib/auth/session";
-import { normalizePhone } from "@/lib/auth/phone";
 import {
   isSnappayConfigured,
   verifyAndSettleSnappay,
@@ -11,18 +9,9 @@ import {
   setOrderSettleRef,
 } from "@/lib/server/payment-refs";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
+import { refundOrderAtGateway } from "@/lib/server/payment-refund";
 
 const PAYABLE = new Set(["pending_payment"]);
-
-function ownsOrder(
-  order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>,
-  session: NonNullable<ReturnType<typeof getSessionFromRequest>>,
-): boolean {
-  return (
-    order.userId === session.userId ||
-    normalizePhone(order.customer.phone) === normalizePhone(session.phone)
-  );
-}
 
 function failedRedirect(orderId?: string) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -103,11 +92,7 @@ export async function GET(request: Request) {
     return failedRedirect(orderId);
   }
 
-  const session = getSessionFromRequest(request);
-  if (!session || !ownsOrder(order, session)) {
-    return failedRedirect(orderId);
-  }
-
+  // Auth via bound payment token (session optional on gateway return).
   const refOk = await assertOrderPaymentRef(orderId, "snappay", paymentToken);
   if (!refOk) {
     return failedRedirect(orderId);
@@ -123,11 +108,18 @@ export async function GET(request: Request) {
     }
     await setOrderSettleRef(orderId, paymentToken);
     const confirmed = await confirmPaidOrder(orderId);
-    if (!confirmed.ok && confirmed.reason === "not_payable") {
+    if (!confirmed.ok) {
+      try {
+        await refundOrderAtGateway(order);
+      } catch (error) {
+        console.error(
+          "[snappay/verify] auto-refund after confirm failure:",
+          error instanceof Error ? error.message : error,
+        );
+      }
       return failedRedirect(orderId);
     }
-    const tracking =
-      (confirmed.ok ? confirmed.order.trackingCode : order.trackingCode) ?? "";
+    const tracking = confirmed.order.trackingCode ?? "";
     return NextResponse.redirect(
       new URL(
         `/checkout/success?orderId=${encodeURIComponent(orderId)}&tracking=${encodeURIComponent(tracking)}`,

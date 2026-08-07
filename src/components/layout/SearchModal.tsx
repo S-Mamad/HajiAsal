@@ -99,7 +99,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[80] overlay-scrim backdrop-blur-md"
+            className="fixed inset-0 z-[80] overlay-scrim"
             onClick={handleClose}
             aria-hidden
           />

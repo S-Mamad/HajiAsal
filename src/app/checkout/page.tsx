@@ -194,6 +194,38 @@ function CheckoutPageInner() {
     })();
   }, [authLoading, user, prefilled, setValue]);
 
+  useEffect(() => {
+    if (discount > 0 && couponCode.trim()) {
+      void (async () => {
+        try {
+          const res = await fetch("/api/coupons", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: couponCode,
+              subtotal,
+              lineItems: items.map((i) => ({
+                productId: i.productId,
+                lineTotal: i.weight.price * i.quantity,
+              })),
+            }),
+          });
+          const data = await res.json();
+          if (data.valid) {
+            setDiscount(data.discount);
+            setCouponMessage(data.message);
+          } else {
+            setDiscount(0);
+            setCouponMessage(data.message);
+          }
+        } catch {
+          /* keep previous */
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- revalidate when cart value changes
+  }, [subtotal]);
+
   if (authLoading || !isLoggedIn || !user?.fullName?.trim()) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
@@ -208,8 +240,9 @@ function CheckoutPageInner() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-20">
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 py-10 sm:py-16">
         <EmptyState
+          className="my-auto"
           title="سبد خرید خالی است"
           description="برای ادامه سفارش، ابتدا محصولی به سبد اضافه کنید."
           action={<Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>}
@@ -332,6 +365,10 @@ function CheckoutPageInner() {
         );
       }
 
+      if (paymentMethod === "online" || paymentMethod === "snappay") {
+        throw new Error("شناسه سفارش دریافت نشد. دوباره تلاش کنید.");
+      }
+
       clearCart();
       const params = new URLSearchParams({
         orderId: result.orderId,
@@ -371,38 +408,6 @@ function CheckoutPageInner() {
       setIsSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    if (discount > 0 && couponCode.trim()) {
-      void (async () => {
-        try {
-          const res = await fetch("/api/coupons", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code: couponCode,
-              subtotal,
-              lineItems: items.map((i) => ({
-                productId: i.productId,
-                lineTotal: i.weight.price * i.quantity,
-              })),
-            }),
-          });
-          const data = await res.json();
-          if (data.valid) {
-            setDiscount(data.discount);
-            setCouponMessage(data.message);
-          } else {
-            setDiscount(0);
-            setCouponMessage(data.message);
-          }
-        } catch {
-          /* keep previous */
-        }
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- revalidate when cart value changes
-  }, [subtotal]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 md:px-8 md:py-14">

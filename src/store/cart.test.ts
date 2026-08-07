@@ -109,4 +109,35 @@ describe("cart store", () => {
     expect(useCartStore.getState().addItem(item, 1)).toBe(false);
     expect(useCartStore.getState().items[0]?.quantity).toBe(2);
   });
+
+  it("aggregates stock across weight variants of the same product", () => {
+    const base = {
+      productId: "p-multi",
+      slug: "honey-multi",
+      title: "عسل چندوزنی",
+      image: "/x.webp",
+      inStock: true,
+      stockQty: 2,
+    };
+    expect(
+      useCartStore.getState().addItem(
+        {
+          ...base,
+          weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+        },
+        2,
+      ),
+    ).toBe(true);
+    expect(
+      useCartStore.getState().addItem(
+        {
+          ...base,
+          weight: { label: "۱ کیلو", grams: 1000, price: 180_000 },
+        },
+        1,
+      ),
+    ).toBe(false);
+    expect(useCartStore.getState().items).toHaveLength(1);
+    expect(useCartStore.getState().items[0]?.quantity).toBe(2);
+  });
 });

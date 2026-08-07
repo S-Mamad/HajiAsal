@@ -9,6 +9,7 @@ import {
   mysqlQueryOne,
   toBool,
   toIso,
+  withMysqlTransaction,
 } from "./mysql";
 
 const PROFILES_FILE = "profiles.json";
@@ -105,20 +106,29 @@ export async function createProfile(input: {
   };
 
   if (isMysqlConfigured()) {
-    await mysqlExecute(
-      `INSERT INTO profiles (id, phone, full_name, email, newsletter_opt_in, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        profile.id,
-        profile.phone,
-        profile.fullName,
-        profile.email,
-        profile.newsletterOptIn,
-        profile.createdAt,
-        profile.updatedAt,
-      ],
-    );
-    return profile;
+    try {
+      await mysqlExecute(
+        `INSERT INTO profiles (id, phone, full_name, email, newsletter_opt_in, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          profile.id,
+          profile.phone,
+          profile.fullName,
+          profile.email,
+          profile.newsletterOptIn,
+          profile.createdAt,
+          profile.updatedAt,
+        ],
+      );
+      return profile;
+    } catch (error) {
+      console.error(
+        "[profiles] createProfile mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+      // Local/dev: fall through to JSON. Production keeps throwing so ops notice DB outage.
+      if (process.env.NODE_ENV === "production") throw error;
+    }
   }
 
   const profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
@@ -144,35 +154,43 @@ export async function updateProfile(
   const now = new Date().toISOString();
 
   if (isMysqlConfigured()) {
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    if (updates.fullName !== undefined) {
-      sets.push("full_name = ?");
-      params.push(updates.fullName);
-    }
-    if (updates.email !== undefined) {
-      sets.push("email = ?");
-      params.push(updates.email);
-    }
-    if (updates.newsletterOptIn !== undefined) {
-      sets.push("newsletter_opt_in = ?");
-      params.push(updates.newsletterOptIn);
-    }
-    sets.push("updated_at = ?");
-    params.push(now);
-    params.push(id);
+    try {
+      const sets: string[] = [];
+      const params: unknown[] = [];
+      if (updates.fullName !== undefined) {
+        sets.push("full_name = ?");
+        params.push(updates.fullName);
+      }
+      if (updates.email !== undefined) {
+        sets.push("email = ?");
+        params.push(updates.email);
+      }
+      if (updates.newsletterOptIn !== undefined) {
+        sets.push("newsletter_opt_in = ?");
+        params.push(updates.newsletterOptIn);
+      }
+      sets.push("updated_at = ?");
+      params.push(now);
+      params.push(id);
 
-    const result = await mysqlExecute(
-      `UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`,
-      params,
-    );
-    if (result.affectedRows === 0) return null;
+      const result = await mysqlExecute(
+        `UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`,
+        params,
+      );
+      if (result.affectedRows === 0) return null;
 
-    const row = await mysqlQueryOne<RowDataPacket>(
-      "SELECT * FROM profiles WHERE id = ? LIMIT 1",
-      [id],
-    );
-    return row ? mapProfileRow(row) : null;
+      const row = await mysqlQueryOne<RowDataPacket>(
+        "SELECT * FROM profiles WHERE id = ? LIMIT 1",
+        [id],
+      );
+      return row ? mapProfileRow(row) : null;
+    } catch (error) {
+      console.error(
+        "[profiles] updateProfile mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+      if (process.env.NODE_ENV === "production") throw error;
+    }
   }
 
   const profiles = await readJsonFile<CustomerUser[]>(PROFILES_FILE, []);
@@ -192,11 +210,19 @@ export async function getAddressesByUserId(
   userId: string,
 ): Promise<UserAddress[]> {
   if (isMysqlConfigured()) {
-    const rows = await mysqlQuery<RowDataPacket>(
-      "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY created_at DESC",
-      [userId],
-    );
-    return rows.map(mapAddressRow);
+    try {
+      const rows = await mysqlQuery<RowDataPacket>(
+        "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY created_at DESC",
+        [userId],
+      );
+      return rows.map(mapAddressRow);
+    } catch (error) {
+      console.error(
+        "[profiles] getAddressesByUserId mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+      if (process.env.NODE_ENV === "production") throw error;
+    }
   }
 
   const all = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
@@ -256,18 +282,84 @@ export async function deleteAddress(
   addressId: string,
 ): Promise<boolean> {
   if (isMysqlConfigured()) {
+    const existing = await mysqlQueryOne<RowDataPacket>(
+      "SELECT id, is_default FROM user_addresses WHERE id = ? AND user_id = ? LIMIT 1",
+      [addressId, userId],
+    );
+    if (!existing) return false;
+
     const result = await mysqlExecute(
       "DELETE FROM user_addresses WHERE id = ? AND user_id = ?",
       [addressId, userId],
     );
-    return result.affectedRows > 0;
+    if (result.affectedRows === 0) return false;
+
+    if (toBool(existing.is_default)) {
+      const next = await mysqlQueryOne<RowDataPacket>(
+        "SELECT id FROM user_addresses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+        [userId],
+      );
+      if (next) {
+        await mysqlExecute(
+          "UPDATE user_addresses SET is_default = 1 WHERE id = ? AND user_id = ?",
+          [next.id, userId],
+        );
+      }
+    }
+    return true;
   }
 
   const all = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
+  const target = all.find((a) => a.id === addressId && a.userId === userId);
+  if (!target) return false;
+
   const next = all.filter((a) => !(a.id === addressId && a.userId === userId));
-  if (next.length === all.length) return false;
+  if (target.isDefault) {
+    const replacement = next.find((a) => a.userId === userId);
+    if (replacement) replacement.isDefault = true;
+  }
   await writeJsonFile(ADDRESSES_FILE, next);
   return true;
+}
+
+export async function setDefaultAddress(
+  userId: string,
+  addressId: string,
+): Promise<UserAddress | null> {
+  if (isMysqlConfigured()) {
+    const existing = await mysqlQueryOne<RowDataPacket>(
+      "SELECT id FROM user_addresses WHERE id = ? AND user_id = ? LIMIT 1",
+      [addressId, userId],
+    );
+    if (!existing) return null;
+
+    await withMysqlTransaction(async (conn) => {
+      await conn.execute(
+        "UPDATE user_addresses SET is_default = 0 WHERE user_id = ?",
+        [userId],
+      );
+      await conn.execute(
+        "UPDATE user_addresses SET is_default = 1 WHERE id = ? AND user_id = ?",
+        [addressId, userId],
+      );
+    });
+
+    const row = await mysqlQueryOne<RowDataPacket>(
+      "SELECT * FROM user_addresses WHERE id = ? AND user_id = ? LIMIT 1",
+      [addressId, userId],
+    );
+    return row ? mapAddressRow(row) : null;
+  }
+
+  const all = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
+  const target = all.find((a) => a.id === addressId && a.userId === userId);
+  if (!target) return null;
+
+  for (const a of all) {
+    if (a.userId === userId) a.isDefault = a.id === addressId;
+  }
+  await writeJsonFile(ADDRESSES_FILE, all);
+  return { ...target, isDefault: true };
 }
 
 // Wishlist

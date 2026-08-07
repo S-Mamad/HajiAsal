@@ -96,6 +96,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: Handshake,
         permission: "sellers.view",
       },
+      {
+        href: hajiasalPath("/admin/seller-applications"),
+        label: "درخواست‌ها",
+        icon: FileText,
+        permission: "sellers.view",
+      },
     ],
   },
   {

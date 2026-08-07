@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-const phoneRegex = /^09\d{9}$/;
+import { isValidIranPhone, normalizePhone } from "@/lib/auth/phone";
 
 export const checkoutSchema = z.object({
   fullName: z
@@ -9,7 +8,8 @@ export const checkoutSchema = z.object({
     .max(100, "نام نباید بیش از ۱۰۰ کاراکتر باشد"),
   phone: z
     .string()
-    .regex(phoneRegex, "شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود"),
+    .refine(isValidIranPhone, "شماره موبایل باید ۱۱ رقم و با ۰۹ شروع شود")
+    .transform((v) => normalizePhone(v)!),
   province: z.string().min(2, "استان را وارد کنید"),
   city: z.string().min(2, "شهر را وارد کنید"),
   address: z

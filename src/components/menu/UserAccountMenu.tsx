@@ -7,14 +7,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
+import type { UserAccountMenuProps } from "./types";
 
-interface UserMenuProps {
-  className?: string;
-  /** Compact icon-only (header mobile) */
-  compact?: boolean;
-}
-
-export function UserMenu({ className, compact = false }: UserMenuProps) {
+export function UserAccountMenu({
+  className,
+  compact = false,
+}: UserAccountMenuProps) {
   const { user, loading, logout, isLoggedIn } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -74,7 +72,11 @@ export function UserMenu({ className, compact = false }: UserMenuProps) {
             {user?.fullName?.split(" ")[0] ?? "حساب"}
           </span>
         ) : null}
-        <Icon icon={CaretDown} size={12} className={cn(!compact && "hidden sm:block", compact && "hidden")} />
+        <Icon
+          icon={CaretDown}
+          size={12}
+          className={cn(!compact && "hidden sm:block", compact && "hidden")}
+        />
       </button>
       {open ? (
         <div

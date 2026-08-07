@@ -1,6 +1,7 @@
 import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { phoneSchema } from "@/lib/auth/validations/auth";
 
 import { logAdminAction } from "@/lib/server/audit-log";
 import {
@@ -18,7 +19,7 @@ type Params = { params: Promise<{ id: string }> };
 const updateSchema = z.object({
   shopName: z.string().min(2).max(120).optional(),
   ownerName: z.string().min(2).max(120).optional(),
-  phone: z.string().min(10).max(20).optional(),
+  phone: phoneSchema.optional(),
   password: z.string().min(6).max(128).optional(),
   city: z.string().max(80).optional(),
   status: z.enum(["pending", "active", "suspended", "rejected"]).optional(),

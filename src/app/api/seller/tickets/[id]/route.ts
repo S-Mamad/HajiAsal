@@ -68,7 +68,11 @@ export async function GET(request: Request, { params }: Params) {
           messages: messages.map(mapMysqlSellerMessage),
         });
       }
-      return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
+      // Miss in MySQL: fall through to memory when allowed (create may have
+      // persisted only to memory after a MySQL write failure).
+      if (!allowTicketMysqlFallthrough()) {
+        return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
+      }
     } catch (error) {
       console.error(
         "[seller/tickets/id] GET mysql failed:",

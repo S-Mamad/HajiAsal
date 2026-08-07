@@ -175,10 +175,18 @@ export function TicketMessageBubble({
         {onReply && !message.pending ? (
           <button
             type="button"
-            className="mt-1 hidden text-[11px] opacity-70 hover:opacity-100 group-hover:inline-flex items-center gap-1"
+            className={cn(
+              "mt-1.5 inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-[11px] opacity-80 transition hover:opacity-100",
+              "sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
+              isSelf
+                ? variant === "storefront"
+                  ? "text-primary/80 hover:bg-black/5"
+                  : "text-white/80 hover:bg-white/10"
+                : "text-zinc-600 hover:bg-black/5",
+            )}
             onClick={() => onReply(message)}
           >
-            <Icon icon={ArrowBendUpLeft} size={12} />
+            <Icon icon={ArrowBendUpLeft} size={14} />
             پاسخ
           </button>
         ) : null}

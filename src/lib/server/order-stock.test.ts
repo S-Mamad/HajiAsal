@@ -16,7 +16,7 @@ vi.mock("./products-store", () => ({
   getProductByIdAsync: (...args: unknown[]) => getProductByIdAsync(...args),
 }));
 
-import { decrementStockForPaidOrder } from "./order-stock";
+import { decrementStockForPaidOrder, restoreStockForPaidOrder } from "./order-stock";
 import type { CartItem } from "@/types";
 
 describe("decrementStockForPaidOrder memory/fs path", () => {
@@ -109,6 +109,31 @@ describe("decrementStockForPaidOrder memory/fs path", () => {
       "p1",
       { stockQty: 5, inStock: true },
       expect.any(Object),
+    );
+  });
+
+  it("restores stock after paid order", async () => {
+    getProductByIdAsync.mockResolvedValue({
+      id: "p1",
+      title: "عسل",
+      stockQty: 1,
+      inStock: true,
+    });
+    const items: CartItem[] = [
+      {
+        productId: "p1",
+        slug: "p1",
+        title: "عسل",
+        image: "",
+        weight: { label: "1kg", grams: 1000, price: 100_000 },
+        quantity: 2,
+      },
+    ];
+    await restoreStockForPaidOrder(items);
+    expect(updateProductAsync).toHaveBeenCalledWith(
+      "p1",
+      { stockQty: 3, inStock: true },
+      expect.objectContaining({ createRevision: false }),
     );
   });
 });

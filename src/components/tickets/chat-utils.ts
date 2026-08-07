@@ -11,6 +11,45 @@ export type ChatMessage = TicketMessage & {
 
 export type TicketChatVariant = "admin" | "storefront";
 
+export type TicketChatLayout = "embedded" | "fullscreen";
+
+/** Human-readable ticket status for customers and operators. */
+export const TICKET_STATUS_LABELS: Record<string, string> = {
+  open: "باز",
+  waiting: "در انتظار پشتیبانی",
+  pending: "منتظر پاسخ شما",
+  answered: "پاسخ داده شد",
+  resolved: "حل‌شده",
+  closed: "بسته",
+};
+
+export const TICKET_STATUS_HINTS: Record<string, string> = {
+  open: "تیکت ثبت شد",
+  waiting: "پشتیبان به‌زودی پاسخ می‌دهد",
+  pending: "پشتیبان پاسخ داده؛ منتظر شماست",
+  answered: "پشتیبان پاسخ داده",
+  resolved: "مشکل حل شده",
+  closed: "این گفتگو بسته است",
+};
+
+export const TICKET_PRIORITY_LABELS: Record<string, string> = {
+  low: "کم",
+  normal: "عادی",
+  high: "بالا",
+};
+
+export function ticketStatusLabel(status: string): string {
+  return TICKET_STATUS_LABELS[status] ?? status;
+}
+
+export function ticketStatusHint(status: string): string {
+  return TICKET_STATUS_HINTS[status] ?? "";
+}
+
+export function ticketPriorityLabel(priority: string): string {
+  return TICKET_PRIORITY_LABELS[priority] ?? priority;
+}
+
 export function senderLabel(senderType: string, selfType: string): string {
   if (senderType === "system") return "سیستم";
   if (senderType === selfType) return "شما";
@@ -93,12 +132,22 @@ export function bubbleTone(
     : "bg-white text-zinc-800 border border-stone-200 rounded-br-md";
 }
 
-export function shellClass(variant: TicketChatVariant): string {
+export function shellClass(
+  variant: TicketChatVariant,
+  layout: TicketChatLayout = "embedded",
+): string {
   return cn(
-    "flex h-full min-h-0 flex-col overflow-hidden",
+    "flex min-h-0 flex-col overflow-hidden",
+    layout === "fullscreen"
+      ? "h-full rounded-none border-0 shadow-none"
+      : "h-full min-h-[28rem] sm:min-h-[32rem] sm:h-[min(70vh,40rem)]",
     variant === "storefront"
-      ? "rounded-2xl border border-border bg-gradient-to-b from-surface to-surface-muted/40 shadow-sm"
-      : "rounded-xl border border-stone-200 bg-gradient-to-b from-white to-stone-50 shadow-sm",
+      ? layout === "fullscreen"
+        ? "bg-surface"
+        : "rounded-2xl border border-border bg-gradient-to-b from-surface to-surface-muted/40 shadow-sm"
+      : layout === "fullscreen"
+        ? "bg-white"
+        : "rounded-xl border border-stone-200 bg-gradient-to-b from-white to-stone-50 shadow-sm",
   );
 }
 

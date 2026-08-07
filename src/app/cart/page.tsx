@@ -16,7 +16,7 @@ export default function CartPage() {
 
   if (!hasHydrated) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 md:px-8 md:py-14">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6 md:px-8 md:py-14">
         <h1 className="mb-6 text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-3xl">
           سبد خرید
         </h1>
@@ -37,8 +37,8 @@ export default function CartPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 md:px-8 md:py-14">
-      <header className="mb-6 flex items-end justify-between gap-3 sm:mb-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6 md:px-8 md:py-14">
+      <header className="mb-6 flex shrink-0 items-end justify-between gap-3 sm:mb-8">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-3xl">
             سبد خرید
@@ -86,7 +86,7 @@ export default function CartPage() {
           </aside>
 
           {/* Mobile sticky checkout above floating bottom nav */}
-          <div className="fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur-md sm:hidden">
+          <div className="fixed inset-x-0 bottom-[var(--mobile-dock-clearance)] z-[111] border-t border-border bg-surface px-4 py-3 sm:hidden">
             <div className="mx-auto flex max-w-lg items-center gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] text-secondary">مجموع</p>
@@ -107,6 +107,7 @@ export default function CartPage() {
         </div>
       ) : (
         <EmptyState
+          className="my-auto"
           title="سبد خرید خالی است"
           description="محصولات مورد علاقه را از فروشگاه انتخاب کنید."
           action={

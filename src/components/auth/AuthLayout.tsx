@@ -14,12 +14,15 @@ interface AuthLayoutProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  /** Use "start" for long multi-step forms so mobile can scroll from the top. */
+  contentAlign?: "center" | "start";
 }
 
 export function AuthLayout({
   children,
   title = "ورود یا ثبت‌نام",
   subtitle = "با شماره موبایل، سریع و امن",
+  contentAlign = "center",
 }: AuthLayoutProps) {
   const siteData = useSiteSettings();
   const reduced = useReducedMotion();
@@ -63,7 +66,13 @@ export function AuthLayout({
         </div>
       </div>
 
-      <div className="relative flex min-h-[100dvh] flex-1 flex-col justify-center px-5 py-14 md:px-10">
+      <div
+        className={
+          contentAlign === "start"
+            ? "relative flex min-h-[100dvh] flex-1 flex-col justify-start px-5 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] md:px-10 md:py-14"
+            : "relative flex min-h-[100dvh] flex-1 flex-col justify-center px-5 py-14 md:px-10"
+        }
+      >
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_0%,rgba(209,160,86,0.08),transparent_45%)] lg:hidden"

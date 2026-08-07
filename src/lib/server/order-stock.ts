@@ -101,3 +101,55 @@ export async function decrementStockForPaidOrder(
 
   return shortages;
 }
+
+/**
+ * Restore catalog stock after refund / cancel of a previously confirmed order.
+ * Aggregates by productId (same as decrement). Safe to call once per order.
+ */
+export async function restoreStockForPaidOrder(
+  items: CartItem[],
+  conn?: PoolConnection,
+): Promise<void> {
+  const grouped = qtyByProduct(items);
+
+  for (const [productId, { qty }] of grouped) {
+    if (qty <= 0) continue;
+
+    if (isMysqlConfigured()) {
+      try {
+        const sql = `UPDATE products
+          SET stock_qty = COALESCE(stock_qty, 0) + ?,
+              in_stock = 1
+          WHERE id = ?`;
+        const params = [qty, productId];
+        if (conn) {
+          await conn.execute(sql, params);
+        } else {
+          await mysqlExecute(sql, params);
+        }
+        continue;
+      } catch (error) {
+        console.error(
+          "[order-stock] mysql restore failed:",
+          error instanceof Error ? error.message : error,
+        );
+        continue;
+      }
+    }
+
+    const product = await getProductByIdAsync(productId, { allowHidden: true });
+    if (!product) continue;
+    const current =
+      typeof product.stockQty === "number" ? product.stockQty : null;
+    if (current == null) continue;
+    const next = current + qty;
+    await updateProductAsync(
+      productId,
+      { stockQty: next, inStock: next > 0 },
+      {
+        createRevision: false,
+        revisionNote: "stock restore after refund/cancel",
+      },
+    );
+  }
+}

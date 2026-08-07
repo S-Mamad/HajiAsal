@@ -29,16 +29,38 @@ export async function GET(request: Request) {
         `SELECT * FROM seller_tickets WHERE seller_id = ? ORDER BY updated_at DESC`,
         [sellerId],
       );
+      const mysqlTickets = rows.map((r) => ({
+        id: String(r.id),
+        subject: String(r.subject),
+        category: String(r.category),
+        priority: String(r.priority),
+        status: String(r.status),
+        createdAt: toIso(r.created_at),
+        updatedAt: toIso(r.updated_at),
+      }));
+      if (!allowTicketMysqlFallthrough()) {
+        return NextResponse.json({ tickets: mysqlTickets });
+      }
+      // Merge memory tickets created during MySQL write fallthrough.
+      await loadSellerTicketsFs();
+      const byId = new Map(mysqlTickets.map((t) => [t.id, t]));
+      for (const mem of listMemoryTickets(sellerId)) {
+        if (!byId.has(mem.id)) {
+          byId.set(mem.id, {
+            id: mem.id,
+            subject: mem.subject,
+            category: mem.category,
+            priority: mem.priority,
+            status: mem.status,
+            createdAt: mem.createdAt,
+            updatedAt: mem.updatedAt,
+          });
+        }
+      }
       return NextResponse.json({
-        tickets: rows.map((r) => ({
-          id: String(r.id),
-          subject: String(r.subject),
-          category: String(r.category),
-          priority: String(r.priority),
-          status: String(r.status),
-          createdAt: toIso(r.created_at),
-          updatedAt: toIso(r.updated_at),
-        })),
+        tickets: Array.from(byId.values()).sort((a, b) =>
+          b.updatedAt.localeCompare(a.updatedAt),
+        ),
       });
     } catch (error) {
       console.error(
@@ -109,9 +131,9 @@ export async function POST(request: Request) {
         );
         await mysqlExecute(
           `INSERT INTO seller_ticket_messages
-            (id, ticket_id, sender_type, body, created_at)
-           VALUES (?, ?, 'seller', ?, ?)`,
-          [msgId, id, maskedBody, now],
+            (id, ticket_id, sender_type, sender_id, body, created_at)
+           VALUES (?, ?, 'seller', ?, ?, ?)`,
+          [msgId, id, gated.ctx.seller.id, maskedBody, now],
         );
         await mysqlExecute("COMMIT");
       } catch (inner) {

@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./mysql", () => ({
   isMysqlConfigured: vi.fn(() => false),
+  isMysqlUsable: vi.fn(() => false),
   mysqlExecute: vi.fn(),
   mysqlQueryOne: vi.fn(),
+}));
+
+vi.mock("./production", () => ({
+  isProduction: vi.fn(() => false),
 }));
 
 import {

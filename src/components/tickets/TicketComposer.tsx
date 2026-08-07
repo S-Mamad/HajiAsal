@@ -297,7 +297,7 @@ export function TicketComposer({
               disabled={locked}
               onClick={() => fileRef.current?.click()}
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition",
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition",
                 variant === "storefront"
                   ? "border border-border text-secondary hover:bg-border/40"
                   : "border border-stone-200 text-stone-600 hover:bg-stone-50",
@@ -321,7 +321,7 @@ export function TicketComposer({
             title="یادداشت داخلی"
             onClick={() => setInternal((v) => !v)}
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition",
               internal
                 ? "border-amber-300 bg-amber-50 text-amber-900"
                 : "border-stone-200 text-stone-500",
@@ -354,7 +354,7 @@ export function TicketComposer({
               internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
             }
             className={cn(
-              "max-h-40 min-h-10 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-relaxed outline-none transition",
+              "max-h-40 min-h-11 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-relaxed outline-none transition",
               "focus-visible:ring-2 focus-visible:ring-amber-700/25",
               variant === "storefront"
                 ? "border border-border bg-surface-elevated text-primary placeholder:text-secondary/70"
@@ -362,14 +362,16 @@ export function TicketComposer({
               locked && "opacity-60",
             )}
           />
-          <span
-            className={cn(
-              "pointer-events-none absolute bottom-1.5 left-2 text-[10px]",
-              text.length > MAX_CHARS - 100 ? "text-rose-500" : "text-stone-400",
-            )}
-          >
-            {text.length}/{MAX_CHARS}
-          </span>
+          {text.length > MAX_CHARS - 200 ? (
+            <span
+              className={cn(
+                "pointer-events-none absolute bottom-1.5 left-2 text-[10px]",
+                text.length > MAX_CHARS - 100 ? "text-rose-500" : "text-stone-400",
+              )}
+            >
+              {text.length}/{MAX_CHARS}
+            </span>
+          ) : null}
         </div>
 
         <button
@@ -377,7 +379,7 @@ export function TicketComposer({
           disabled={!canSend}
           onClick={() => void submit()}
           className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition active:scale-[0.97]",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition active:scale-[0.97]",
             variant === "storefront"
               ? "bg-gold text-primary hover:brightness-95 disabled:opacity-40"
               : "bg-zinc-900 text-white hover:bg-zinc-800 disabled:bg-zinc-300",
@@ -393,7 +395,7 @@ export function TicketComposer({
       </div>
       <p
         className={cn(
-          "mt-1.5 text-[11px]",
+          "mt-1.5 hidden text-[11px] sm:block",
           variant === "storefront" ? "text-secondary" : "text-stone-400",
         )}
       >

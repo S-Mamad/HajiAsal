@@ -9,6 +9,8 @@ import {
 const bodySchema = z.object({
   productId: z.string().min(1),
   quantity: z.number().int().min(1).max(20).optional().default(1),
+  /** Units already in cart for this product (all weights). */
+  cartQuantity: z.number().int().min(0).max(100).optional().default(0),
 });
 
 export async function POST(request: Request) {
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { productId, quantity } = parsed.data;
+  const { productId, quantity, cartQuantity } = parsed.data;
   const product = await getProductByIdAsync(productId);
 
   if (!product) {
@@ -54,14 +56,16 @@ export async function POST(request: Request) {
   }
 
   const maxQty = maxPurchasableQty(product);
-  if (quantity > maxQty) {
+  const remaining = Math.max(0, maxQty - cartQuantity);
+  if (quantity > remaining) {
     return NextResponse.json(
       {
         success: false,
-        message: `موجودی «${product.title}» کافی نیست (باقی‌مانده: ${maxQty})`,
+        message: `موجودی «${product.title}» کافی نیست (باقی‌مانده: ${remaining})`,
         inStock: true,
         stockQty: product.stockQty,
         maxQty,
+        remaining,
       },
       { status: 400 },
     );
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
     inStock: true,
     stockQty: product.stockQty,
     maxQty,
+    remaining,
     title: product.title,
   });
 }

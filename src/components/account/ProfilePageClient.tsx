@@ -3,14 +3,30 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/EmptyState";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
+import { AccountFormSkeleton } from "@/components/account/AccountSkeleton";
 
-export function ProfilePageClient() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [newsletter, setNewsletter] = useState(false);
-  const [loading, setLoading] = useState(true);
+export type ProfileInitialUser = {
+  fullName: string;
+  email: string;
+  phone: string;
+  newsletterOptIn: boolean;
+};
+
+type ProfilePageClientProps = {
+  initialUser?: ProfileInitialUser | null;
+};
+
+export function ProfilePageClient({ initialUser }: ProfilePageClientProps) {
+  const hasInitial = Boolean(initialUser);
+  const [fullName, setFullName] = useState(initialUser?.fullName ?? "");
+  const [email, setEmail] = useState(initialUser?.email ?? "");
+  const [phone, setPhone] = useState(initialUser?.phone ?? "");
+  const [newsletter, setNewsletter] = useState(
+    Boolean(initialUser?.newsletterOptIn),
+  );
+  const [loading, setLoading] = useState(!hasInitial);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
     type: "ok" | "err";
@@ -19,6 +35,7 @@ export function ProfilePageClient() {
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
+    if (hasInitial) return;
     let cancelled = false;
     fetch("/api/account/profile")
       .then(async (r) => {
@@ -43,7 +60,7 @@ export function ProfilePageClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasInitial]);
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +78,7 @@ export function ProfilePageClient() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: "ok", text: "تغییرات با موفقیت ذخیره شد." });
+        setMessage({ type: "ok", text: "تغییرات ذخیره شد." });
         if (data.user) {
           setFullName(data.user.fullName ?? "");
           setEmail(data.user.email ?? "");
@@ -83,14 +100,7 @@ export function ProfilePageClient() {
     return (
       <div>
         <AccountPageHeader title="پروفایل" subtitle="در حال بارگذاری..." />
-        <div className="space-y-3" aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-11 animate-pulse rounded-xl bg-surface-muted"
-            />
-          ))}
-        </div>
+        <AccountFormSkeleton fields={4} />
       </div>
     );
   }
@@ -99,21 +109,10 @@ export function ProfilePageClient() {
     return (
       <div>
         <AccountPageHeader title="پروفایل" />
-        <div
-          className="rounded-2xl border border-red-200/80 bg-red-50/80 px-5 py-8 text-center dark:border-red-900/40 dark:bg-red-950/30"
-          role="alert"
-        >
-          <p className="text-sm text-red-800 dark:text-red-200">
-            بارگذاری پروفایل ممکن نشد.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 text-sm text-red-800 underline underline-offset-2 dark:text-red-200"
-          >
-            تلاش مجدد
-          </button>
-        </div>
+        <ErrorState
+          title="بارگذاری پروفایل ممکن نشد."
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -127,7 +126,7 @@ export function ProfilePageClient() {
 
       <form
         onSubmit={onSave}
-        className="max-w-lg rounded-2xl border border-border bg-surface p-5 sm:p-6"
+        className="account-surface max-w-lg rounded-2xl border border-border bg-surface p-5 sm:p-6"
       >
         <div className="flex flex-col gap-4">
           <Input
@@ -136,6 +135,7 @@ export function ProfilePageClient() {
             onChange={(e) => setFullName(e.target.value)}
             placeholder="مثلاً علی رضایی"
             autoComplete="name"
+            required
           />
           <Input
             label="موبایل"
@@ -156,7 +156,7 @@ export function ProfilePageClient() {
             placeholder="name@example.com"
             autoComplete="email"
           />
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface-elevated/50 px-3.5 py-3 text-sm text-secondary">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface-elevated/50 px-3.5 py-3 text-sm text-secondary transition-colors hover:border-gold/25">
             <input
               type="checkbox"
               checked={newsletter}
@@ -168,12 +168,17 @@ export function ProfilePageClient() {
                 دریافت خبرنامه
               </span>
               <span className="mt-0.5 block text-xs leading-relaxed text-dim">
-                تخفیف‌ها و محصولات تازه عسل را از طریق پیامک یا ایمیل اطلاع می‌دهیم.
+                تخفیف‌ها و محصولات تازه عسل را از طریق پیامک یا ایمیل اطلاع
+                می‌دهیم.
               </span>
             </span>
           </label>
 
-          <Button type="submit" disabled={saving} className="mt-1 w-full sm:w-auto">
+          <Button
+            type="submit"
+            disabled={saving || !fullName.trim()}
+            className="mt-1 w-full sm:w-auto"
+          >
             {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
           </Button>
 
@@ -182,8 +187,8 @@ export function ProfilePageClient() {
               role="status"
               className={
                 message.type === "ok"
-                  ? "text-sm text-emerald-700 dark:text-emerald-400"
-                  : "text-sm text-red-600 dark:text-red-400"
+                  ? "rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
               }
             >
               {message.text}

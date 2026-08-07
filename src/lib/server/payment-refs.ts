@@ -1,6 +1,12 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import { isMysqlConfigured, mysqlExecute, mysqlQueryOne } from "./mysql";
+import {
+  isMysqlConfigured,
+  isMysqlUsable,
+  mysqlExecute,
+  mysqlQueryOne,
+} from "./mysql";
+import { isProduction } from "./production";
 
 export type PaymentProvider = "zarinpal" | "snappay";
 
@@ -59,6 +65,8 @@ async function ensurePaymentRefsTable(): Promise<void> {
 /**
  * Bind gateway authority/token to an order at payment-create time.
  * Verify callbacks must present the same ref (stops cross-order replay).
+ * Production + MySQL: fail-closed if persist fails (multi-instance safety).
+ * Local/dev: memory binding is enough when MySQL is down.
  */
 export async function setOrderPaymentRef(
   orderId: string,
@@ -75,7 +83,8 @@ export async function setOrderPaymentRef(
     settleRef: prev?.settleRef,
   });
 
-  if (!isMysqlConfigured()) return;
+  if (!isMysqlUsable()) return;
+
   try {
     await ensurePaymentRefsTable();
     await mysqlExecute(
@@ -89,6 +98,12 @@ export async function setOrderPaymentRef(
       "[payment-refs] persist failed:",
       error instanceof Error ? error.message : error,
     );
+    if (isProduction()) {
+      memoryStore().delete(orderId);
+      if (prev) memoryStore().set(orderId, prev);
+      throw new Error("ثبت مرجع پرداخت ناموفق بود. دوباره تلاش کنید.");
+    }
+    // Keep memory binding for local single-process checkout.
   }
 }
 
@@ -111,7 +126,7 @@ export async function setOrderSettleRef(
     });
   }
 
-  if (!isMysqlConfigured()) return;
+  if (!isMysqlUsable()) return;
   try {
     await ensurePaymentRefsTable();
     await mysqlExecute(

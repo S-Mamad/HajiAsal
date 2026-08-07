@@ -47,7 +47,7 @@ export function SellerLayout({
         className="panel-shell seller-shell flex min-h-[100dvh] text-[var(--panel-text)]"
         dir="rtl"
       >
-        <div className="hidden lg:flex">
+        <div className="sticky top-0 hidden h-[100dvh] shrink-0 lg:flex">
           <SellerSidebar shopName={shopName} capabilities={capabilities} />
         </div>
 
@@ -56,7 +56,7 @@ export function SellerLayout({
             <button
               type="button"
               className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[2px]"
-              aria-label="بستن"
+              aria-label="بستن منو"
               onClick={() => setMobileNav(false)}
             />
             <div className="absolute inset-y-0 start-0 flex max-w-[min(20rem,88vw)] shadow-2xl">
@@ -70,9 +70,9 @@ export function SellerLayout({
                   type="button"
                   onClick={() => setMobileNav(false)}
                   className="absolute end-2 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-[var(--panel-radius-sm)] bg-white/10 text-zinc-100 transition hover:bg-white/15"
-                  aria-label="بستن"
+                  aria-label="بستن منو"
                 >
-                  <X size={18} />
+                  <X size={18} weight="bold" />
                 </button>
               </div>
             </div>

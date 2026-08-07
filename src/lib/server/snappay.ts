@@ -71,6 +71,8 @@ export async function createSnappayPayment(input: {
   returnURL: string;
   transactionId: string;
   mobile?: string;
+  discountAmount?: number;
+  externalSourceAmount?: number;
 }): Promise<{ paymentToken: string; paymentPageUrl: string }> {
   const token = await getBearerToken();
   const url = `${baseUrl()}/api/online/payment/v1/token`;
@@ -84,8 +86,11 @@ export async function createSnappayPayment(input: {
     body: JSON.stringify({
       amount: input.amountRial,
       cartList: input.cartList,
-      discountAmount: 0,
-      externalSourceAmount: 0,
+      discountAmount: Math.max(0, Math.round(input.discountAmount ?? 0)),
+      externalSourceAmount: Math.max(
+        0,
+        Math.round(input.externalSourceAmount ?? 0),
+      ),
       mobile: input.mobile,
       paymentMethodTypeDto: "INSTALLMENT",
       returnURL: input.returnURL,

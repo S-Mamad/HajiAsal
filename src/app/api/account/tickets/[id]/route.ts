@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/support-tickets";
 import {
   assertMessageRateLimitAsync,
+  getTypingActors,
   isBlocked,
   setTyping,
 } from "@/lib/server/ticket-runtime";
@@ -34,7 +35,13 @@ export async function GET(request: Request, { params }: Params) {
   const messages = (await listSupportTicketMessages(id)).filter(
     (m) => !m.isInternal,
   );
-  return NextResponse.json({ ticket, messages });
+  const typing = getTypingActors("customer", id, session.userId);
+  const adminTyping = typing.some((t) => t.actorType === "admin");
+  return NextResponse.json({
+    ticket,
+    messages,
+    typing: { adminTyping },
+  });
 }
 
 const replySchema = z.object({

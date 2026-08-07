@@ -32,8 +32,8 @@ export function CartLiveRegion() {
           className={cn(
             "pointer-events-none fixed start-1/2 z-[100] -translate-x-1/2 rounded-full border border-border bg-brown px-5 py-2.5 text-sm font-medium text-cream shadow-lg",
             liftForNav
-              ? "bottom-[calc(6.5rem+env(safe-area-inset-bottom))] lg:bottom-6"
-              : "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-6",
+              ? "bottom-[var(--mobile-dock-toast-clearance)] lg:bottom-6"
+              : "bottom-6",
           )}
         >
           {announcement}

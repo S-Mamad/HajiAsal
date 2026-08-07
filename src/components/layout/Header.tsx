@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,12 +16,16 @@ import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/Icon";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { UserMenu } from "@/components/auth/UserMenu";
 import { CountBadge } from "@/components/ui/CountBadge";
-import { MobileMenu } from "./MobileMenu";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
-import { extraNav, resolveNavHref } from "@/lib/nav";
+import {
+  DesktopNav,
+  MobileDrawer,
+  UserAccountMenu,
+  buildResolvedNavItems,
+  isNavActive,
+} from "@/components/menu";
 import { hajiasalPath } from "@/lib/paths";
 
 export function Header() {
@@ -29,17 +33,30 @@ export function Header() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const itemCount = useCartStore((s) => s.getItemCount());
   const hasHydrated = useCartStore((s) => s._hasHydrated);
   const wishlistCount = useWishlistStore((s) => s.count());
 
+  const navItems = useMemo(
+    () => buildResolvedNavItems(siteData.nav),
+    [siteData.nav],
+  );
+
   const iconBtn =
-    "flex h-11 w-11 items-center justify-center rounded-xl text-secondary transition-colors hover:bg-surface-muted hover:text-gold active:bg-surface-elevated touch-manipulation";
+    "flex h-10 w-10 items-center justify-center rounded-full text-secondary transition-[color,background-color,transform] duration-200 hover:bg-gold-dim hover:text-gold active:scale-[0.96] touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--header-bg)]";
 
   useEffect(() => {
     setMobileOpen(false);
     setSearchOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 6);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const openSearch = () => {
     setMobileOpen(false);
@@ -55,14 +72,15 @@ export function Header() {
     <>
       <header
         className={cn(
-          "site-header fixed inset-x-0 top-0 h-16 border-b backdrop-blur-xl sm:h-[4.75rem]",
+          "site-header fixed inset-x-0 top-0 h-16 sm:h-[4.75rem]",
           mobileOpen ? "z-[100]" : "z-50",
+          scrolled && "is-scrolled",
         )}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-2 px-3 sm:px-4 md:px-8">
           <Link
             href={hajiasalPath()}
-            className="group/logo -ms-0.5 flex shrink-0 items-center rounded-xl px-1 py-0.5 transition-transform duration-300 hover:opacity-95 active:scale-[0.98]"
+            className="group/logo -ms-0.5 flex shrink-0 items-center rounded-xl px-0.5 py-0.5 transition-opacity duration-300 hover:opacity-95 active:scale-[0.98]"
             onClick={() => setMobileOpen(false)}
             aria-label={siteData.brand.name}
           >
@@ -74,27 +92,9 @@ export function Header() {
             />
           </Link>
 
-          <nav className="hidden items-center gap-6 lg:flex">
-            {[...siteData.nav, ...extraNav].map((item) => {
-              const href = resolveNavHref(item.href);
-              return (
-                <Link
-                  key={item.id}
-                  href={href}
-                  className={cn(
-                    "text-sm transition-colors duration-300",
-                    pathname === href
-                      ? "font-medium text-gold underline decoration-gold/40 underline-offset-4"
-                      : "text-secondary hover:text-gold",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <DesktopNav items={navItems} pathname={pathname} />
 
-          {/* Mobile: search + wishlist + menu (cart lives in FloatingBottomNav) */}
+          {/* Mobile: search + wishlist + menu (cart lives in MobileDock) */}
           <div className="flex shrink-0 items-center gap-0.5 lg:hidden">
             <button
               type="button"
@@ -115,7 +115,7 @@ export function Header() {
             <button
               type="button"
               onClick={toggleMobile}
-              className={iconBtn}
+              className={cn(iconBtn, mobileOpen && "bg-gold-dim text-gold")}
               aria-label={mobileOpen ? "بستن منو" : "منو"}
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav"
@@ -125,8 +125,8 @@ export function Header() {
           </div>
 
           {/* Desktop actions */}
-          <div className="hidden shrink-0 items-center gap-1 lg:flex">
-            <ThemeToggle />
+          <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
+            <ThemeToggle className="h-10 w-10 rounded-full hover:bg-gold-dim" />
             <button
               type="button"
               onClick={openSearch}
@@ -139,17 +139,33 @@ export function Header() {
               href={hajiasalPath("/wishlist")}
               className={cn("relative", iconBtn)}
               aria-label="علاقه‌مندی‌ها"
+              aria-current={
+                isNavActive(pathname, hajiasalPath("/wishlist"))
+                  ? "page"
+                  : undefined
+              }
             >
               <Icon icon={Heart} size={18} />
               {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
             </Link>
-            <UserMenu compact />
+            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+            <UserAccountMenu
+              compact
+              className="h-10 w-10 rounded-full hover:bg-gold-dim"
+            />
             <Link
               href={hajiasalPath("/cart")}
-              className={cn("relative", iconBtn)}
+              className={cn(
+                "relative",
+                iconBtn,
+                isNavActive(pathname, hajiasalPath("/cart")) &&
+                  "bg-gold-dim text-gold",
+              )}
               aria-label="سبد خرید"
               aria-current={
-                pathname?.startsWith(hajiasalPath("/cart")) ? "page" : undefined
+                isNavActive(pathname, hajiasalPath("/cart"))
+                  ? "page"
+                  : undefined
               }
             >
               <Icon icon={ShoppingBag} size={18} />
@@ -159,7 +175,11 @@ export function Header() {
         </div>
       </header>
       <div className="h-16 sm:h-[4.75rem]" aria-hidden />
-      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <MobileDrawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        items={navItems}
+      />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );

@@ -212,37 +212,70 @@ export default function SellerPrintExportPage() {
 
       {!loading && (doc === "barcode" || doc === "qr") && (
         products.length === 0 ? (
-          <p className="rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-500">
-            محصولی برای چاپ بارکد/QR نیست
+          <p className="rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4 text-sm text-zinc-500">
+            محصولی برای چاپ نیست
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-stone-200 bg-white p-4 text-center"
-              >
-                <p className="text-sm font-medium">{p.title}</p>
-                <p className="mt-2 font-mono text-xs tracking-widest">{p.id}</p>
-                {doc === "qr" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt="qr"
-                    className="mx-auto mt-3 h-28 w-28"
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(p.slug)}`}
-                  />
-                ) : (
-                  <p className="mt-4 text-2xl tracking-[0.3em]">||||| {p.id.slice(-6)} |||||</p>
-                )}
-                <AdminButton
-                  className="mt-3"
-                  variant="outline"
-                  onClick={() => window.print()}
+          <div className="space-y-3">
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {doc === "barcode"
+                ? "بارکد واقعی هنوز فعال نیست. فعلاً شناسه محصول برای برچسب متنی چاپ می‌شود."
+                : "QR خارجی حذف شد. لینک محصول را به‌صورت متنی روی برچسب چاپ کنید."}
+            </p>
+            <div className="grid gap-3 print:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((p) => (
+                <div
+                  key={p.id}
+                  className="print-label rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4 text-center"
                 >
-                  چاپ
-                </AdminButton>
-              </div>
-            ))}
+                  <p className="text-sm font-medium text-zinc-900">{p.title}</p>
+                  <p
+                    className="mt-3 break-all font-mono text-xs tracking-wide text-zinc-700"
+                    dir="ltr"
+                  >
+                    {doc === "qr"
+                      ? hajiasalPath(`/product/${p.slug}`)
+                      : p.id}
+                  </p>
+                  <AdminButton
+                    className="mt-3 print:hidden"
+                    variant="outline"
+                    onClick={() => {
+                      const node = document.getElementById(`print-card-${p.id}`);
+                      if (!node) {
+                        window.print();
+                        return;
+                      }
+                      const win = window.open("", "_blank", "noopener,noreferrer");
+                      if (!win) {
+                        window.print();
+                        return;
+                      }
+                      win.document.write(
+                        `<!doctype html><html dir="rtl"><head><title>چاپ</title>
+                        <style>body{font-family:tahoma,sans-serif;padding:24px;text-align:center}
+                        .mono{font-family:ui-monospace,monospace;direction:ltr;word-break:break-all;margin-top:12px}</style>
+                        </head><body>${node.innerHTML}</body></html>`,
+                      );
+                      win.document.close();
+                      win.focus();
+                      win.print();
+                      win.close();
+                    }}
+                  >
+                    چاپ این برچسب
+                  </AdminButton>
+                  <div id={`print-card-${p.id}`} className="hidden">
+                    <h1>{escapeHtml(p.title)}</h1>
+                    <p className="mono">
+                      {doc === "qr"
+                        ? escapeHtml(hajiasalPath(`/product/${p.slug}`))
+                        : escapeHtml(p.id)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )
       )}

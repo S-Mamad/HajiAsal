@@ -168,6 +168,7 @@ describe("unified ticket chat behavior", () => {
     );
     const detail = await readJson(detailRes);
     expect((detail.ticket as { status: string }).status).toBe("waiting");
+    expect(detail.typing).toEqual({ adminTyping: false });
   });
 
   it("customer cannot access another customer ticket", async () => {

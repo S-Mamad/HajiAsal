@@ -20,7 +20,7 @@ import {
   recordRateLimitHitAsync,
 } from "@/lib/server/rate-limit";
 
-export type PanelOtpAudience = "admin" | "seller";
+export type PanelOtpAudience = "admin" | "seller" | "seller_apply";
 
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name];

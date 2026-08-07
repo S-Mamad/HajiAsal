@@ -5,16 +5,51 @@ import { usePathname } from "next/navigation";
 import { CaretLeft, Keyboard, MagnifyingGlass } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
-import { resolveSellerPageTitle } from "@/lib/seller/nav";
+import { SELLER_PAGE_TITLES, resolveSellerPageTitle } from "@/lib/seller/nav";
 import { NotificationCenter } from "@/components/seller/global/NotificationCenter";
+import { cn } from "@/lib/utils";
 
 interface SellerHeaderProps {
   compact?: boolean;
 }
 
+function matchDetail(
+  pathname: string,
+  base: string,
+  listLabel: string,
+  detailLabel: string,
+) {
+  const basePath = hajiasalPath(base);
+  if (pathname.includes(`${basePath}/`) && pathname !== basePath) {
+    return [
+      { label: "فروشنده", href: hajiasalPath("/seller/dashboard") },
+      { label: listLabel, href: basePath },
+      { label: detailLabel },
+    ];
+  }
+  return null;
+}
+
+function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
+  return (
+    matchDetail(pathname, "/seller/products", "محصولات", "جزئیات محصول") ??
+    matchDetail(pathname, "/seller/orders", "سفارشات", "جزئیات سفارش") ??
+    matchDetail(pathname, "/seller/tickets", "تیکت‌ها", "گفتگو") ??
+    matchDetail(pathname, "/seller/customers", "مشتریان", "پروفایل مشتری") ?? [
+      { label: "فروشنده", href: hajiasalPath("/seller/dashboard") },
+      ...(SELLER_PAGE_TITLES[pathname]
+        ? [{ label: SELLER_PAGE_TITLES[pathname] }]
+        : [{ label: resolveSellerPageTitle(pathname) }]),
+    ]
+  );
+}
+
 export function SellerHeader({ compact = false }: SellerHeaderProps) {
-  const pathname = usePathname();
-  const title = resolveSellerPageTitle(pathname ?? "");
+  const pathname = usePathname() ?? "";
+  const breadcrumbs = getBreadcrumbs(pathname);
+  const title =
+    breadcrumbs[breadcrumbs.length - 1]?.label ??
+    resolveSellerPageTitle(pathname);
 
   const actions = (
     <div className="flex items-center gap-0.5">
@@ -59,17 +94,33 @@ export function SellerHeader({ compact = false }: SellerHeaderProps) {
       <div className="mx-auto flex max-w-[1440px] items-start justify-between gap-3">
         <div className="min-w-0">
           <nav
-            className="mb-1 flex items-center gap-1.5 text-[11px] text-zinc-500"
+            className={cn(
+              "mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500",
+            )}
             aria-label="مسیر صفحه"
           >
-            <Link
-              href={hajiasalPath("/seller/dashboard")}
-              className="transition hover:text-zinc-800"
-            >
-              فروشنده
-            </Link>
-            <Icon icon={CaretLeft} size={11} className="text-zinc-400" />
-            <span className="text-zinc-700">{title}</span>
+            {breadcrumbs.map((crumb, i) => {
+              const isLast = i === breadcrumbs.length - 1;
+              return (
+                <span key={`${crumb.label}-${i}`} className="flex items-center gap-1.5">
+                  {i > 0 ? (
+                    <Icon icon={CaretLeft} size={11} className="text-zinc-400" />
+                  ) : null}
+                  {crumb.href && !isLast ? (
+                    <Link
+                      href={crumb.href}
+                      className="transition hover:text-zinc-800"
+                    >
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    <span className={isLast ? "text-zinc-700" : undefined}>
+                      {crumb.label}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </nav>
           <h2 className="text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl">
             {title}

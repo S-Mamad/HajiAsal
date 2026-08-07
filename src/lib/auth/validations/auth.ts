@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { isValidIranPhone } from "@/lib/auth/phone";
+import { isValidIranPhone, normalizePhone } from "@/lib/auth/phone";
 import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
 
+/** Accepts messy input; outputs canonical `09xxxxxxxxx`. */
 export const phoneSchema = z
   .string()
-  .min(10, "شماره موبایل نامعتبر")
-  .refine(isValidIranPhone, "شماره موبایل نامعتبر");
+  .refine(isValidIranPhone, "شماره موبایل نامعتبر")
+  .transform((v) => normalizePhone(v)!);
 
 export const otpSendSchema = z.object({
   phone: phoneSchema,

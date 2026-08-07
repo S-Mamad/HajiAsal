@@ -34,6 +34,13 @@ function isAdminPanelPath(pathname: string): boolean {
 
 function isSellerPanelPath(pathname: string): boolean {
   if (pathname === "/seller" || pathname === "/seller/") return false;
+  // Public seller onboarding (no seller session required)
+  if (
+    pathname === "/seller/apply" ||
+    pathname.startsWith("/seller/apply/")
+  ) {
+    return false;
+  }
   return pathname.startsWith("/seller/");
 }
 

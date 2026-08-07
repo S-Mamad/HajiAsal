@@ -64,7 +64,7 @@ export function Hero() {
         <div className="mesh-warm pointer-events-none absolute inset-0 opacity-30 md:opacity-40" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-end px-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-20 sm:px-6 sm:pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-24 md:px-8 lg:pb-28 lg:pt-24">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-end px-4 pb-[calc(var(--mobile-dock-clearance)+1.5rem)] pt-20 sm:px-6 sm:pb-[calc(var(--mobile-dock-clearance)+2rem)] sm:pt-24 md:px-8 lg:pb-28 lg:pt-24">
         <motion.div
           className="max-w-xl"
           initial={reduced ? false : { opacity: 0, y: 12 }}
@@ -98,7 +98,7 @@ export function Hero() {
               href={hajiasalPath("/reviews")}
               variant="outline"
               size="lg"
-              className="w-full whitespace-nowrap border-border-bright bg-void/40 px-5 text-primary backdrop-blur-sm hover:border-gold/50 sm:w-auto sm:px-8"
+              className="w-full whitespace-nowrap border-border-bright bg-surface px-5 text-primary hover:border-gold/50 sm:w-auto sm:px-8"
             >
               نظرات مشتریان
             </Button>

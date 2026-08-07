@@ -30,7 +30,7 @@ export function isMysqlUsable(): boolean {
 function openMysqlCircuit(error: unknown): void {
   mysqlCircuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
   const message = error instanceof Error ? error.message : String(error);
-  console.error(
+  console.warn(
     `[mysql] circuit open for ${CIRCUIT_COOLDOWN_MS}ms:`,
     message,
   );

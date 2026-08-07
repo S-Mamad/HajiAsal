@@ -85,9 +85,10 @@ function buildRequest(ep: SellerModuleEndpoint, withCookie: boolean): Request {
 describe("seller API static gate presence", () => {
   it("every seller route.ts except auth imports/calls gateSeller", () => {
     const root = path.join(process.cwd(), "src/app/api/seller");
-    const files = walkSellerRoutes(root).filter(
-      (f) => !f.replace(/\\/g, "/").includes("/auth/"),
-    );
+    const files = walkSellerRoutes(root).filter((f) => {
+      const norm = f.replace(/\\/g, "/");
+      return !norm.includes("/auth/") && !norm.includes("/apply/");
+    });
     expect(files.length).toBeGreaterThan(15);
 
     const ungated: string[] = [];

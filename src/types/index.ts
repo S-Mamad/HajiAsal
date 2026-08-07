@@ -119,6 +119,8 @@ export interface CartItem {
   /** Snapshot for client-side stock guards */
   inStock?: boolean;
   stockQty?: number;
+  /** Seller ownership at order time (wallet credits must use this, not live catalog). */
+  sellerId?: string;
 }
 
 export interface NavItem {

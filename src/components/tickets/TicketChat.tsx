@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SpeakerHigh, SpeakerSlash, WifiSlash } from "@phosphor-icons/react";
+import { WifiSlash } from "@phosphor-icons/react";
 import { TicketComposer } from "./TicketComposer";
 import { TicketMessageList } from "./TicketMessageList";
 import { TicketThreadHeader } from "./TicketThreadHeader";
 import {
   shellClass,
   type ChatMessage,
+  type TicketChatLayout,
   type TicketChatVariant,
 } from "./chat-utils";
 import { cn } from "@/lib/utils";
@@ -24,10 +25,12 @@ type Props = {
   messages: ChatMessage[];
   selfSenderType: string;
   variant?: TicketChatVariant;
+  layout?: TicketChatLayout;
   loading?: boolean;
   error?: string | null;
   onRetryLoad?: () => void;
   headerActions?: React.ReactNode;
+  headerLeading?: React.ReactNode;
   className?: string;
   allowInternal?: boolean;
   pollUrl?: string | null;
@@ -64,10 +67,12 @@ export function TicketChat({
   messages,
   selfSenderType,
   variant = "admin",
+  layout = "embedded",
   loading,
   error,
   onRetryLoad,
   headerActions,
+  headerLeading,
   className,
   allowInternal,
   pollUrl,
@@ -244,8 +249,10 @@ export function TicketChat({
     });
   };
 
+  const isFullscreen = layout === "fullscreen";
+
   return (
-    <div className={cn(shellClass(variant), "min-h-[28rem]", className)}>
+    <div className={cn(shellClass(variant, layout), className)}>
       <TicketThreadHeader
         subject={subject}
         status={status}
@@ -253,45 +260,44 @@ export function TicketChat({
         partyLabel={partyLabel}
         channelLabel={channelLabel}
         variant={variant}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 text-stone-600"
-              onClick={() => setMuted((m) => !m)}
-              aria-label={muted ? "فعال کردن صدا" : "بی‌صدا"}
-            >
-              <Icon icon={muted ? SpeakerSlash : SpeakerHigh} size={16} />
-            </button>
-            {headerActions}
-          </div>
-        }
+        leading={headerLeading}
+        muted={muted}
+        onToggleMute={() => setMuted((m) => !m)}
+        compact={isFullscreen}
+        actions={headerActions}
       />
 
-      {contextChip ? (
-        <div className="border-b border-stone-100 bg-stone-50 px-4 py-1.5 text-[11px] text-stone-600">
+      {contextChip && !isFullscreen ? (
+        <div
+          className={cn(
+            "shrink-0 border-b px-4 py-1.5 text-[11px]",
+            variant === "storefront"
+              ? "border-border bg-surface-muted/50 text-secondary"
+              : "border-stone-100 bg-stone-50 text-stone-600",
+          )}
+        >
           {contextChip}
         </div>
       ) : null}
       {lockLabel ? (
-        <div className="border-b border-amber-100 bg-amber-50 px-4 py-1.5 text-xs text-amber-900">
+        <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-1.5 text-xs text-amber-900">
           {lockLabel}
         </div>
       ) : null}
       {presenceLabel ? (
-        <div className="border-b border-stone-100 px-4 py-1 text-[11px] text-stone-500">
+        <div className="shrink-0 border-b border-stone-100 px-4 py-1 text-[11px] text-stone-500">
           {presenceLabel}
         </div>
       ) : null}
       {!online ? (
-        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           <Icon icon={WifiSlash} size={16} />
           اتصال قطع است. پس از وصل شدن، ارسال از سر گرفته می‌شود
         </div>
       ) : null}
 
       {error ? (
-        <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+        <div className="shrink-0 border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
           {error}
           {onRetryLoad ? (
             <button type="button" className="ms-2 underline" onClick={onRetryLoad}>
@@ -301,7 +307,7 @@ export function TicketChat({
         </div>
       ) : null}
       {localError ? (
-        <div className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+        <div className="shrink-0 border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
           {localError}
         </div>
       ) : null}
@@ -316,24 +322,33 @@ export function TicketChat({
       />
 
       {typingLabel ? (
-        <p className="px-4 pb-1 text-[11px] text-stone-500">{typingLabel}</p>
+        <p
+          className={cn(
+            "shrink-0 px-4 pb-1 text-[11px]",
+            variant === "storefront" ? "text-secondary" : "text-stone-500",
+          )}
+        >
+          {typingLabel}
+        </p>
       ) : null}
 
-      <TicketComposer
-        variant={variant}
-        ticketId={ticketId}
-        roleKey={selfSenderType}
-        sending={sending}
-        closed={status === "closed" || status === "resolved"}
-        disabled={!online}
-        allowInternal={allowInternal}
-        replyTo={replyTo}
-        onClearReply={() => setReplyTo(null)}
-        canned={selfSenderType === "admin" ? canned : []}
-        onTyping={onTyping}
-        onSend={handleSend}
-        onUpload={onUpload}
-      />
+      <div className="shrink-0">
+        <TicketComposer
+          variant={variant}
+          ticketId={ticketId}
+          roleKey={selfSenderType}
+          sending={sending}
+          closed={status === "closed" || status === "resolved"}
+          disabled={!online}
+          allowInternal={allowInternal}
+          replyTo={replyTo}
+          onClearReply={() => setReplyTo(null)}
+          canned={selfSenderType === "admin" ? canned : []}
+          onTyping={onTyping}
+          onSend={handleSend}
+          onUpload={onUpload}
+        />
+      </div>
     </div>
   );
 }

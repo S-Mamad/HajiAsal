@@ -220,7 +220,7 @@ export async function creditSellersForDeliveredOrder(
   const totals = new Map<string, number>();
   for (const item of order.items) {
     const product = byProduct.get(item.productId);
-    const sellerId = product?.sellerId;
+    const sellerId = item.sellerId ?? product?.sellerId;
     if (!sellerId) continue;
     const line = item.weight.price * item.quantity;
     totals.set(sellerId, (totals.get(sellerId) ?? 0) + line);
@@ -286,7 +286,7 @@ export async function reverseSaleCreditsForOrder(
   const totals = new Map<string, number>();
   for (const item of order.items) {
     const product = byProduct.get(item.productId);
-    const sellerId = product?.sellerId;
+    const sellerId = item.sellerId ?? product?.sellerId;
     if (!sellerId) continue;
     const line = item.weight.price * item.quantity;
     totals.set(sellerId, (totals.get(sellerId) ?? 0) + line);

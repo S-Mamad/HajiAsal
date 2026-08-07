@@ -18,13 +18,19 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "رد شده",
   open: "باز",
   closed: "بسته",
-  answered: "پاسخ‌داده‌شده",
+  answered: "پاسخ داده شد",
   resolved: "حل‌شده",
-  waiting: "در انتظار پاسخ",
+  waiting: "در انتظار پشتیبانی",
   new: "جدید",
   normal: "عادی",
   high: "بالا",
   low: "پایین",
+  credit: "واریز",
+  debit: "برداشت",
+  withdrawal: "تسویه",
+  completed: "انجام‌شده",
+  failed: "ناموفق",
+  paid: "پرداخت‌شده",
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -51,6 +57,12 @@ const STATUS_STYLES: Record<string, string> = {
   high: "bg-rose-50 text-rose-800 ring-rose-200/80",
   normal: "bg-zinc-100 text-zinc-600 ring-zinc-200/80",
   low: "bg-sky-50 text-sky-800 ring-sky-200/80",
+  credit: "bg-emerald-50 text-emerald-800 ring-emerald-200/80",
+  debit: "bg-rose-50 text-rose-800 ring-rose-200/80",
+  withdrawal: "bg-amber-50 text-amber-800 ring-amber-200/80",
+  completed: "bg-emerald-50 text-emerald-800 ring-emerald-200/80",
+  failed: "bg-rose-50 text-rose-800 ring-rose-200/80",
+  paid: "bg-emerald-50 text-emerald-800 ring-emerald-200/80",
 };
 
 interface StatusBadgeProps {

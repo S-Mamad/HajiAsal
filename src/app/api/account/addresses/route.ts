@@ -5,6 +5,7 @@ import {
   getAddressesByUserId,
   createAddress,
   deleteAddress,
+  setDefaultAddress,
 } from "@/lib/server/profiles";
 
 const addressSchema = z.object({
@@ -14,6 +15,11 @@ const addressSchema = z.object({
   address: z.string().min(5),
   postalCode: z.string().min(10).max(10),
   isDefault: z.boolean().optional(),
+});
+
+const patchSchema = z.object({
+  id: z.string().min(1),
+  action: z.literal("setDefault"),
 });
 
 export async function GET(request: Request) {
@@ -51,6 +57,27 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ success: true, address });
+}
+
+export async function PATCH(request: Request) {
+  const session = getSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "درخواست نامعتبر است" }, { status: 400 });
+  }
+
+  const address = await setDefaultAddress(session.userId, parsed.data.id);
+  if (!address) {
+    return NextResponse.json({ error: "آدرس پیدا نشد" }, { status: 404 });
+  }
+
+  const addresses = await getAddressesByUserId(session.userId);
+  return NextResponse.json({ success: true, address, addresses });
 }
 
 export async function DELETE(request: Request) {

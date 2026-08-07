@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { StatusBadge } from "@/components/admin/ui/StatusBadge";
 import { Input } from "@/components/ui/Input";
 import { SellerDataTable } from "@/components/seller/ui/SellerDataTable";
 import { useSellerCan } from "@/components/seller/layout/SellerCapabilitiesContext";
 import { hajiasalPath } from "@/lib/paths";
+import { normalizeDigits } from "@/lib/seller/apply-validation";
 
 type Balance = { available: number; pending: number; totalEarned: number };
 type Ledger = {
@@ -71,10 +73,15 @@ export default function SellerWalletPage() {
     setError("");
     setMessage("");
     try {
+      const normalized = normalizeDigits(amount);
+      const parsedAmount = Number(normalized);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0 || !Number.isInteger(parsedAmount)) {
+        throw new Error("مبلغ باید عدد صحیح مثبت باشد");
+      }
       const res = await fetch("/api/seller/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: Number(amount) }),
+        body: JSON.stringify({ amount: parsedAmount }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا");
@@ -102,29 +109,29 @@ export default function SellerWalletPage() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-stone-200 bg-white p-4">
-          <p className="text-xs text-stone-500">قابل برداشت</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {fmt(balance?.available ?? 0)}
+        <div className="rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4">
+          <p className="text-xs text-zinc-500">قابل برداشت</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-900">
+            {loading && !balance ? "…" : fmt(balance?.available ?? 0)}
           </p>
         </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-4">
-          <p className="text-xs text-stone-500">در انتظار</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {fmt(balance?.pending ?? 0)}
+        <div className="rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4">
+          <p className="text-xs text-zinc-500">در انتظار</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-900">
+            {loading && !balance ? "…" : fmt(balance?.pending ?? 0)}
           </p>
         </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-4">
-          <p className="text-xs text-stone-500">درآمد کل</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums">
-            {fmt(balance?.totalEarned ?? 0)}
+        <div className="rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4">
+          <p className="text-xs text-zinc-500">درآمد کل</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-900">
+            {loading && !balance ? "…" : fmt(balance?.totalEarned ?? 0)}
           </p>
         </div>
       </div>
 
       {canWithdraw ? (
-        <div className="rounded-xl border border-stone-200 bg-white p-4">
-          <h3 className="font-semibold">درخواست تسویه</h3>
+        <div className="rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4">
+          <h3 className="font-semibold text-zinc-900">درخواست تسویه</h3>
           {!hasSheba ? (
             <p className="mt-3 text-sm text-amber-800">
               برای تسویه ابتدا شماره شبا را در{" "}
@@ -143,12 +150,12 @@ export default function SellerWalletPage() {
                   label="مبلغ (تومان)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  type="number"
+                  inputMode="numeric"
                 />
               </div>
               <AdminButton
                 onClick={() => void withdraw()}
-                disabled={submitting || !amount}
+                disabled={submitting || !amount.trim()}
               >
                 ثبت درخواست
               </AdminButton>
@@ -173,7 +180,11 @@ export default function SellerWalletPage() {
               <span className="tabular-nums">{fmt(r.amount)}</span>
             ),
           },
-          { key: "status", header: "وضعیت", render: (r) => r.status },
+          {
+            key: "status",
+            header: "وضعیت",
+            render: (r) => <StatusBadge status={r.status} />,
+          },
           {
             key: "note",
             header: "یادداشت",
@@ -194,7 +205,11 @@ export default function SellerWalletPage() {
             header: "تاریخ",
             render: (r) => new Date(r.createdAt).toLocaleString("fa-IR"),
           },
-          { key: "type", header: "نوع", render: (r) => r.type },
+          {
+            key: "type",
+            header: "نوع",
+            render: (r) => <StatusBadge status={r.type} />,
+          },
           {
             key: "amount",
             header: "مبلغ",
@@ -202,7 +217,11 @@ export default function SellerWalletPage() {
               <span className="tabular-nums">{fmt(r.amount)}</span>
             ),
           },
-          { key: "status", header: "وضعیت", render: (r) => r.status },
+          {
+            key: "status",
+            header: "وضعیت",
+            render: (r) => <StatusBadge status={r.status} />,
+          },
         ]}
         data={ledger}
         rowKey={(r) => r.id}

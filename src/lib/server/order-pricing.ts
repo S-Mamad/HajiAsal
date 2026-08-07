@@ -35,6 +35,11 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
 
   const items: CartItem[] = [];
   let subtotal = 0;
+  /** Aggregate requested qty by productId (multi-weight lines share one stock pool). */
+  const qtyByProduct = new Map<
+    string,
+    { qty: number; title: string; stockQty: number | null }
+  >();
 
   for (const raw of rawItems) {
     const product = await getProductByIdAsync(raw.productId);
@@ -74,12 +79,19 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
 
     const stockQty =
       typeof product.stockQty === "number" ? product.stockQty : null;
-    if (stockQty != null && requestedQty > stockQty) {
+    const prev = qtyByProduct.get(product.id);
+    const aggregated = (prev?.qty ?? 0) + requestedQty;
+    if (stockQty != null && aggregated > stockQty) {
       return {
         ok: false,
         message: `موجودی «${product.title}» کافی نیست (باقی‌مانده: ${stockQty})`,
       };
     }
+    qtyByProduct.set(product.id, {
+      qty: aggregated,
+      title: product.title,
+      stockQty,
+    });
 
     const quantity = requestedQty;
 
@@ -96,6 +108,7 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
         price: unitPrice,
       },
       quantity,
+      sellerId: product.sellerId,
     });
     subtotal += unitPrice * quantity;
   }

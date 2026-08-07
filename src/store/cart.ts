@@ -55,6 +55,24 @@ function stockSnapshot(item: AddItemInput | CartItem) {
   };
 }
 
+/** Qty already in cart for a product across all weight lines. */
+function qtyForProduct(
+  items: CartItem[],
+  productId: string,
+  exceptWeightGrams?: number,
+): number {
+  return items.reduce((sum, i) => {
+    if (i.productId !== productId) return sum;
+    if (
+      typeof exceptWeightGrams === "number" &&
+      i.weight.grams === exceptWeightGrams
+    ) {
+      return sum;
+    }
+    return sum + i.quantity;
+  }, 0);
+}
+
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
@@ -88,7 +106,13 @@ export const useCartStore = create<CartStore>()(
             i.weight.grams === item.weight.grams,
         );
         const currentQty = existing?.quantity ?? 0;
-        const nextQty = Math.min(currentQty + quantity, maxQty);
+        const otherWeightsQty = qtyForProduct(
+          get().items,
+          item.productId,
+          item.weight.grams,
+        );
+        const room = Math.max(0, maxQty - otherWeightsQty);
+        const nextQty = Math.min(currentQty + quantity, room);
 
         if (nextQty <= currentQty) {
           set({
@@ -175,10 +199,16 @@ export const useCartStore = create<CartStore>()(
             };
           }
 
-          const capped = Math.min(
-            quantity,
-            typeof target.stockQty === "number" ? maxQty : CART_MAX_QTY,
+          const otherWeightsQty = qtyForProduct(
+            state.items,
+            productId,
+            weightGrams,
           );
+          const room =
+            typeof target.stockQty === "number"
+              ? Math.max(0, maxQty - otherWeightsQty)
+              : CART_MAX_QTY;
+          const capped = Math.min(quantity, room);
 
           if (capped < quantity) {
             return {

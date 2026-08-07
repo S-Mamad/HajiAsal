@@ -7,7 +7,12 @@ import { SellerDataTable } from "@/components/seller/ui/SellerDataTable";
 import { hajiasalPath } from "@/lib/paths";
 import type { Product } from "@/types";
 
-type InvProduct = Product & { stockQty?: number; lowStock?: boolean };
+type InvProduct = Product & {
+  stockQty?: number | null;
+  stockTracked?: boolean;
+  lowStock?: boolean;
+  displayStock?: string;
+};
 
 type Movement = {
   id: string;
@@ -55,6 +60,15 @@ export default function SellerInventoryPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!historyProduct) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHistoryProduct(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [historyProduct]);
+
   const openHistory = async (p: InvProduct) => {
     setHistoryProduct(p);
     setHistoryLoading(true);
@@ -95,7 +109,7 @@ export default function SellerInventoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-zinc-500">
           ناموجود: {outOfStock.toLocaleString("fa-IR")} · کم‌موجود:{" "}
           {lowStock.toLocaleString("fa-IR")}
         </p>
@@ -103,7 +117,11 @@ export default function SellerInventoryPage() {
           بروزرسانی
         </AdminButton>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
+        </p>
+      ) : null}
 
       <SellerDataTable
         storageKey="seller.inventory.grid.v1"
@@ -115,7 +133,7 @@ export default function SellerInventoryPage() {
         searchKeys={(p) => `${p.title} ${p.id}`}
         data={products}
         rowKey={(p) => p.id}
-        emptyMessage="محصولی نیست"
+        emptyMessage="محصولی برای مدیریت موجودی نیست"
         columns={[
           {
             key: "title",
@@ -130,48 +148,78 @@ export default function SellerInventoryPage() {
             key: "qty",
             header: "موجودی",
             render: (p) => (
-              <span className="tabular-nums">{p.stockQty ?? 0}</span>
+              <span className="tabular-nums">
+                {p.displayStock ??
+                  (typeof p.stockQty === "number"
+                    ? p.stockQty
+                    : p.inStock
+                      ? "نامحدود"
+                      : "۰")}
+              </span>
             ),
           },
           {
             key: "action",
             header: "عملیات",
-            render: (p) => (
-              <div className="flex flex-wrap gap-1">
-                <AdminButton
-                  variant="outline"
-                  size="sm"
-                  disabled={busyId === p.id}
-                  onClick={() => void adjust(p.id, 1)}
-                >
-                  +۱
-                </AdminButton>
-                <AdminButton
-                  variant="outline"
-                  size="sm"
-                  disabled={busyId === p.id}
-                  onClick={() => void adjust(p.id, -1)}
-                >
-                  −۱
-                </AdminButton>
-                <AdminButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void openHistory(p)}
-                >
-                  تاریخچه
-                </AdminButton>
-              </div>
-            ),
+            render: (p) => {
+              const unlimited =
+                !p.stockTracked && typeof p.stockQty !== "number" && p.inStock;
+              return (
+                <div className="flex flex-wrap gap-1">
+                  <AdminButton
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === p.id}
+                    onClick={() => void adjust(p.id, 1)}
+                    title={
+                      unlimited
+                        ? "تبدیل به موجودی عددی (شروع از ۱)"
+                        : undefined
+                    }
+                  >
+                    +۱
+                  </AdminButton>
+                  <AdminButton
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === p.id || unlimited}
+                    onClick={() => void adjust(p.id, -1)}
+                    title={
+                      unlimited
+                        ? "ابتدا موجودی عددی تعیین کنید"
+                        : undefined
+                    }
+                  >
+                    −۱
+                  </AdminButton>
+                  <AdminButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void openHistory(p)}
+                  >
+                    تاریخچه
+                  </AdminButton>
+                </div>
+              );
+            },
           },
         ]}
       />
 
       {historyProduct ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-white p-4 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label="تاریخچه موجودی"
+          onClick={() => setHistoryProduct(null)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="font-semibold text-stone-900">
+              <h3 className="font-semibold text-zinc-900">
                 تاریخچه موجودی · {historyProduct.title}
               </h3>
               <AdminButton
@@ -183,17 +231,17 @@ export default function SellerInventoryPage() {
               </AdminButton>
             </div>
             {historyLoading ? (
-              <p className="text-sm text-stone-500">در حال بارگذاری...</p>
+              <p className="text-sm text-zinc-500">در حال بارگذاری...</p>
             ) : movements.length === 0 ? (
-              <p className="text-sm text-stone-500">
-                حرکتی ثبت نشده (نیاز به MySQL و migration)
+              <p className="text-sm text-zinc-500">
+                هنوز حرکتی برای این محصول ثبت نشده است.
               </p>
             ) : (
               <ul className="space-y-2 text-sm">
                 {movements.map((m) => (
                   <li
                     key={m.id}
-                    className="rounded-lg border border-stone-100 px-3 py-2"
+                    className="rounded-lg border border-zinc-100 px-3 py-2"
                   >
                     <div className="flex justify-between gap-2">
                       <span
@@ -204,15 +252,13 @@ export default function SellerInventoryPage() {
                         {m.delta >= 0 ? "+" : ""}
                         {m.delta}
                       </span>
-                      <span className="text-stone-400">
-                        بعد: {m.qtyAfter}
-                      </span>
+                      <span className="text-zinc-400">بعد: {m.qtyAfter}</span>
                     </div>
-                    <p className="text-xs text-stone-500">
+                    <p className="text-xs text-zinc-500">
                       {m.reason ?? "manual"}
                       {m.note ? ` · ${m.note}` : ""}
                     </p>
-                    <p className="text-xs text-stone-400">
+                    <p className="text-xs text-zinc-400">
                       {new Date(m.createdAt).toLocaleString("fa-IR")}
                     </p>
                   </li>

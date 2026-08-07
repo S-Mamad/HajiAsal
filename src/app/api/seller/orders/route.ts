@@ -33,6 +33,35 @@ function canMutateOrder(order: {
   return null;
 }
 
+/** Enforce forward-only fulfillment transitions (idempotent at current step). */
+function canTransitionOrder(
+  action: "confirm" | "prepare" | "tracking" | "bulkConfirm" | "bulkPrepare",
+  status: string,
+): string | null {
+  if (action === "confirm" || action === "bulkConfirm") {
+    if (status === "confirmed") return null;
+    if (status === "processing" || status === "shipped" || status === "delivered") {
+      return "این سفارش از مرحله تأیید گذشته است.";
+    }
+    return "فقط سفارش پرداخت‌شده قابل تأیید است.";
+  }
+  if (action === "prepare" || action === "bulkPrepare") {
+    if (status === "processing" || status === "confirmed") return null;
+    return "آماده‌سازی فقط برای سفارش تأییدشده مجاز است.";
+  }
+  if (action === "tracking") {
+    if (
+      status === "confirmed" ||
+      status === "processing" ||
+      status === "shipped"
+    ) {
+      return null;
+    }
+    return "ثبت کد رهگیری فقط برای سفارش در جریان مجاز است.";
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   const gated = await gateSellerAny(request, [
     "orders.manage",
@@ -150,7 +179,8 @@ export async function PATCH(request: Request) {
           skipped += 1;
           continue;
         }
-        const reason = canMutateOrder(order);
+        const reason =
+          canMutateOrder(order) ?? canTransitionOrder(parsed.data.action, order.status);
         if (reason) {
           skipped += 1;
           if (skipReasons.length < 3) skipReasons.push(`${id}: ${reason}`);
@@ -184,19 +214,25 @@ export async function PATCH(request: Request) {
     }
 
     if (parsed.data.action === "confirm") {
-      const reason = canMutateOrder(order);
+      const reason =
+        canMutateOrder(order) ??
+        canTransitionOrder("confirm", order.status);
       if (reason) {
         return NextResponse.json({ error: reason }, { status: 403 });
       }
       await updateOrderAdmin(parsed.data.orderId, { status: "confirmed" });
     } else if (parsed.data.action === "prepare") {
-      const reason = canMutateOrder(order);
+      const reason =
+        canMutateOrder(order) ??
+        canTransitionOrder("prepare", order.status);
       if (reason) {
         return NextResponse.json({ error: reason }, { status: 403 });
       }
       await updateOrderAdmin(parsed.data.orderId, { status: "processing" });
     } else if (parsed.data.action === "tracking") {
-      const reason = canMutateOrder(order);
+      const reason =
+        canMutateOrder(order) ??
+        canTransitionOrder("tracking", order.status);
       if (reason) {
         return NextResponse.json({ error: reason }, { status: 403 });
       }

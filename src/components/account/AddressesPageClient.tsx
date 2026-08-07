@@ -6,19 +6,31 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
+import { AccountSkeleton } from "@/components/account/AccountSkeleton";
+import { AccountSurface } from "@/components/account/AccountSurface";
 import iranLocations from "@/data/iran-locations.json";
 
 type LocationEntry = { province: string; cities: string[] };
 
 const selectClass =
-  "h-11 w-full rounded-xl border border-border bg-surface-elevated px-4 text-sm text-primary transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30";
+  "h-11 w-full rounded-xl border border-border bg-surface-elevated px-4 text-sm text-primary transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30 disabled:opacity-55";
 
-export function AddressesPageClient() {
-  const [addresses, setAddresses] = useState<UserAddress[]>([]);
-  const [loading, setLoading] = useState(true);
+type AddressesPageClientProps = {
+  initialAddresses?: UserAddress[];
+};
+
+export function AddressesPageClient({
+  initialAddresses,
+}: AddressesPageClientProps) {
+  const hasInitial = initialAddresses !== undefined;
+  const [addresses, setAddresses] = useState<UserAddress[]>(
+    initialAddresses ?? [],
+  );
+  const [loading, setLoading] = useState(!hasInitial);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [defaultingId, setDefaultingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [province, setProvince] = useState("");
   const [city, setCity] = useState("");
@@ -33,6 +45,7 @@ export function AddressesPageClient() {
   const load = async () => {
     try {
       const r = await fetch("/api/account/addresses");
+      if (!r.ok) throw new Error("failed");
       const d = await r.json();
       setAddresses(d.addresses ?? []);
     } catch {
@@ -43,8 +56,9 @@ export function AddressesPageClient() {
   };
 
   useEffect(() => {
+    if (hasInitial) return;
     void load();
-  }, []);
+  }, [hasInitial]);
 
   const resetForm = () => {
     setProvince("");
@@ -83,9 +97,7 @@ export function AddressesPageClient() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(
-          data.error ?? data.message ?? "ذخیره آدرس انجام نشد.",
-        );
+        setError(data.error ?? data.message ?? "ذخیره آدرس انجام نشد.");
         return;
       }
       setShowForm(false);
@@ -117,18 +129,37 @@ export function AddressesPageClient() {
     }
   };
 
+  const onSetDefault = async (id: string) => {
+    setDefaultingId(id);
+    setError("");
+    try {
+      const res = await fetch("/api/account/addresses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "setDefault" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "تنظیم آدرس پیش‌فرض انجام نشد.");
+        return;
+      }
+      if (Array.isArray(data.addresses)) {
+        setAddresses(data.addresses);
+      } else {
+        await load();
+      }
+    } catch {
+      setError("تنظیم آدرس پیش‌فرض ممکن نشد.");
+    } finally {
+      setDefaultingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div>
         <AccountPageHeader title="آدرس‌های من" subtitle="در حال بارگذاری..." />
-        <div className="space-y-3" aria-busy="true">
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              className="h-28 animate-pulse rounded-2xl bg-surface-muted"
-            />
-          ))}
-        </div>
+        <AccountSkeleton rows={2} rowClassName="h-28" />
       </div>
     );
   }
@@ -143,6 +174,7 @@ export function AddressesPageClient() {
             type="button"
             size="sm"
             variant={showForm ? "outline" : "primary"}
+            className="w-full sm:w-auto"
             onClick={() => {
               setShowForm((v) => !v);
               setError("");
@@ -165,7 +197,7 @@ export function AddressesPageClient() {
       {showForm ? (
         <form
           onSubmit={onAdd}
-          className="mb-6 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5"
+          className="account-surface mb-6 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5"
         >
           <Input
             label="برچسب (اختیاری)"
@@ -174,7 +206,10 @@ export function AddressesPageClient() {
             placeholder="خانه، محل کار"
           />
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-secondary" htmlFor="addr-province">
+            <label
+              className="text-sm font-medium text-secondary"
+              htmlFor="addr-province"
+            >
               استان
             </label>
             <select
@@ -196,7 +231,10 @@ export function AddressesPageClient() {
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-secondary" htmlFor="addr-city">
+            <label
+              className="text-sm font-medium text-secondary"
+              htmlFor="addr-city"
+            >
               شهر
             </label>
             <select
@@ -253,11 +291,8 @@ export function AddressesPageClient() {
           />
         ) : null}
         {addresses.map((a) => (
-          <li
-            key={a.id}
-            className="rounded-2xl border border-border bg-surface p-4 sm:p-5"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
+          <AccountSurface as="li" key={a.id} className="list-none sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   {a.label ? (
@@ -266,7 +301,7 @@ export function AddressesPageClient() {
                     <p className="text-xs font-medium text-secondary">آدرس</p>
                   )}
                   {a.isDefault ? (
-                    <span className="rounded-full bg-gold-dim px-2 py-0.5 text-[10px] font-medium text-gold">
+                    <span className="rounded-md bg-gold-dim px-2 py-0.5 text-[10px] font-medium text-gold">
                       پیش‌فرض
                     </span>
                   ) : null}
@@ -277,20 +312,37 @@ export function AddressesPageClient() {
                 <p className="mt-1 text-sm leading-relaxed text-secondary">
                   {a.address}
                 </p>
-                <p className="mt-1.5 font-mono text-xs text-dim" dir="ltr">
+                <p
+                  className="mt-1.5 font-mono text-xs tabular-nums text-dim"
+                  dir="ltr"
+                >
                   {a.postalCode}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => void onDelete(a.id)}
-                disabled={deletingId === a.id}
-                className="text-xs text-red-600 transition-colors hover:underline disabled:opacity-50 dark:text-red-400"
-              >
-                {deletingId === a.id ? "در حال حذف..." : "حذف"}
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                {!a.isDefault ? (
+                  <button
+                    type="button"
+                    onClick={() => void onSetDefault(a.id)}
+                    disabled={defaultingId === a.id || deletingId === a.id}
+                    className="rounded-lg px-2 py-1 text-xs font-medium text-gold transition-colors hover:bg-gold-dim disabled:opacity-50"
+                  >
+                    {defaultingId === a.id
+                      ? "در حال تنظیم..."
+                      : "پیش‌فرض کردن"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void onDelete(a.id)}
+                  disabled={deletingId === a.id || defaultingId === a.id}
+                  className="rounded-lg px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                >
+                  {deletingId === a.id ? "در حال حذف..." : "حذف"}
+                </button>
+              </div>
             </div>
-          </li>
+          </AccountSurface>
         ))}
       </ul>
     </div>

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { resolveProductImageSrc } from "@/lib/product-image";
 
 interface ProductImageProps {
   src: string;
@@ -21,7 +24,14 @@ export function ProductImage({
   priority = false,
   className,
 }: ProductImageProps) {
-  const [imgSrc, setImgSrc] = useState(src);
+  const resolved = resolveProductImageSrc(src);
+  const [imgSrc, setImgSrc] = useState(resolved);
+
+  useEffect(() => {
+    setImgSrc(resolved);
+  }, [resolved]);
+
+  const isSvg = imgSrc.toLowerCase().endsWith(".svg");
 
   return (
     <Image
@@ -30,6 +40,7 @@ export function ProductImage({
       fill={fill}
       sizes={sizes}
       priority={priority}
+      unoptimized={isSvg}
       className={cn(className)}
       onError={() => setImgSrc("/images/hajiasal/placeholder.svg")}
     />

@@ -13,7 +13,7 @@ import type { Product, ProductCategory, SortOption } from "@/types";
 import { getPriceRange } from "@/lib/products";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
-import { ProductGrid } from "@/components/product/ProductGrid";
+import { ProductGrid } from "@/components/product";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Pagination } from "@/components/ui/Pagination";
 import { ShopEmptyState } from "@/components/shop/ShopEmptyState";
@@ -340,7 +340,7 @@ function ShopContentInner() {
         <div className="fixed inset-0 z-[60] lg:hidden">
           <button
             type="button"
-            className="absolute inset-0 overlay-scrim backdrop-blur-sm"
+            className="absolute inset-0 overlay-scrim"
             aria-label="بستن فیلتر"
             onClick={() => setFiltersOpen(false)}
           />

@@ -1,8 +1,9 @@
 import { hajiasalPath } from "@/lib/paths";
 
 /**
- * Floating glass nav is for browse/chrome, not focus surfaces
- * (auth, checkout, account tabs, product PDP sticky CTA).
+ * Mobile dock is a fixed full-bleed tab bar (not a floating glass pill).
+ * Shown on browse surfaces including PDP so cart stays reachable.
+ * Hidden on focus flows (auth, checkout, account).
  */
 export function shouldShowFloatingNav(pathname: string): boolean {
   const p = pathname || "/";
@@ -11,6 +12,5 @@ export function shouldShowFloatingNav(pathname: string): boolean {
   if (p.startsWith(hajiasalPath("/login"))) return false;
   if (p.startsWith(hajiasalPath("/register"))) return false;
   if (p.startsWith(hajiasalPath("/forgot-password"))) return false;
-  if (p.startsWith(hajiasalPath("/product/"))) return false;
   return true;
 }

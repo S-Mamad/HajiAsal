@@ -1,7 +1,7 @@
 import { gateAdmin } from "@/lib/server/admin-gate";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isValidIranPhone } from "@/lib/auth/phone";
+import { phoneSchema } from "@/lib/auth/validations/auth";
 
 import { logAdminAction } from "@/lib/server/audit-log";
 import {
@@ -15,11 +15,7 @@ import { isSellerProductAwaitingReview } from "@/lib/product-approval";
 const createSchema = z.object({
   shopName: z.string().min(2).max(120),
   ownerName: z.string().min(2).max(120),
-  phone: z
-    .string()
-    .min(10)
-    .max(20)
-    .refine(isValidIranPhone, "شماره موبایل نامعتبر است"),
+  phone: phoneSchema,
   password: z.string().min(6).max(128).optional(),
   city: z.string().max(80).optional().default(""),
   status: z

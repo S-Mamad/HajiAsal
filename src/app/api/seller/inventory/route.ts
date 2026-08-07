@@ -25,8 +25,27 @@ export async function GET(request: Request) {
     gated.ctx.seller.shopSettings?.lowStockThreshold ?? 10;
 
   const enriched = products.map((p) => {
-    const stockQty = p.stockQty ?? (p.inStock ? 1 : 0);
-    return { ...p, stockQty, lowStock: stockQty <= threshold };
+    const hasTrackedQty = typeof p.stockQty === "number";
+    const stockQty = hasTrackedQty
+      ? p.stockQty!
+      : p.inStock
+        ? null
+        : 0;
+    const numericForLow =
+      typeof stockQty === "number" ? stockQty : p.inStock ? threshold + 1 : 0;
+    return {
+      ...p,
+      stockQty,
+      stockTracked: hasTrackedQty,
+      lowStock: hasTrackedQty && stockQty! <= threshold,
+      displayStock: hasTrackedQty
+        ? String(stockQty)
+        : p.inStock
+          ? "نامحدود"
+          : "۰",
+      // Keep a numeric hint for sorting/filters without inventing stock.
+      sortStock: numericForLow,
+    };
   });
 
   const { searchParams } = new URL(request.url);
@@ -55,7 +74,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     products: enriched,
-    outOfStock: enriched.filter((p) => p.stockQty <= 0).length,
+    outOfStock: enriched.filter(
+      (p) => !p.inStock || (typeof p.stockQty === "number" && p.stockQty <= 0),
+    ).length,
     lowStock: enriched.filter((p) => p.lowStock).length,
     threshold,
     movements,
@@ -90,12 +111,29 @@ export async function PATCH(request: Request) {
 
     const threshold =
       gated.ctx.seller.shopSettings?.lowStockThreshold ?? 10;
-    let stockQty = existing.stockQty ?? (existing.inStock ? 1 : 0);
+    const hasTrackedQty = typeof existing.stockQty === "number";
+    const prevQty = hasTrackedQty
+      ? existing.stockQty!
+      : existing.inStock
+        ? null
+        : 0;
+    let stockQty: number;
 
     if (typeof parsed.data.delta === "number") {
-      stockQty = Math.max(0, stockQty + parsed.data.delta);
+      if (prevQty === null && parsed.data.delta < 0) {
+        return NextResponse.json(
+          {
+            error:
+              "موجودی این محصول نامحدود است. ابتدا با +۱ موجودی عددی تعیین کنید.",
+          },
+          { status: 400 },
+        );
+      }
+      const base = prevQty ?? 0;
+      stockQty = Math.max(0, base + parsed.data.delta);
     } else if (typeof parsed.data.inStock === "boolean") {
-      stockQty = parsed.data.inStock ? Math.max(stockQty, 1) : 0;
+      const base = prevQty ?? (parsed.data.inStock ? 1 : 0);
+      stockQty = parsed.data.inStock ? Math.max(base, 1) : 0;
     } else {
       return NextResponse.json({ error: "delta یا inStock لازم است" }, { status: 400 });
     }
@@ -135,12 +173,7 @@ export async function PATCH(request: Request) {
       updatedProduct = toggled;
     }
 
-    const delta =
-      typeof parsed.data.delta === "number"
-        ? parsed.data.delta
-        : inStock
-          ? 1
-          : -stockQty;
+    const appliedDelta = stockQty - (prevQty ?? 0);
 
     if (isMysqlConfigured()) {
       try {
@@ -152,7 +185,7 @@ export async function PATCH(request: Request) {
             randomUUID(),
             sellerId,
             parsed.data.productId,
-            delta,
+            appliedDelta,
             stockQty,
             parsed.data.reason ?? "adjust",
             parsed.data.note ?? null,
@@ -180,7 +213,7 @@ export async function PATCH(request: Request) {
       action: "inventory.adjust",
       entityType: "product",
       entityId: parsed.data.productId,
-      meta: { stockQty, delta },
+      meta: { stockQty, delta: appliedDelta },
       ip: clientIpFromRequest(request),
     });
 

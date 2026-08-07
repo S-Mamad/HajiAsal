@@ -7,6 +7,7 @@ import {
   buildWebSiteJsonLd,
 } from "@/lib/seo";
 import { getSiteSettings } from "@/lib/server/site-settings";
+import { getAppRole } from "@/lib/server/app-role";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
 import "@/styles/globals.css";
@@ -90,6 +91,8 @@ export default async function RootLayout({
   const siteData = await getSiteSettings();
   const orgJsonLd = buildOrganizationJsonLd(siteData);
   const webSiteJsonLd = buildWebSiteJsonLd(siteData);
+  const appRole = getAppRole();
+  const forceBare = appRole === "admin" || appRole === "seller";
 
   return (
     <html lang="fa" dir="rtl" className={`${vazirmatn.variable} ${lalezar.variable} hajiasal-root h-full antialiased`} data-theme="light">
@@ -113,7 +116,9 @@ export default async function RootLayout({
       >
         پرش به محتوای اصلی
       </a>
-      <StoreChrome siteSettings={siteData}>{children}</StoreChrome>
+      <StoreChrome siteSettings={siteData} forceBare={forceBare}>
+        {children}
+      </StoreChrome>
     </body>
     </html>
   );

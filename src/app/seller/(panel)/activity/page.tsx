@@ -66,9 +66,9 @@ export default function SellerActivityPage() {
             render: (r) =>
               r.entityType
                 ? `${r.entityType}${r.entityId ? `: ${r.entityId}` : ""}`
-                : "—",
+                : "-",
           },
-          { key: "ip", header: "IP", render: (r) => r.ip ?? "—" },
+          { key: "ip", header: "IP", render: (r) => r.ip ?? "-" },
         ]}
         data={rows}
         rowKey={(r) => r.id}

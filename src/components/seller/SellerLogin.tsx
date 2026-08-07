@@ -221,11 +221,17 @@ export function SellerLogin() {
           </div>
         )}
 
-        <p className="mt-6 text-center text-xs text-zinc-400">
+        <div className="mt-6 flex flex-col items-center gap-2 text-xs text-zinc-400">
+          <a
+            href={hajiasalPath("/seller/apply")}
+            className="hover:text-zinc-600"
+          >
+            درخواست همکاری فروشنده
+          </a>
           <a href={sitePublicUrl()} className="hover:text-zinc-600">
             بازگشت به فروشگاه
           </a>
-        </p>
+        </div>
       </div>
     </div>
   );

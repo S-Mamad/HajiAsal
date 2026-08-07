@@ -2,7 +2,7 @@
 
 import faqData from "@/data/faq.json";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { ProductAccordion } from "@/components/product/ProductAccordion";
+import { ProductAccordion } from "@/components/product";
 
 export default function FaqPage() {
   const items = faqData.map((f) => ({
@@ -17,7 +17,11 @@ export default function FaqPage() {
         subtitle="پاسخ پرسش‌های رایج درباره خرید، ارسال و نگهداری عسل"
         className="mb-10"
       />
-      <ProductAccordion items={items} />
+      <ProductAccordion
+        items={items}
+        title={null}
+        ariaLabel="سوالات متداول"
+      />
     </div>
   );
 }

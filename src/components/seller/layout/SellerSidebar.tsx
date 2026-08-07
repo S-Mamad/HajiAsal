@@ -84,14 +84,14 @@ export function SellerSidebar({
   };
 
   return (
-    <aside className="flex h-full w-[15.5rem] shrink-0 flex-col border-e border-[var(--panel-sidebar-border)] bg-[var(--panel-sidebar)] text-zinc-100 pb-[env(safe-area-inset-bottom)]">
+    <aside className="flex h-[100dvh] w-[15.5rem] shrink-0 flex-col border-e border-[var(--panel-sidebar-border)] bg-[var(--panel-sidebar)] text-zinc-100 pb-[env(safe-area-inset-bottom)]">
       <div className="border-b border-[var(--panel-sidebar-border)] px-4 py-4">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-[var(--panel-radius-sm)] bg-[var(--panel-accent)] text-white">
             <Icon icon={Storefront} size={18} weight="fill" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] text-zinc-500">پنل فروشنده</p>
+            <p className="text-[11px] text-zinc-400">پنل فروشنده</p>
             <h1 className="truncate text-sm font-semibold tracking-tight text-white">
               {shopName ?? "حاجی عسل"}
             </h1>
@@ -102,7 +102,7 @@ export function SellerSidebar({
       <nav className="panel-scrollbar flex-1 overflow-y-auto px-2.5 py-3">
         {groups.map((group) => (
           <div key={group.id} className="mb-3">
-            <p className="mb-1 px-2.5 text-[10px] font-medium text-zinc-600">
+            <p className="mb-1 px-2.5 text-[10px] font-medium text-zinc-400">
               {group.label}
             </p>
             <ul className="flex flex-col gap-0.5">

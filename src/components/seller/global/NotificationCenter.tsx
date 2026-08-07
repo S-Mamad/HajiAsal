@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
+import { useSellerCan } from "@/components/seller/layout/SellerCapabilitiesContext";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -17,11 +18,13 @@ type Notif = {
 };
 
 export function NotificationCenter() {
+  const canView = useSellerCan("notifications.view");
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
 
   const load = useCallback(async () => {
+    if (!canView) return;
     try {
       const res = await fetch("/api/seller/notifications");
       if (!res.ok) return;
@@ -34,13 +37,16 @@ export function NotificationCenter() {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [canView]);
 
   useEffect(() => {
+    if (!canView) return;
     void load();
     const t = window.setInterval(() => void load(), 60_000);
     return () => window.clearInterval(t);
-  }, [load]);
+  }, [load, canView]);
+
+  if (!canView) return null;
 
   const mark = async (payload: { ids?: string[]; all?: boolean }) => {
     await fetch("/api/seller/notifications", {

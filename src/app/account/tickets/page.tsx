@@ -4,8 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChatCircle, Plus } from "@phosphor-icons/react";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
-import { StatusBadge } from "@/components/admin/ui/StatusBadge";
+import { AccountSkeleton } from "@/components/account/AccountSkeleton";
+import { TicketStatusBadge } from "@/components/tickets/TicketStatusBadge";
+import { ticketStatusHint } from "@/components/tickets/chat-utils";
+import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -27,11 +31,11 @@ export default function AccountTicketsPage() {
     setError("");
     try {
       const res = await fetch("/api/account/tickets", { credentials: "include" });
-      if (!res.ok) throw new Error("خطا در بارگذاری");
+      if (!res.ok) throw new Error("بارگذاری تیکت‌ها ممکن نشد.");
       const data = await res.json();
       setTickets(data.tickets ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا");
+      setError(err instanceof Error ? err.message : "خطا در بارگذاری");
     } finally {
       setLoading(false);
     }
@@ -45,63 +49,66 @@ export default function AccountTicketsPage() {
     <div>
       <AccountPageHeader
         title="پشتیبانی"
-        subtitle="تیکت بسازید و پاسخ تیم حاجی‌عسل را همین‌جا ببینید."
+        subtitle="سوال سفارش یا خرید را همین‌جا بپرسید."
         action={
-          <Link
+          <Button
             href={hajiasalPath("/account/tickets/new")}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-gold px-4 text-sm font-medium text-primary transition hover:brightness-95"
+            size="sm"
+            className="w-full sm:w-auto"
           >
             <Icon icon={Plus} size={16} />
             تیکت جدید
-          </Link>
+          </Button>
         }
       />
 
-      <p className="mb-5 rounded-xl border border-border bg-surface-elevated/60 px-4 py-3 text-sm text-secondary">
-        برای پیگیری سفارش یا سوالات خرید، از همین بخش پیام بگذارید. فرم تماس عمومی
-        همچنان برای پیام‌های عمومی در دسترس است.
-      </p>
-
       {error ? (
-        <p className="mb-4 text-sm text-rose-600">{error}</p>
+        <p
+          role="alert"
+          className="mb-4 rounded-xl border border-red-200/80 bg-red-50/80 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200"
+        >
+          {error}
+        </p>
       ) : null}
 
       {loading ? (
-        <div className="space-y-2">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-16 animate-pulse rounded-2xl bg-border/50" />
-          ))}
-        </div>
+        <AccountSkeleton rows={3} rowClassName="h-20" />
       ) : tickets.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-16 text-center">
-          <Icon icon={ChatCircle} size={40} className="text-secondary/60" />
-          <p className="text-sm text-secondary">هنوز تیکتی ندارید</p>
-          <Link
-            href={hajiasalPath("/account/tickets/new")}
-            className="text-sm font-medium text-gold hover:underline"
-          >
-            اولین تیکت را بسازید
-          </Link>
-        </div>
+        <EmptyState
+          title="هنوز تیکتی ندارید"
+          description="اگر سوالی درباره سفارش یا محصول دارید، اولین گفتگو را شروع کنید."
+          action={
+            <Button href={hajiasalPath("/account/tickets/new")} size="sm">
+              <Icon icon={ChatCircle} size={16} />
+              ساخت تیکت
+            </Button>
+          }
+        />
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+        <ul className="space-y-2.5">
           {tickets.map((t) => (
             <li key={t.id}>
               <Link
                 href={hajiasalPath(`/account/tickets/${t.id}`)}
                 className={cn(
-                  "flex flex-col gap-2 px-4 py-4 transition hover:bg-surface-muted/50 sm:flex-row sm:items-center sm:justify-between",
+                  "account-surface flex flex-col gap-2 rounded-2xl border border-border bg-surface px-4 py-3.5",
+                  "transition-[border-color,background-color,transform] duration-200",
+                  "hover:border-gold/30 hover:bg-gold/[0.03] active:scale-[0.995]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void",
                 )}
               >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-primary">{t.subject}</p>
-                  <p className="mt-0.5 text-xs text-secondary">
-                    {new Date(t.updatedAt).toLocaleString("fa-IR")}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 flex-1 truncate font-medium text-primary">
+                    {t.subject}
                   </p>
+                  <TicketStatusBadge status={t.status} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={t.priority} />
-                  <StatusBadge status={t.status} />
+                <div className="flex flex-wrap items-center gap-2 text-xs text-secondary">
+                  <span>{ticketStatusHint(t.status)}</span>
+                  <span aria-hidden>·</span>
+                  <time dateTime={t.updatedAt}>
+                    {new Date(t.updatedAt).toLocaleString("fa-IR")}
+                  </time>
                 </div>
               </Link>
             </li>

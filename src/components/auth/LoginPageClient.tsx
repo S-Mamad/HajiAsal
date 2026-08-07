@@ -7,7 +7,7 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 import { PhoneLoginForm } from "@/components/auth/PhoneLoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { AuthWelcome } from "@/components/auth/AuthWelcome";
-import { hajiasalPath } from "@/lib/paths";
+import { hajiasalPath, sellerPublicUrl } from "@/lib/paths";
 import { useAuth } from "@/hooks/useAuth";
 import { isProfileComplete } from "@/lib/auth/profile-complete";
 import { safeInternalRedirect } from "@/lib/safe-redirect";
@@ -162,6 +162,15 @@ function LoginPageContent() {
               حریم خصوصی
             </Link>{" "}
             را می‌پذیرید.
+          </p>
+          <p className="mt-4 text-center text-xs text-muted">
+            فروشنده‌اید؟{" "}
+            <a
+              href={sellerPublicUrl()}
+              className="text-gold hover:underline"
+            >
+              ورود پنل فروشنده
+            </a>
           </p>
         </>
       ) : null}

@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import type { Product } from "@/types";
-import { ProductCard } from "@/components/product/ProductCard";
+import { ProductCard } from "@/components/product";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";

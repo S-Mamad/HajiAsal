@@ -11,6 +11,7 @@ import {
   updateSiteSettings,
 } from "@/lib/server/site-settings";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { isZarinpalConfigured } from "@/lib/server/zarinpal";
 
 const patchSchema = z.object({
   shippingCost: z.number().min(0).optional(),
@@ -72,10 +73,7 @@ export async function GET(request: Request) {
       transactionalSms,
       orderSms,
       orderSmsEnabled,
-      zarinpal: Boolean(
-        process.env.ZARINPAL_MERCHANT_ID &&
-          process.env.ZARINPAL_MERCHANT_ID !== "your_merchant_id",
-      ),
+      zarinpal: isZarinpalConfigured(),
       zarinpalRefund: Boolean(process.env.ZARINPAL_ACCESS_TOKEN?.trim()),
       authSecret: Boolean(process.env.AUTH_SESSION_SECRET),
       adminOtp: true,

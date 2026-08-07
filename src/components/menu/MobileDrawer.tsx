@@ -15,23 +15,19 @@ import {
 } from "@phosphor-icons/react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { useAuth } from "@/hooks/useAuth";
-import { extraNav, resolveNavHref } from "@/lib/nav";
 import { hajiasalPath } from "@/lib/paths";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { cn } from "@/lib/utils";
+import { drawerUtilityLinks, isNavActive } from "./nav-config";
+import { NavLink } from "./NavLink";
+import type { MobileDrawerProps } from "./types";
 
-interface MobileMenuProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export function MobileMenu({ open, onClose }: MobileMenuProps) {
+export function MobileDrawer({ open, onClose, items }: MobileDrawerProps) {
   const siteData = useSiteSettings();
   const pathname = usePathname();
   const { user, isLoggedIn, logout, loading } = useAuth();
-  const navItems = [...siteData.nav, ...extraNav];
   const [backdropReady, setBackdropReady] = useState(false);
 
   useBodyScrollLock(open);
@@ -63,7 +59,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overlay-scrim fixed inset-0 z-[80] backdrop-blur-sm lg:hidden"
+            className="overlay-scrim fixed inset-0 z-[80] lg:hidden"
             onClick={backdropReady ? onClose : undefined}
             aria-hidden
           />
@@ -142,52 +138,46 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             ) : null}
 
             <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-3 py-4">
-              {navItems.map((item) => {
-                const href = resolveNavHref(item.href);
-                const active = pathname === href;
+              {items.map((item) => {
+                const active = isNavActive(pathname, item.href);
                 return (
                   <li key={item.id}>
-                    <Link
-                      href={href}
-                      onClick={onClose}
-                      className={cn(
-                        "block rounded-xl px-4 py-3.5 text-base transition-colors active:bg-surface-elevated",
-                        active
-                          ? "bg-gold-dim font-medium text-gold"
-                          : "text-primary hover:bg-surface-muted hover:text-gold",
-                      )}
-                    >
-                      {item.label}
-                    </Link>
+                    <NavLink
+                      href={item.href}
+                      label={item.label}
+                      active={active}
+                      onNavigate={onClose}
+                      className="block rounded-xl px-4 py-3.5 text-base transition-colors active:bg-surface-elevated"
+                      activeClassName="bg-gold-dim font-medium text-gold"
+                      inactiveClassName="text-primary hover:bg-surface-muted hover:text-gold"
+                    />
                   </li>
                 );
               })}
             </ul>
 
             <div className="mt-auto space-y-1 border-t border-border px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <Link
-                href={hajiasalPath("/wishlist")}
-                onClick={onClose}
-                className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold"
-              >
-                علاقه‌مندی‌ها
-              </Link>
-              <Link
-                href={hajiasalPath("/faq")}
-                onClick={onClose}
-                className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold"
-              >
-                <Question size={16} />
-                سوالات متداول
-              </Link>
-              <Link
-                href={hajiasalPath("/contact")}
-                onClick={onClose}
-                className="flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold"
-              >
-                <Phone size={16} />
-                تماس با ما
-              </Link>
+              {drawerUtilityLinks.map((link) => {
+                const icon =
+                  link.id === "faq" ? (
+                    <Question size={16} />
+                  ) : link.id === "contact" ? (
+                    <Phone size={16} />
+                  ) : null;
+                return (
+                  <Link
+                    key={link.id}
+                    href={link.href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-3 py-3 text-sm text-secondary active:bg-surface-muted hover:text-gold",
+                    )}
+                  >
+                    {icon}
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
           </motion.nav>
         </>

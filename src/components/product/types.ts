@@ -1,0 +1,99 @@
+import type { ComponentType } from "react";
+import type { IconProps as PhosphorIconProps } from "@phosphor-icons/react";
+import type { Product, ProductCategory, WeightOption } from "@/types";
+import type { Review } from "@/lib/server/reviews";
+
+export type ProductUiIcon = ComponentType<PhosphorIconProps>;
+
+export interface ProductCardProps {
+  product: Product;
+}
+
+export interface ProductGridProps {
+  products: Product[];
+}
+
+export interface WeightSelectorProps {
+  options: WeightOption[];
+  selected: WeightOption;
+  onChange: (option: WeightOption) => void;
+}
+
+export interface ProductGalleryProps {
+  images: string[];
+  title: string;
+}
+
+export interface AccordionItem {
+  title: string;
+  content: string;
+}
+
+export interface ProductAccordionProps {
+  items: AccordionItem[];
+  /** Section heading. Pass `null` to hide (e.g. FAQ page already has its own title). */
+  title?: string | null;
+  /** Accessible name when the visible heading is hidden. */
+  ariaLabel?: string;
+  className?: string;
+}
+
+export interface StickyAddToCartProps {
+  title: string;
+  price: number;
+  discountPrice?: number;
+  inStock: boolean;
+  onAddToCart: () => void;
+}
+
+export interface RelatedProductsProps {
+  products: Product[];
+  category?: ProductCategory;
+  categoryLabel?: string;
+}
+
+export interface ReviewsSectionProps {
+  product: Product;
+  initialReviews?: Review[];
+}
+
+export interface ProductDetailClientProps {
+  product: Product;
+  relatedProducts: Product[];
+  initialReviews?: Review[];
+}
+
+export interface ProductFeatureBadge {
+  icon: ProductUiIcon;
+  label: string;
+  href?: string;
+  downloadName?: string;
+}
+
+export interface ProductBreadcrumbProps {
+  category: ProductCategory;
+  categoryLabel: string;
+  title: string;
+}
+
+export interface ProductInfoHeaderProps {
+  product: Product;
+  purchasable: boolean;
+}
+
+export interface ProductPurchasePanelProps {
+  product: Product;
+  selectedWeight: WeightOption;
+  onWeightChange: (option: WeightOption) => void;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
+  listPrice: number;
+  salePrice: number;
+  purchasable: boolean;
+  maxQty: number;
+  adding: boolean;
+  addedFlash: boolean;
+  onAddToCart: () => void;
+  shippingLabel: string;
+  trustTitle: string;
+}

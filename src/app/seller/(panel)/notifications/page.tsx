@@ -74,7 +74,7 @@ export default function SellerNotificationsPage() {
               <span className={!r.readAt ? "font-semibold" : ""}>{r.title}</span>
             ),
           },
-          { key: "body", header: "متن", render: (r) => r.body ?? "—" },
+          { key: "body", header: "متن", render: (r) => r.body ?? "-" },
           {
             key: "date",
             header: "زمان",

@@ -4,6 +4,10 @@ import {
 } from "./payment-refs";
 import { isSnappayConfigured } from "./snappay";
 import type { StoredOrder } from "./orders";
+import {
+  getZarinpalMerchantId,
+  zarinpalRefundUrl,
+} from "./zarinpal";
 
 export type GatewayRefundResult =
   | { ok: true; provider: PaymentProvider; message?: string }
@@ -11,12 +15,6 @@ export type GatewayRefundResult =
 
 function zarinpalAccessToken(): string | null {
   return process.env.ZARINPAL_ACCESS_TOKEN?.trim() || null;
-}
-
-function zarinpalMerchantId(): string | null {
-  const id = process.env.ZARINPAL_MERCHANT_ID?.trim();
-  if (!id || id === "your_merchant_id") return null;
-  return id;
 }
 
 /**
@@ -27,7 +25,7 @@ export async function refundZarinpal(input: {
   authority: string;
   amountRial?: number;
 }): Promise<GatewayRefundResult> {
-  const merchantId = zarinpalMerchantId();
+  const merchantId = getZarinpalMerchantId();
   const accessToken = zarinpalAccessToken();
   if (!merchantId) {
     return {
@@ -49,25 +47,22 @@ export async function refundZarinpal(input: {
   }
 
   try {
-    const res = await fetch(
-      "https://api.zarinpal.com/pg/v4/payment/refund.json",
-      {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
-          authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          merchant_id: merchantId,
-          authority: input.authority,
-          ...(typeof input.amountRial === "number"
-            ? { amount: input.amountRial }
-            : {}),
-        }),
-        signal: AbortSignal.timeout(20_000),
+    const res = await fetch(zarinpalRefundUrl(), {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
       },
-    );
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        authority: input.authority,
+        ...(typeof input.amountRial === "number"
+          ? { amount: input.amountRial }
+          : {}),
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
     const data = (await res.json().catch(() => ({}))) as {
       data?: { code?: number; message?: string };
       errors?: { message?: string; code?: number };

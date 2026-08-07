@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   CurrencyCircleDollar,
   WarningCircle,
+  Wallet,
 } from "@phosphor-icons/react";
 import { StatCard } from "@/components/admin/ui/StatCard";
 import { StatusBadge } from "@/components/admin/ui/StatusBadge";
@@ -92,7 +93,11 @@ export default function SellerDashboardPage() {
         </AdminButton>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {error}
+        </p>
+      ) : null}
       {loading && !kpis ? (
         <div className="space-y-6 animate-pulse" aria-busy>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -109,64 +114,55 @@ export default function SellerDashboardPage() {
 
       {kpis ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="فروش امروز"
-            value={`${(kpis.salesToday ?? 0).toLocaleString("fa-IR")} تومان`}
-            icon={CurrencyCircleDollar}
-            tone="amber"
-          />
-          <StatCard
-            label="فروش هفته"
-            value={`${(kpis.salesWeek ?? 0).toLocaleString("fa-IR")} تومان`}
-            hint={`ماه: ${(kpis.salesMonth ?? 0).toLocaleString("fa-IR")}`}
-            icon={CurrencyCircleDollar}
-            tone="emerald"
-          />
-          <StatCard
-            label="کیف پول"
-            value={`${(kpis.walletAvailable ?? 0).toLocaleString("fa-IR")}`}
-            hint={`در انتظار: ${(kpis.walletPending ?? 0).toLocaleString("fa-IR")}`}
-            icon={Package}
-            tone="slate"
-          />
-          <StatCard
-            label="کم‌موجود / ناموجود"
-            value={`${kpis.lowStockCount ?? kpis.outOfStock}`}
-            hint={`${kpis.outOfStock} ناموجود`}
-            icon={WarningCircle}
-            tone={(kpis.lowStockCount ?? kpis.outOfStock) > 0 ? "rose" : "slate"}
-          />
-          <StatCard
-            label="درآمد کل"
-            value={`${kpis.revenue.toLocaleString("fa-IR")} تومان`}
-            icon={CurrencyCircleDollar}
-            tone="amber"
-          />
-          <StatCard
-            label="سفارش‌ها"
-            value={kpis.orderCount}
-            hint={`${kpis.pendingOrders.toLocaleString("fa-IR")} در جریان`}
-            icon={Package}
-            tone="emerald"
-          />
-          <StatCard
-            label="محصولات من"
-            value={kpis.productCount}
-            hint={
-              (kpis.pendingProducts ?? 0) > 0
-                ? `${kpis.pendingProducts!.toLocaleString("fa-IR")} در انتظار تأیید`
-                : undefined
-            }
-            icon={ShoppingBag}
-            tone="slate"
-          />
-          <StatCard
-            label="ناموجود"
-            value={kpis.outOfStock}
-            hint="نیاز به تأمین"
-            icon={WarningCircle}
-            tone={kpis.outOfStock > 0 ? "rose" : "slate"}
-          />
+          <Link href={hajiasalPath("/seller/reports")} className="block">
+            <StatCard
+              label="فروش امروز"
+              value={`${(kpis.salesToday ?? 0).toLocaleString("fa-IR")} تومان`}
+              hint={`هفته: ${(kpis.salesWeek ?? 0).toLocaleString("fa-IR")}`}
+              icon={CurrencyCircleDollar}
+              tone="amber"
+            />
+          </Link>
+          <Link href={hajiasalPath("/seller/wallet")} className="block">
+            <StatCard
+              label="کیف پول"
+              value={`${(kpis.walletAvailable ?? 0).toLocaleString("fa-IR")}`}
+              hint={`در انتظار: ${(kpis.walletPending ?? 0).toLocaleString("fa-IR")}`}
+              icon={Wallet}
+              tone="slate"
+            />
+          </Link>
+          <Link href={hajiasalPath("/seller/orders")} className="block">
+            <StatCard
+              label="سفارش‌ها"
+              value={kpis.orderCount}
+              hint={`${kpis.pendingOrders.toLocaleString("fa-IR")} در جریان`}
+              icon={Package}
+              tone="emerald"
+            />
+          </Link>
+          <Link href={hajiasalPath("/seller/inventory")} className="block">
+            <StatCard
+              label="کم‌موجود"
+              value={`${kpis.lowStockCount ?? kpis.outOfStock}`}
+              hint={`${kpis.outOfStock} ناموجود · ${(kpis.revenue).toLocaleString("fa-IR")} درآمد کل`}
+              icon={WarningCircle}
+              tone={(kpis.lowStockCount ?? kpis.outOfStock) > 0 ? "rose" : "slate"}
+            />
+          </Link>
+          <Link href={hajiasalPath("/seller/products")} className="block sm:col-span-2 xl:col-span-1">
+            <StatCard
+              label="محصولات من"
+              value={kpis.productCount}
+              hint={
+                (kpis.pendingProducts ?? 0) > 0
+                  ? `${kpis.pendingProducts!.toLocaleString("fa-IR")} در انتظار تأیید`
+                  : undefined
+              }
+              icon={ShoppingBag}
+              tone="slate"
+            />
+          </Link>
         </div>
       ) : null}
 
@@ -191,15 +187,26 @@ export default function SellerDashboardPage() {
               key: "id",
               header: "شناسه",
               render: (r) => (
-                <span className="font-mono text-xs" dir="ltr">
+                <Link
+                  href={hajiasalPath(`/seller/orders/${r.id}`)}
+                  className="font-mono text-xs text-amber-900 hover:underline"
+                  dir="ltr"
+                >
                   {r.id}
-                </span>
+                </Link>
               ),
             },
             {
               key: "customer",
               header: "مشتری",
-              render: (r) => r.customer.fullName,
+              render: (r) => (
+                <Link
+                  href={hajiasalPath(`/seller/orders/${r.id}`)}
+                  className="hover:underline"
+                >
+                  {r.customer.fullName}
+                </Link>
+              ),
             },
             {
               key: "total",

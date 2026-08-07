@@ -20,6 +20,7 @@ type MemoryRoot = {
   adminSessions: MemorySession[];
   sellerSessions: MemorySession[];
   sellers: Record<string, unknown>[];
+  sellerApplications: Record<string, unknown>[];
   createdProducts: Record<string, unknown>[];
   stockOverrides: Record<string, boolean | { inStock: boolean; stockQty: number }>;
   productOverrides: Record<string, Record<string, unknown>>;
@@ -39,6 +40,7 @@ function root(): MemoryRoot {
       adminSessions: [],
       sellerSessions: [],
       sellers: [],
+      sellerApplications: [],
       createdProducts: [],
       stockOverrides: {},
       productOverrides: {},
@@ -50,6 +52,9 @@ function root(): MemoryRoot {
   // Migrate older in-memory roots created before createdProducts existed.
   if (!Array.isArray(g[globalKey]!.createdProducts)) {
     g[globalKey]!.createdProducts = [];
+  }
+  if (!Array.isArray(g[globalKey]!.sellerApplications)) {
+    g[globalKey]!.sellerApplications = [];
   }
   return g[globalKey]!;
 }
@@ -76,6 +81,16 @@ export function memoryGetSellers<T = Record<string, unknown>>(): T[] {
 
 export function memorySetSellers(sellers: Record<string, unknown>[]): void {
   root().sellers = sellers;
+}
+
+export function memoryGetSellerApplications<T = Record<string, unknown>>(): T[] {
+  return root().sellerApplications as T[];
+}
+
+export function memorySetSellerApplications(
+  apps: Record<string, unknown>[],
+): void {
+  root().sellerApplications = apps;
 }
 
 export function memoryGetCreatedProducts<T = Record<string, unknown>>(): T[] {

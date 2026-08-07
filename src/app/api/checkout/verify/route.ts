@@ -7,6 +7,11 @@ import {
   setOrderSettleRef,
 } from "@/lib/server/payment-refs";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
+import { refundOrderAtGateway } from "@/lib/server/payment-refund";
+import {
+  getZarinpalMerchantId,
+  zarinpalVerifyUrl,
+} from "@/lib/server/zarinpal";
 
 const PAYABLE_STATUSES = new Set(["pending_payment"]);
 
@@ -74,8 +79,8 @@ export async function GET(request: Request) {
     return cancelledRedirect(orderId);
   }
 
-  const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-  if (!merchantId || merchantId === "your_merchant_id") {
+  const merchantId = getZarinpalMerchantId();
+  if (!merchantId) {
     return failedRedirect(request.url, orderId);
   }
 
@@ -96,11 +101,7 @@ export async function GET(request: Request) {
     return failedRedirect(request.url, orderId);
   }
 
-  const session = getSessionFromRequest(request);
-  if (!session || !ownsOrder(order, session)) {
-    return failedRedirect(request.url, orderId);
-  }
-
+  // Auth via bound payment_ref (session optional — cookie may expire on gateway return).
   const refOk = await assertOrderPaymentRef(orderId, "zarinpal", authority);
   if (!refOk) {
     return failedRedirect(request.url, orderId);
@@ -109,29 +110,34 @@ export async function GET(request: Request) {
   const amountRial = Math.round(order.total * 10);
 
   try {
-    const verifyRes = await fetch(
-      "https://api.zarinpal.com/pg/v4/payment/verify.json",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchant_id: merchantId,
-          amount: amountRial,
-          authority,
-        }),
-      },
-    );
+    const verifyRes = await fetch(zarinpalVerifyUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        amount: amountRial,
+        authority,
+      }),
+    });
 
     const verifyData = await verifyRes.json();
     if (verifyData.data?.code === 100 || verifyData.data?.code === 101) {
       const settleRef = String(verifyData.data.ref_id ?? "");
       if (settleRef) await setOrderSettleRef(orderId, settleRef);
       const confirmed = await confirmPaidOrder(orderId);
-      if (!confirmed.ok && confirmed.reason === "not_payable") {
+      if (!confirmed.ok) {
+        // Money already settled at gateway — attempt auto-refund so we don't leave unpaid charged orders.
+        try {
+          await refundOrderAtGateway(order);
+        } catch (error) {
+          console.error(
+            "[checkout/verify] auto-refund after confirm failure:",
+            error instanceof Error ? error.message : error,
+          );
+        }
         return failedRedirect(request.url, orderId);
       }
-      const tracking =
-        (confirmed.ok ? confirmed.order.trackingCode : order.trackingCode) ?? "";
+      const tracking = confirmed.order.trackingCode ?? "";
       return successRedirect(orderId, tracking, settleRef);
     }
   } catch {
@@ -162,8 +168,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-    if (!merchantId || merchantId === "your_merchant_id") {
+    const merchantId = getZarinpalMerchantId();
+    if (!merchantId) {
       return NextResponse.json(
         {
           success: false,
@@ -218,18 +224,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const verifyRes = await fetch(
-      "https://api.zarinpal.com/pg/v4/payment/verify.json",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchant_id: merchantId,
-          amount: Math.round(order.total * 10),
-          authority,
-        }),
-      },
-    );
+    const verifyRes = await fetch(zarinpalVerifyUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        amount: Math.round(order.total * 10),
+        authority,
+      }),
+    });
 
     const verifyData = await verifyRes.json();
     const verified =
@@ -240,6 +243,11 @@ export async function POST(request: Request) {
       if (settleRef) await setOrderSettleRef(orderId, settleRef);
       const confirmed = await confirmPaidOrder(orderId);
       if (!confirmed.ok) {
+        try {
+          await refundOrderAtGateway(order);
+        } catch {
+          /* best-effort */
+        }
         return NextResponse.json(
           {
             success: false,

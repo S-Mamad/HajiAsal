@@ -22,28 +22,38 @@ export default function SellerTicketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/seller/tickets/${params.id}`);
-      if (res.status === 401) {
-        router.push(hajiasalPath("/seller"));
-        return;
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/seller/tickets/${params.id}`);
+        if (res.status === 401) {
+          router.push(hajiasalPath("/seller"));
+          return;
+        }
+        if (!res.ok) {
+          if (res.status === 404) {
+            router.push(hajiasalPath("/seller/tickets"));
+            return;
+          }
+          const data = await res.json().catch(() => ({}));
+          setError(
+            typeof data.error === "string" ? data.error : "خطا در بارگذاری تیکت",
+          );
+          return;
+        }
+        const data = await res.json();
+        setTicket(data.ticket);
+        setMessages(data.messages ?? []);
+      } catch {
+        setError("خطا در بارگذاری تیکت");
+      } finally {
+        if (!opts?.silent) setLoading(false);
       }
-      if (!res.ok) {
-        router.push(hajiasalPath("/seller/tickets"));
-        return;
-      }
-      const data = await res.json();
-      setTicket(data.ticket);
-      setMessages(data.messages ?? []);
-    } catch {
-      setError("خطا در بارگذاری تیکت");
-    } finally {
-      if (!opts?.silent) setLoading(false);
-    }
-  }, [params.id, router]);
+    },
+    [params.id, router],
+  );
 
   useEffect(() => {
     void load();
@@ -71,13 +81,13 @@ export default function SellerTicketDetailPage() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "ارسال ناموفق");
-    await load();
+    await load({ silent: true });
   };
 
   const upload = async (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/seller/media", {
+    const res = await fetch("/api/seller/tickets/upload", {
       method: "POST",
       body: fd,
     });
@@ -102,11 +112,11 @@ export default function SellerTicketDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     });
-    if (res.ok) await load();
+    if (res.ok) await load({ silent: true });
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
       <Link
         href={hajiasalPath("/seller/tickets")}
         className="inline-flex items-center gap-1 text-sm text-stone-600 hover:text-zinc-900"
@@ -132,7 +142,11 @@ export default function SellerTicketDetailPage() {
           onSend={send}
           onUpload={upload}
           headerActions={
-            <AdminButton size="sm" variant="outline" onClick={() => void toggleClose()}>
+            <AdminButton
+              size="sm"
+              variant="outline"
+              onClick={() => void toggleClose()}
+            >
               {ticket.status === "closed" || ticket.status === "resolved"
                 ? "بازگشایی"
                 : "بستن تیکت"}
@@ -140,7 +154,7 @@ export default function SellerTicketDetailPage() {
           }
         />
       ) : loading ? (
-        <div className="h-96 animate-pulse rounded-xl bg-stone-100" />
+        <div className="h-[min(70vh,40rem)] animate-pulse rounded-xl bg-stone-100" />
       ) : (
         <p className="text-sm text-rose-600">{error || "تیکت یافت نشد"}</p>
       )}

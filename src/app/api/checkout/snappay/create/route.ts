@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth/session";
-import { getOrderById, updateOrderStatus } from "@/lib/server/orders";
+import { getOrderById } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
 import {
   createSnappayPayment,
@@ -99,15 +99,33 @@ export async function POST(request: Request) {
       commissionType: 100,
     }));
 
+    const productsRial = cartList.reduce((sum, line) => sum + line.amount, 0);
+    const discountRial = Math.round(Math.max(0, order.discount) * 10);
+    // Align gateway amount check: cartSum - discount + shipping/fee line = amount
+    const remainderRial = Math.max(
+      0,
+      amountRial - productsRial + discountRial,
+    );
+    if (remainderRial > 0) {
+      cartList.push({
+        id: cartList.length + 1,
+        name: "هزینه ارسال و خدمات",
+        count: 1,
+        amount: remainderRial,
+        category: "GROCERY",
+        commissionType: 100,
+      });
+    }
+
     const payment = await createSnappayPayment({
       amountRial,
       cartList,
       returnURL,
       transactionId: order.id,
       mobile: session.phone,
+      discountAmount: discountRial,
     });
 
-    await updateOrderStatus(order.id, "pending_payment");
     await setOrderPaymentRef(order.id, "snappay", payment.paymentToken);
 
     return NextResponse.json({

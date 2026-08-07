@@ -355,13 +355,14 @@ export async function addSellerTicketMessage(input: {
     try {
       await mysqlExecute(
         `INSERT INTO seller_ticket_messages
-          (id, ticket_id, sender_type, body, attachment_url, attachment_name, attachment_mime,
+          (id, ticket_id, sender_type, sender_id, body, attachment_url, attachment_name, attachment_mime,
            client_message_id, reply_to_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           message.id,
           input.ticketId,
           message.senderType,
+          message.senderId,
           message.body,
           message.attachmentUrl,
           message.attachmentName,

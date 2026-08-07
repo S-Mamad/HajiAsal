@@ -12,11 +12,13 @@ import { Reveal } from "@/components/ui/Reveal";
 import { SocialFollowSection } from "@/components/social/SocialFollowSection";
 import { SupportMessengerButtons } from "@/components/social/SupportMessengerButtons";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { phoneSchema } from "@/lib/auth/validations/auth";
+import { formatPhoneInput } from "@/lib/auth/phone-mask";
 
 const schema = z.object({
   name: z.string().min(2, "نام الزامی است"),
   email: z.string().email("ایمیل نامعتبر"),
-  phone: z.string().min(11, "شماره موبایل نامعتبر"),
+  phone: phoneSchema,
   subject: z.string().min(3, "موضوع الزامی است"),
   message: z.string().min(10, "پیام حداقل ۱۰ کاراکتر"),
 });
@@ -34,10 +36,15 @@ export default function ContactPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { phone: "" },
   });
+
+  const phoneValue = watch("phone") ?? "";
 
   const onSubmit = async (data: FormData) => {
     setStatus("loading");
@@ -165,8 +172,16 @@ export default function ContactPage() {
               <Input
                 label="موبایل"
                 dir="ltr"
-                placeholder="09967891973"
-                {...register("phone")}
+                placeholder="0912 345 6789"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={phoneValue}
+                onChange={(e) =>
+                  setValue("phone", formatPhoneInput(e.target.value), {
+                    shouldValidate: phoneValue.length >= 10,
+                    shouldDirty: true,
+                  })
+                }
                 error={errors.phone?.message}
               />
             </div>

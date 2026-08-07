@@ -79,25 +79,23 @@ export function SocialFollowSection({
         className={cn("w-full", className)}
         aria-label="شبکه‌های اجتماعی"
       >
-        <p className="mb-3 text-center text-[12px] text-dim md:text-start">
-          شبکه‌های اجتماعی
-          <span className="mx-1.5 text-border">·</span>
-          <span dir="ltr" className="text-secondary">
-            {HANDLE}
-          </span>
-        </p>
-        <ul className="flex flex-wrap items-center justify-center gap-2.5 md:justify-start">
+        <ul className="flex flex-wrap items-center justify-center gap-2 md:justify-start md:gap-2.5">
           {items.map(({ key, brand, label }) => (
             <li key={key}>
               <a
                 href={social[key]}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`${label} ${HANDLE}`}
+                aria-label={label}
                 title={label}
                 className="block transition duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
               >
-                <SocialIconFace brand={brand} size={40} />
+                <span className="md:hidden">
+                  <SocialIconFace brand={brand} size={32} />
+                </span>
+                <span className="hidden md:inline-flex">
+                  <SocialIconFace brand={brand} size={40} />
+                </span>
               </a>
             </li>
           ))}

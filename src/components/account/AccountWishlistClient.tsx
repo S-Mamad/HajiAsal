@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/types";
 import { useWishlistStore } from "@/store/wishlist";
-import { ProductGrid } from "@/components/product/ProductGrid";
+import { ProductGrid } from "@/components/product";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
 import { hajiasalPath } from "@/lib/paths";
 import { formatPersianNumber } from "@/lib/utils";
@@ -15,6 +15,8 @@ export function AccountWishlistClient() {
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const readyToSync = useRef(false);
+  const lastSynced = useRef<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +46,11 @@ export function AccountWishlistClient() {
           setError(true);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          readyToSync.current = true;
+          lastSynced.current = useWishlistStore.getState().ids.join(",");
+        }
       }
     };
     void load();
@@ -54,12 +60,27 @@ export function AccountWishlistClient() {
   }, []);
 
   useEffect(() => {
-    if (ids.length === 0) return;
-    void fetch("/api/account/wishlist", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productIds: ids, merge: true }),
-    });
+    if (!readyToSync.current) return;
+    const key = ids.join(",");
+    if (key === lastSynced.current) return;
+    lastSynced.current = key;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch("/api/account/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productIds: ids, merge: true }),
+        signal: controller.signal,
+      }).catch(() => {
+        /* ignore abort / network */
+      });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [ids]);
 
   const products = useMemo(() => {
@@ -92,25 +113,15 @@ export function AccountWishlistClient() {
             <div
               key={i}
               className="aspect-[3/4] animate-pulse rounded-2xl bg-surface-muted"
+              style={{ animationDelay: `${i * 70}ms` }}
             />
           ))}
         </div>
       ) : error ? (
-        <div
-          className="rounded-2xl border border-red-200/80 bg-red-50/80 px-5 py-8 text-center dark:border-red-900/40 dark:bg-red-950/30"
-          role="alert"
-        >
-          <p className="text-sm text-red-800 dark:text-red-200">
-            بارگذاری علاقه‌مندی‌ها ممکن نشد.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 text-sm underline underline-offset-2"
-          >
-            تلاش مجدد
-          </button>
-        </div>
+        <ErrorState
+          title="بارگذاری علاقه‌مندی‌ها ممکن نشد."
+          onRetry={() => window.location.reload()}
+        />
       ) : products.length > 0 ? (
         <ProductGrid products={products} />
       ) : (
@@ -118,7 +129,9 @@ export function AccountWishlistClient() {
           title="لیست علاقه‌مندی خالی است"
           description="در صفحه محصول روی قلب بزنید تا اینجا جمع شوند."
           action={
-            <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
+            <Button href={hajiasalPath("/shop")} size="sm">
+              مشاهده فروشگاه
+            </Button>
           }
         />
       )}

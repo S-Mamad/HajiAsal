@@ -97,12 +97,24 @@ export default function SellerMediaPage() {
   };
 
   const remove = async (id: string) => {
-    await fetch("/api/seller/media", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    await load();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/seller/media", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "حذف ناموفق");
+      setMessage("فایل حذف شد");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

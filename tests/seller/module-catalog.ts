@@ -394,6 +394,7 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     method: "GET",
     path: "/api/seller/media",
     capability: "media.manage",
+    anyOfCapabilities: ["media.manage", "products.manage"],
     importPath: "@/app/api/seller/media/route",
   },
   {
@@ -402,6 +403,7 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     method: "POST",
     path: "/api/seller/media",
     capability: "media.manage",
+    anyOfCapabilities: ["media.manage", "products.manage"],
     importPath: "@/app/api/seller/media/route",
     skipAllowedProbe: true,
   },
@@ -413,6 +415,16 @@ export const SELLER_API_CATALOG: SellerModuleEndpoint[] = [
     capability: "media.manage",
     importPath: "@/app/api/seller/media/route",
     body: { id: "m1" },
+    skipAllowedProbe: true,
+  },
+
+  {
+    id: "tickets.upload.POST",
+    module: "tickets",
+    method: "POST",
+    path: "/api/seller/tickets/upload",
+    capability: "tickets.manage",
+    importPath: "@/app/api/seller/tickets/upload/route",
     skipAllowedProbe: true,
   },
 

@@ -232,17 +232,23 @@ export async function setSellerProductStock(
   }
 
   const overrideValue = { inStock: nextInStock, stockQty: qty };
+  // Owned products: productId key (storefront sees the same SKU).
+  // Catalog assignments: seller-scoped key so one seller cannot OOS the global catalog.
+  const overrideKey =
+    product.sellerId === sellerId
+      ? productId
+      : `seller:${sellerId}:${productId}`;
 
   if (canUseFilesystemPersistence()) {
     const overrides = await readJsonFile<
       Record<string, boolean | { inStock: boolean; stockQty: number }>
     >("seller-stock-overrides.json", {});
-    overrides[productId] = overrideValue;
+    overrides[overrideKey] = overrideValue;
     await writeJsonFile("seller-stock-overrides.json", overrides);
     return { ...product, inStock: nextInStock, stockQty: qty };
   }
 
-  memorySetStockOverride(productId, overrideValue);
+  memorySetStockOverride(overrideKey, overrideValue);
   return { ...product, inStock: nextInStock, stockQty: qty };
 }
 
@@ -262,7 +268,10 @@ function normalizeStockOverride(
   };
 }
 
-async function applyStockOverrides(products: Product[]): Promise<Product[]> {
+async function applyStockOverrides(
+  products: Product[],
+  sellerId: string,
+): Promise<Product[]> {
   let overrides: Record<
     string,
     boolean | { inStock: boolean; stockQty: number }
@@ -273,9 +282,13 @@ async function applyStockOverrides(products: Product[]): Promise<Product[]> {
     overrides = memoryGetStockOverrides();
   }
   return products.map((p) => {
-    if (!(p.id in overrides)) return p;
+    const scopedKey = `seller:${sellerId}:${p.id}`;
+    const raw =
+      overrides[scopedKey] ??
+      (p.sellerId === sellerId ? overrides[p.id] : undefined);
+    if (raw === undefined) return p;
     const next = normalizeStockOverride(
-      overrides[p.id]!,
+      raw,
       p.stockQty ?? (p.inStock ? 1 : 0),
     );
     return { ...p, inStock: next.inStock, stockQty: next.stockQty };
@@ -302,7 +315,7 @@ export async function getSellerProducts(sellerId: string): Promise<Product[]> {
   const byId = new Map<string, Product>();
   for (const p of assigned) byId.set(p.id, p);
   for (const p of owned) byId.set(p.id, p);
-  return applyStockOverrides(Array.from(byId.values()));
+  return applyStockOverrides(Array.from(byId.values()), sellerId);
 }
 
 export async function getSellerOrders(
@@ -424,7 +437,11 @@ export async function createSellerSession(
         "[seller-sessions] insert failed:",
         error instanceof Error ? error.message : error,
       );
+      // Production: never fall back to memory-only (lost across workers → repeated OTP).
+      if (isProduction()) return null;
     }
+  } else if (isProduction()) {
+    return null;
   }
 
   const sessions = await readSessions();

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { phoneSchema } from "@/lib/auth/validations/auth";
 import { saveContactMessage } from "@/lib/server/newsletter";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 const schema = z.object({
   name: z.string().min(2, "نام الزامی است"),
   email: z.string().email("ایمیل نامعتبر است"),
-  phone: z.string().min(11, "شماره موبایل نامعتبر است"),
+  phone: phoneSchema,
   subject: z.string().min(3, "موضوع الزامی است"),
   message: z.string().min(10, "پیام باید حداقل ۱۰ کاراکتر باشد"),
 });

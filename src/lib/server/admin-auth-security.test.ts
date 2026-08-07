@@ -18,6 +18,7 @@ vi.mock("./db", () => ({
 
 vi.mock("./production", () => ({
   canUseFilesystemPersistence: vi.fn(() => true),
+  isProduction: vi.fn(() => false),
 }));
 
 import {
@@ -41,7 +42,7 @@ import {
   memorySetAdminSessions,
 } from "./memory-store";
 import { isMysqlConfigured, mysqlExecute, mysqlQueryOne } from "./mysql";
-import { canUseFilesystemPersistence } from "./production";
+import { canUseFilesystemPersistence, isProduction } from "./production";
 import { readJsonFile, writeJsonFile } from "./db";
 import {
   canAccessAdminPath,
@@ -192,6 +193,19 @@ describe("admin session dual-write", () => {
     const created = await createAdminSession({ adminUserId: "admin-2" });
     expect(created).toBeTruthy();
     expect(sessions.length).toBe(1);
+  });
+
+  it("refuses memory-only sessions when MySQL fails in production", async () => {
+    vi.mocked(isMysqlConfigured).mockReturnValue(true);
+    vi.mocked(mysqlExecute).mockRejectedValue(new Error("mysql down"));
+    vi.mocked(canUseFilesystemPersistence).mockReturnValue(false);
+    vi.mocked(isProduction).mockReturnValue(true);
+
+    const created = await createAdminSession({ adminUserId: "admin-3" });
+    expect(created).toBeNull();
+    expect(memoryGetAdminSessions().length).toBe(0);
+
+    vi.mocked(isProduction).mockReturnValue(false);
   });
 });
 

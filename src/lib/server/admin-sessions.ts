@@ -5,7 +5,7 @@ import {
   memoryGetAdminSessions,
   memorySetAdminSessions,
 } from "./memory-store";
-import { canUseFilesystemPersistence } from "./production";
+import { canUseFilesystemPersistence, isProduction } from "./production";
 import { isMysqlConfigured, mysqlExecute, mysqlQueryOne, toIso } from "./mysql";
 
 const SESSIONS_FILE = "admin-sessions.json";
@@ -111,7 +111,16 @@ export async function createAdminSession(meta?: {
     }
   }
 
-  // Dual-write: always mirror to FS/memory so sessions survive MySQL outages.
+  // Production must persist in MySQL — memory-only cookies die across workers/restarts
+  // and force repeated OTP ("no cache"). Never issue a dead session cookie.
+  if (!mysqlOk && isMysqlConfigured() && isProduction()) {
+    console.error(
+      "[admin-sessions] refusing memory-only session in production (MySQL write failed)",
+    );
+    return null;
+  }
+
+  // Dual-write: mirror to FS/memory so sessions survive MySQL outages in non-prod.
   if (canUseFilesystemPersistence()) {
     try {
       const sessions = await readJsonFile<AdminSession[]>(SESSIONS_FILE, []);
@@ -128,7 +137,7 @@ export async function createAdminSession(meta?: {
         memorySetAdminSessions(mem);
       }
     }
-  } else {
+  } else if (mysqlOk || !isProduction()) {
     const mem = memoryGetAdminSessions();
     mem.push(session);
     memorySetAdminSessions(mem);

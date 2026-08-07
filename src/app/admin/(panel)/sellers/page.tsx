@@ -7,6 +7,11 @@ import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { Input } from "@/components/ui/Input";
 import { hajiasalPath } from "@/lib/paths";
+import {
+  formatPhoneInput,
+  isValidIranMobile,
+  normalizePhoneInput,
+} from "@/lib/auth/phone-mask";
 
 type SellerStatus = "pending" | "active" | "suspended" | "rejected";
 
@@ -91,8 +96,8 @@ export default function AdminSellersPage() {
   }, [sellers, query, statusFilter]);
 
   const createSeller = async () => {
-    if (!shopName.trim() || !ownerName.trim() || !phone.trim()) {
-      setError("نام فروشگاه، صاحب و موبایل الزامی است");
+    if (!shopName.trim() || !ownerName.trim() || !isValidIranMobile(phone)) {
+      setError("نام فروشگاه، صاحب و موبایل معتبر الزامی است");
       return;
     }
     setCreating(true);
@@ -104,7 +109,7 @@ export default function AdminSellersPage() {
         body: JSON.stringify({
           shopName,
           ownerName,
-          phone,
+          phone: normalizePhoneInput(phone),
           city,
           commissionPercent: Number(commission) || 10,
           status: "active",
@@ -161,10 +166,12 @@ export default function AdminSellersPage() {
             onChange={(e) => setOwnerName(e.target.value)}
           />
           <Input
-            placeholder="موبایل (09123456789)"
+            placeholder="موبایل (0912 345 6789)"
             dir="ltr"
+            inputMode="numeric"
+            autoComplete="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
           />
           <Input
             placeholder="شهر"

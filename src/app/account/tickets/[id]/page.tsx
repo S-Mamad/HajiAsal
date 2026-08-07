@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react";
 import { TicketChat } from "@/components/tickets/TicketChat";
+import { TicketCsatPrompt } from "@/components/tickets/TicketCsatPrompt";
 import type { ChatMessage } from "@/components/tickets/chat-utils";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
@@ -20,34 +21,41 @@ export default function AccountTicketDetailPage() {
     csatScore?: number | null;
   } | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/account/tickets/${params.id}`, {
-        credentials: "include",
-      });
-      if (res.status === 401) {
-        router.push(hajiasalPath("/login?redirect=/account/tickets"));
-        return;
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/account/tickets/${params.id}`, {
+          credentials: "include",
+        });
+        if (res.status === 401) {
+          router.push(hajiasalPath("/login?redirect=/account/tickets"));
+          return;
+        }
+        if (!res.ok) {
+          setError("تیکت یافت نشد");
+          setTicket(null);
+          return;
+        }
+        const data = await res.json();
+        setTicket(data.ticket);
+        setMessages(data.messages ?? []);
+        setTypingLabel(
+          data.typing?.adminTyping ? "پشتیبان در حال نوشتن…" : null,
+        );
+      } catch {
+        setError("خطا در بارگذاری");
+      } finally {
+        if (!opts?.silent) setLoading(false);
       }
-      if (!res.ok) {
-        setError("تیکت یافت نشد");
-        setTicket(null);
-        return;
-      }
-      const data = await res.json();
-      setTicket(data.ticket);
-      setMessages(data.messages ?? []);
-    } catch {
-      setError("خطا در بارگذاری");
-    } finally {
-      if (!opts?.silent) setLoading(false);
-    }
-  }, [params.id, router]);
+    },
+    [params.id, router],
+  );
 
   useEffect(() => {
     void load();
@@ -69,7 +77,7 @@ export default function AccountTicketDetailPage() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "ارسال ناموفق");
-    await load();
+    await load({ silent: true });
   };
 
   const upload = async (file: File) => {
@@ -102,7 +110,7 @@ export default function AccountTicketDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     });
-    if (res.ok) await load();
+    if (res.ok) await load({ silent: true });
   };
 
   const sendCsat = async (score: number) => {
@@ -112,19 +120,21 @@ export default function AccountTicketDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ csatScore: score, status: "closed" }),
     });
-    await load();
+    await load({ silent: true });
   };
 
-  return (
-    <div className="space-y-4">
-      <Link
-        href={hajiasalPath("/account/tickets")}
-        className="inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
-      >
-        <Icon icon={ArrowRight} size={16} />
-        بازگشت به تیکت‌ها
-      </Link>
+  const backLink = (
+    <Link
+      href={hajiasalPath("/account/tickets")}
+      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-secondary transition hover:border-gold/30 hover:bg-surface-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+      aria-label="بازگشت به تیکت‌ها"
+    >
+      <Icon icon={ArrowRight} size={18} />
+    </Link>
+  );
 
+  return (
+    <div className="flex h-full min-h-0 flex-col">
       {ticket ? (
         <>
           <TicketChat
@@ -135,12 +145,14 @@ export default function AccountTicketDetailPage() {
             messages={messages}
             selfSenderType="customer"
             variant="storefront"
+            layout="fullscreen"
             loading={loading}
             error={error || null}
             onRetryLoad={() => void load()}
             onPollUpdate={() => void load({ silent: true })}
             pollUrl={`/api/account/tickets/${ticket.id}`}
-            contextChip="پشتیبان حاجی‌عسل · پاسخ در همین صفحه نمایش داده می‌شود"
+            typingLabel={typingLabel}
+            headerLeading={backLink}
             onSend={send}
             onUpload={upload}
             onTyping={() => {
@@ -151,7 +163,7 @@ export default function AccountTicketDetailPage() {
                 body: JSON.stringify({ typing: true }),
               });
             }}
-            className="min-h-[30rem]"
+            className="min-h-0 flex-1"
             headerActions={
               <button
                 type="button"
@@ -166,29 +178,18 @@ export default function AccountTicketDetailPage() {
           />
           {(ticket.status === "closed" || ticket.status === "resolved") &&
           !ticket.csatScore ? (
-            <div className="rounded-2xl border border-border bg-surface p-4 text-center">
-              <p className="mb-3 text-sm text-secondary">
-                کیفیت پشتیبانی را امتیاز دهید
-              </p>
-              <div className="flex justify-center gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => void sendCsat(n)}
-                    className="h-10 w-10 rounded-xl border border-border text-sm font-medium hover:bg-gold-dim"
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+            <div className="shrink-0 border-t border-border bg-surface p-3">
+              <TicketCsatPrompt onSubmit={sendCsat} />
             </div>
           ) : null}
         </>
       ) : loading ? (
-        <div className="h-96 animate-pulse rounded-2xl bg-border/40" />
+        <div className="h-full min-h-[20rem] animate-pulse bg-border/40" />
       ) : (
-        <p className="text-sm text-rose-600">{error || "تیکت یافت نشد"}</p>
+        <div className="space-y-3 p-4">
+          {backLink}
+          <p className="text-sm text-rose-600">{error || "تیکت یافت نشد"}</p>
+        </div>
       )}
     </div>
   );

@@ -25,11 +25,11 @@ export default function AdminInventoryPage() {
         return;
       }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "??? ?? ????????");
+      if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری");
       setProducts(data.products ?? []);
       setLowStockCount(data.lowStockCount ?? 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "???");
+      setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setLoading(false);
     }
@@ -52,10 +52,10 @@ export default function AdminInventoryPage() {
           reason: "admin_toggle",
         }),
       });
-      if (!res.ok) throw new Error("??? ?? ????? ??????");
+      if (!res.ok) throw new Error("خطا در تغییر موجودی");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "???");
+      setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setBusyId(null);
     }
@@ -64,13 +64,13 @@ export default function AdminInventoryPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <p className="text-sm text-zinc-500">
-        {lowStockCount.toLocaleString("fa-IR")} ????? ??????? / ????????
+        {lowStockCount.toLocaleString("fa-IR")} قلم کم‌موجود / ناموجود
       </p>
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
       <DataTable
         data={products}
         rowKey={(r) => r.id}
-        emptyMessage="?????? ???? ???"
+        emptyMessage="محصولی یافت نشد"
         minWidth={false}
         loading={loading}
         error={error || null}
@@ -78,14 +78,14 @@ export default function AdminInventoryPage() {
         columns={[
           {
             key: "title",
-            header: "?????",
+            header: "عنوان",
             sortable: true,
             getSortValue: (r) => r.title,
             render: (r) => r.title,
           },
           {
             key: "stock",
-            header: "????? ??????",
+            header: "وضعیت موجودی",
             className: "w-[10rem]",
             sortable: true,
             getSortValue: (r) => (r.inStock ? 1 : 0),
@@ -97,7 +97,7 @@ export default function AdminInventoryPage() {
                 disabled={busyId === r.id}
                 onClick={() => void toggleStock(r)}
               >
-                {busyId === r.id ? "..." : r.inStock ? "?????" : "???????"}
+                {busyId === r.id ? "..." : r.inStock ? "موجود" : "ناموجود"}
               </AdminButton>
             ),
           },

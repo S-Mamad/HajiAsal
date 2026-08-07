@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChatCircle, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import { StatusBadge } from "@/components/admin/ui/StatusBadge";
 import { AdminModal } from "@/components/admin/ui/AdminModal";
 import { AdminInput, AdminTextarea, FormField } from "@/components/admin/ui/AdminForm";
 import { useAdminToast } from "@/components/admin/ui/AdminToast";
 import { Can } from "@/components/admin/auth/AdminAuthProvider";
+import { TicketStatusBadge } from "@/components/tickets/TicketStatusBadge";
+import { ticketStatusHint } from "@/components/tickets/chat-utils";
 import { Icon } from "@/components/ui/Icon";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
@@ -123,8 +124,8 @@ export default function AdminTicketsPage() {
         </Can>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-[12rem] flex-1">
+      <div className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-3">
+        <div className="relative w-full">
           <Icon
             icon={MagnifyingGlass}
             size={16}
@@ -138,40 +139,42 @@ export default function AdminTicketsPage() {
             }}
             onBlur={() => setQ(qDraft)}
             placeholder="جستجو موضوع، نام، موبایل…"
-            className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pe-3 ps-9 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
+            className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 pe-3 ps-9 text-sm outline-none focus:ring-2 focus:ring-amber-700/20"
           />
         </div>
-        <select
-          value={channel}
-          onChange={(e) => setChannel(e.target.value)}
-          className="h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm"
-        >
-          <option value="all">همه کانال‌ها</option>
-          <option value="customer">مشتری</option>
-          <option value="seller">فروشنده</option>
-        </select>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm"
-        >
-          <option value="all">همه وضعیت‌ها</option>
-          <option value="open">باز</option>
-          <option value="waiting">در انتظار پاسخ</option>
-          <option value="pending">منتظر کاربر</option>
-          <option value="resolved">حل‌شده</option>
-          <option value="closed">بسته</option>
-        </select>
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="h-10 rounded-lg border border-stone-200 bg-white px-3 text-sm"
-        >
-          <option value="all">همه اولویت‌ها</option>
-          <option value="low">کم</option>
-          <option value="normal">عادی</option>
-          <option value="high">بالا</option>
-        </select>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <select
+            value={channel}
+            onChange={(e) => setChannel(e.target.value)}
+            className="h-11 rounded-lg border border-stone-200 bg-white px-3 text-sm"
+          >
+            <option value="all">همه کانال‌ها</option>
+            <option value="customer">مشتری</option>
+            <option value="seller">فروشنده</option>
+          </select>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-11 rounded-lg border border-stone-200 bg-white px-3 text-sm"
+          >
+            <option value="all">همه وضعیت‌ها</option>
+            <option value="open">باز</option>
+            <option value="waiting">در انتظار پاسخ</option>
+            <option value="pending">منتظر کاربر</option>
+            <option value="resolved">حل‌شده</option>
+            <option value="closed">بسته</option>
+          </select>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="h-11 rounded-lg border border-stone-200 bg-white px-3 text-sm"
+          >
+            <option value="all">همه اولویت‌ها</option>
+            <option value="low">کم</option>
+            <option value="normal">عادی</option>
+            <option value="high">بالا</option>
+          </select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -196,7 +199,7 @@ export default function AdminTicketsPage() {
                   )}
                   className="flex flex-col gap-2 px-4 py-3.5 transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={cn(
@@ -208,19 +211,23 @@ export default function AdminTicketsPage() {
                       >
                         {t.channel === "seller" ? "فروشنده" : "مشتری"}
                       </span>
-                      <p className="truncate text-sm font-medium text-zinc-900">
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900">
                         {t.subject}
                       </p>
                     </div>
                     <p className="truncate text-xs text-stone-500">
-                      {t.partyName || t.partyPhone || t.sellerId || "—"}
+                      {ticketStatusHint(t.status) ||
+                        t.partyName ||
+                        t.partyPhone ||
+                        t.sellerId ||
+                        "—"}
                       {" · "}
                       {new Date(t.updatedAt).toLocaleString("fa-IR")}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <StatusBadge status={t.priority} />
-                    <StatusBadge status={t.status} />
+                    <TicketStatusBadge priority={t.priority} variant="admin" />
+                    <TicketStatusBadge status={t.status} variant="admin" />
                   </div>
                 </Link>
               </li>

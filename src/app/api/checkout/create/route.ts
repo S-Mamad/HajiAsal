@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionFromRequest } from "@/lib/auth/session";
-import { getOrderById, updateOrderStatus } from "@/lib/server/orders";
+import { getOrderById } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
 import { setOrderPaymentRef } from "@/lib/server/payment-refs";
+import {
+  getZarinpalMerchantId,
+  zarinpalRequestUrl,
+  zarinpalStartPayUrl,
+} from "@/lib/server/zarinpal";
 
 const createSchema = z.object({
   orderId: z.string().min(1),
@@ -19,8 +24,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-  if (!merchantId || merchantId === "your_merchant_id") {
+  const merchantId = getZarinpalMerchantId();
+  if (!merchantId) {
     return NextResponse.json(
       {
         success: false,
@@ -82,20 +87,17 @@ export async function POST(request: Request) {
     const callbackUrl = `${siteUrl}/api/checkout/verify?orderId=${encodeURIComponent(order.id)}`;
     const amountRial = Math.round(order.total * 10);
 
-    const zarinRes = await fetch(
-      "https://api.zarinpal.com/pg/v4/payment/request.json",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merchant_id: merchantId,
-          amount: amountRial,
-          callback_url: callbackUrl,
-          description: parsed.data.description ?? `سفارش ${order.id}`,
-          metadata: { order_id: order.id, mobile: session.phone },
-        }),
-      },
-    );
+    const zarinRes = await fetch(zarinpalRequestUrl(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        merchant_id: merchantId,
+        amount: amountRial,
+        callback_url: callbackUrl,
+        description: parsed.data.description ?? `سفارش ${order.id}`,
+        metadata: { order_id: order.id, mobile: session.phone },
+      }),
+    });
 
     const zarinData = await zarinRes.json();
     const authority = zarinData.data?.authority;
@@ -110,19 +112,24 @@ export async function POST(request: Request) {
       );
     }
 
-    await updateOrderStatus(order.id, "pending_payment");
     await setOrderPaymentRef(order.id, "zarinpal", String(authority));
 
     return NextResponse.json({
       success: true,
       available: true,
       authority,
-      redirectUrl: `https://www.zarinpal.com/pg/StartPay/${authority}`,
+      redirectUrl: zarinpalStartPayUrl(String(authority)),
       callbackUrl,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { success: false, message: "خطا در ایجاد درخواست پرداخت" },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "خطا در ایجاد درخواست پرداخت",
+      },
       { status: 500 },
     );
   }

@@ -499,6 +499,8 @@ async function applyLocalOverrides(products: Product[]): Promise<Product[]> {
       | (Partial<Product> & Record<string, unknown>)
       | undefined;
     let merged = patch ? applyProductOverridePatch(p, patch) : p;
+    // Skip seller-scoped keys (`seller:{sellerId}:{productId}`) — those are
+    // applied only in getSellerProducts, never to the public catalog.
     if (p.id in stockOverrides) {
       merged = applyStockOverridePatch(merged, stockOverrides[p.id]!);
     }

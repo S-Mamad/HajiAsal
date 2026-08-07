@@ -16,6 +16,7 @@ const footerLinks = [
   { label: "سوالات", href: hajiasalPath("/faq") },
   { label: "پیگیری سفارش", href: hajiasalPath("/track-order") },
   { label: "علاقه‌مندی‌ها", href: hajiasalPath("/wishlist") },
+  { label: "فروشنده شوید", href: hajiasalPath("/seller/apply") },
 ];
 
 const legalLinks = [
@@ -32,6 +33,7 @@ const mobileQuickLinks = [
   { label: "اصالت", href: hajiasalPath("/authenticity") },
   { label: "ارسال", href: hajiasalPath("/shipping") },
   { label: "سوالات", href: hajiasalPath("/faq") },
+  { label: "فروشنده شوید", href: hajiasalPath("/seller/apply") },
 ];
 
 const ENAMAD_HREF =
@@ -40,14 +42,20 @@ const ENAMAD_SRC =
   "https://trustseal.enamad.ir/logo.aspx?id=759178&Code=3HO7QSKRb8oSthAlzX6BLgc7k9e03wDp";
 const ENAMAD_CODE = "3HO7QSKRb8oSthAlzX6BLgc7k9e03wDp";
 
-function EnamadSeal({ className }: { className?: string }) {
+function EnamadSeal({
+  className,
+  width = "4rem",
+}: {
+  className?: string;
+  width?: string;
+}) {
   // Keep official Enamad markup (including non-standard `code`) for seal verification.
   return (
     <span
       className={className}
       aria-label="نماد اعتماد الکترونیکی"
       dangerouslySetInnerHTML={{
-        __html: `<a referrerpolicy="origin" target="_blank" rel="noopener noreferrer" href="${ENAMAD_HREF}"><img referrerpolicy="origin" src="${ENAMAD_SRC}" alt="نماد اعتماد الکترونیکی" style="cursor:pointer;width:5rem;height:auto" code="${ENAMAD_CODE}"></a>`,
+        __html: `<a referrerpolicy="origin" target="_blank" rel="noopener noreferrer" href="${ENAMAD_HREF}"><img referrerpolicy="origin" src="${ENAMAD_SRC}" alt="نماد اعتماد الکترونیکی" style="cursor:pointer;width:${width};height:auto" code="${ENAMAD_CODE}"></a>`,
       }}
     />
   );
@@ -57,65 +65,57 @@ export function Footer() {
   const siteData = useSiteSettings();
 
   return (
-    <footer className="border-t border-border bg-void">
-      {/* Mobile */}
-      <div className="mx-auto max-w-7xl px-5 py-12 md:hidden">
-        <div className="text-center">
-          <div className="flex justify-center">
-            <BrandLogo name={siteData.brand.name} size="lg" />
-          </div>
-          <p className="mx-auto mt-3 max-w-sm text-[13px] leading-relaxed text-secondary">
-            {siteData.brand.description}
+    <footer className="relative z-[1] shrink-0 border-t border-border bg-void">
+      {/* Mobile — compact so short pages (cart, wishlist) are not footer-dominated */}
+      <div className="mx-auto max-w-7xl px-4 py-7 md:hidden">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <BrandLogo name={siteData.brand.name} size="md" />
+          <p className="line-clamp-2 max-w-xs text-[12px] leading-snug text-secondary">
+            {siteData.brand.tagline}
           </p>
         </div>
 
         <nav
           aria-label="لینک‌های فوتر"
-          className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-3"
+          className="mt-5 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2"
         >
           {mobileQuickLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-[13px] text-secondary transition-colors active:text-gold"
+              className="text-[12px] text-secondary transition-colors active:text-gold"
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        <div className="mx-auto mt-8 flex max-w-xs flex-col items-center gap-2.5 text-[13px] text-dim">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] text-dim">
           <a
             href={`tel:${siteData.footer.phone.replace(/\s/g, "")}`}
-            className="inline-flex items-center gap-2 transition-colors active:text-gold"
+            className="inline-flex items-center gap-1.5 transition-colors active:text-gold"
             dir="ltr"
           >
-            <Phone size={14} weight="light" className="text-gold/80" />
+            <Phone size={13} weight="light" className="text-gold/80" />
             {siteData.footer.phone}
           </a>
           <a
             href={`mailto:${siteData.footer.email}`}
-            className="inline-flex max-w-full items-center gap-2 truncate transition-colors active:text-gold"
+            className="inline-flex max-w-[14rem] items-center gap-1.5 truncate transition-colors active:text-gold"
           >
-            <Envelope size={14} weight="light" className="shrink-0 text-gold/80" />
+            <Envelope size={13} weight="light" className="shrink-0 text-gold/80" />
             <span className="truncate">{siteData.footer.email}</span>
           </a>
-          <p className="text-center text-[12px] leading-relaxed text-dim">
-            {siteData.footer.address}
-          </p>
         </div>
 
         <SocialFollowSection
           social={siteData.social}
           compact
-          className="mx-auto mt-8 max-w-sm"
+          className="mx-auto mt-5 max-w-sm"
         />
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-5 flex items-center justify-center gap-4 border-t border-border pt-4">
           <EnamadSeal />
-        </div>
-
-        <div className="mt-10 border-t border-border pt-5 text-center">
           <p className="text-[11px] text-dim">
             © {new Date().getFullYear()} {siteData.brand.name}
           </p>
@@ -123,7 +123,7 @@ export function Footer() {
       </div>
 
       {/* Desktop */}
-      <div className="mx-auto hidden max-w-7xl px-8 py-20 md:block">
+      <div className="mx-auto hidden max-w-7xl px-8 py-14 md:block lg:py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-1">
             <BrandLogo name={siteData.brand.name} size="lg" className="mb-4" />
@@ -195,7 +195,7 @@ export function Footer() {
               className="mt-6 max-w-full"
             />
             <div className="mt-6">
-              <EnamadSeal />
+              <EnamadSeal width="5rem" />
             </div>
           </div>
         </div>
