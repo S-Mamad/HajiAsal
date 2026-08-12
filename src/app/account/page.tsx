@@ -8,7 +8,7 @@ import {
   ArrowLeft,
   ChatCircle,
   CaretLeft,
-} from "@phosphor-icons/react/dist/ssr";
+} from "@/components/account/AccountIcons";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import {
   findProfileById,

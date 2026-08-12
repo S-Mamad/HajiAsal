@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package } from "@phosphor-icons/react/dist/ssr";
+import { Package } from "@/components/account/AccountIcons";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { getOrdersByUserId } from "@/lib/server/orders";
 import { EmptyState } from "@/components/ui/EmptyState";

@@ -22,6 +22,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Prefer ESM "import" so Phosphor `/dist/ssr` does not resolve via the
+  // broken `require` export to the client CJS bundle (createContext crash).
+  webpack: (config) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.conditionNames = [
+      "import",
+      "module",
+      "require",
+      "default",
+      ...(config.resolve.conditionNames ?? []),
+    ];
+    return config;
+  },
 };
 
 export default nextConfig;

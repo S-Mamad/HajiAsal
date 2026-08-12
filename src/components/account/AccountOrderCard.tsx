@@ -1,10 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import {
   Package,
   FileText,
   DownloadSimple,
   CaretDown,
-} from "@phosphor-icons/react/dist/ssr";
+} from "@phosphor-icons/react";
 import type { StoredOrder } from "@/lib/server/orders";
 import { AccountSurface } from "@/components/account/AccountSurface";
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge";

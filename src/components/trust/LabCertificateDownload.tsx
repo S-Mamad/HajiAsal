@@ -1,5 +1,7 @@
+"use client";
+
 import Image from "next/image";
-import { FileArrowDown } from "@phosphor-icons/react/dist/ssr";
+import { FileArrowDown } from "@phosphor-icons/react";
 import { LAB_CERTIFICATE } from "@/lib/lab-certificate";
 import { Reveal } from "@/components/ui/Reveal";
 

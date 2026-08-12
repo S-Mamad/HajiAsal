@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Storefront } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, Storefront } from "@phosphor-icons/react";
 import { ACCOUNT_STORE_LINK } from "@/lib/account/nav";
 import { cn } from "@/lib/utils";
 
