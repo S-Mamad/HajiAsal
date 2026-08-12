@@ -126,7 +126,7 @@ export default function AccountTicketDetailPage() {
   const backLink = (
     <Link
       href={hajiasalPath("/account/tickets")}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-secondary transition hover:border-gold/30 hover:bg-surface-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 text-secondary transition hover:border-gold/30 hover:bg-surface-muted hover:text-primary active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
       aria-label="بازگشت به تیکت‌ها"
     >
       <Icon icon={ArrowRight} size={18} />
@@ -134,7 +134,7 @@ export default function AccountTicketDetailPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-surface md:bg-transparent">
       {ticket ? (
         <>
           <TicketChat
@@ -168,7 +168,7 @@ export default function AccountTicketDetailPage() {
               <button
                 type="button"
                 onClick={() => void toggleClose()}
-                className="h-9 rounded-xl border border-border px-3 text-xs font-medium text-primary transition hover:bg-surface-muted"
+                className="h-10 rounded-xl border border-border px-3 text-xs font-medium text-primary transition hover:bg-surface-muted active:scale-[0.98]"
               >
                 {ticket.status === "closed" || ticket.status === "resolved"
                   ? "بازگشایی"
@@ -178,13 +178,18 @@ export default function AccountTicketDetailPage() {
           />
           {(ticket.status === "closed" || ticket.status === "resolved") &&
           !ticket.csatScore ? (
-            <div className="shrink-0 border-t border-border bg-surface p-3">
+            <div className="relative z-[2] shrink-0 border-t border-border/80 bg-surface/95 p-3 backdrop-blur-md">
               <TicketCsatPrompt onSubmit={sendCsat} />
             </div>
           ) : null}
         </>
       ) : loading ? (
-        <div className="h-full min-h-[20rem] animate-pulse bg-border/40" />
+        <div className="flex h-full min-h-[20rem] flex-col gap-3 p-4">
+          <div className="h-14 animate-pulse rounded-2xl bg-border/50" />
+          <div className="ml-auto h-16 w-3/4 animate-pulse rounded-[1.15rem] bg-border/40" />
+          <div className="mr-auto h-16 w-2/3 animate-pulse rounded-[1.15rem] bg-border/40" />
+          <div className="mt-auto h-14 animate-pulse rounded-[1.35rem] bg-border/50" />
+        </div>
       ) : (
         <div className="space-y-3 p-4">
           {backLink}

@@ -70,7 +70,7 @@ export function AccountWishlistClient() {
       void fetch("/api/account/wishlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productIds: ids, merge: true }),
+        body: JSON.stringify({ productIds: ids, merge: false }),
         signal: controller.signal,
       }).catch(() => {
         /* ignore abort / network */

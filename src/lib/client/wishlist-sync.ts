@@ -1,6 +1,20 @@
 import { useWishlistStore } from "@/store/wishlist";
 
-/** Push local wishlist ids to the authenticated account (merge). */
+/** Replace server wishlist with local ids (supports removals). */
+export async function pushWishlistReplace(): Promise<void> {
+  const ids = useWishlistStore.getState().ids;
+  try {
+    await fetch("/api/account/wishlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds: ids, merge: false }),
+    });
+  } catch {
+    // non-blocking sync
+  }
+}
+
+/** Push local wishlist ids to the authenticated account (merge on first login). */
 export async function syncWishlistToServer(): Promise<void> {
   const ids = useWishlistStore.getState().ids;
   if (ids.length === 0) return;
@@ -32,8 +46,8 @@ export async function syncWishlistFromServer(): Promise<void> {
   }
 }
 
-/** Two-way sync: pull then push merge. */
+/** Two-way sync: pull merge, then push replace so removals stick later. */
 export async function syncWishlistBidirectional(): Promise<void> {
   await syncWishlistFromServer();
-  await syncWishlistToServer();
+  await pushWishlistReplace();
 }

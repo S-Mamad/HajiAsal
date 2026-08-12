@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/payment-refs";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { refundOrderAtGateway } from "@/lib/server/payment-refund";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 const PAYABLE = new Set(["pending_payment"]);
 
@@ -61,6 +62,11 @@ export async function GET(request: Request) {
     state === "cancelled" ||
     state === "reject"
   ) {
+    void notifyTelegram("order.payment_failed", {
+      orderId,
+      gateway: "snappay",
+      reason: "cancelled",
+    });
     return cancelledRedirect(orderId);
   }
 
@@ -104,6 +110,11 @@ export async function GET(request: Request) {
       expectedAmountRial: expectedRial,
     });
     if (!result.ok) {
+      void notifyTelegram("order.payment_failed", {
+        orderId,
+        gateway: "snappay",
+        reason: "failed",
+      });
       return failedRedirect(orderId);
     }
     await setOrderSettleRef(orderId, paymentToken);
@@ -127,6 +138,11 @@ export async function GET(request: Request) {
       ),
     );
   } catch {
+    void notifyTelegram("order.payment_failed", {
+      orderId,
+      gateway: "snappay",
+      reason: "failed",
+    });
     return failedRedirect(orderId);
   }
 }

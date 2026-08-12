@@ -65,15 +65,25 @@ export function formatMessageTime(iso: string): string {
     const diff = Date.now() - d.getTime();
     if (diff < 60_000) return "همین الان";
     if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} دقیقه پیش`;
+    return d.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+export function formatRelativeShort(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    if (diff < 60_000) return "الان";
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}ق`;
     if (diff < 86_400_000) {
       return d.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
     }
-    return d.toLocaleDateString("fa-IR", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    if (diff < 86_400_000 * 7) {
+      return d.toLocaleDateString("fa-IR", { weekday: "short" });
+    }
+    return d.toLocaleDateString("fa-IR", { month: "short", day: "numeric" });
   } catch {
     return "";
   }
@@ -120,16 +130,16 @@ export function bubbleTone(
     return "bg-transparent text-stone-500 shadow-none ring-0 border-0";
   }
   if (isInternal) {
-    return "bg-amber-50 text-amber-950 border border-amber-200 rounded-br-md";
+    return "bg-amber-50/95 text-amber-950 border border-amber-200/80 shadow-sm";
   }
   if (isSelf) {
     return variant === "storefront"
-      ? "bg-gold text-primary rounded-bl-md"
-      : "bg-zinc-900 text-white rounded-bl-md";
+      ? "bg-gold text-primary shadow-[0_8px_20px_-12px_var(--gold-glow)]"
+      : "bg-zinc-900 text-white shadow-md shadow-zinc-900/20";
   }
   return variant === "storefront"
-    ? "bg-surface-elevated text-primary border border-border rounded-br-md"
-    : "bg-white text-zinc-800 border border-stone-200 rounded-br-md";
+    ? "bg-surface text-primary border border-border/80 shadow-[0_6px_18px_-14px_rgb(28_25_23/0.35)]"
+    : "bg-white text-zinc-800 border border-stone-200 shadow-sm";
 }
 
 export function shellClass(
@@ -137,16 +147,16 @@ export function shellClass(
   layout: TicketChatLayout = "embedded",
 ): string {
   return cn(
-    "flex min-h-0 flex-col overflow-hidden",
+    "relative flex min-h-0 flex-col overflow-hidden",
     layout === "fullscreen"
       ? "h-full rounded-none border-0 shadow-none"
       : "h-full min-h-[28rem] sm:min-h-[32rem] sm:h-[min(70vh,40rem)]",
     variant === "storefront"
       ? layout === "fullscreen"
-        ? "bg-surface"
-        : "rounded-2xl border border-border bg-gradient-to-b from-surface to-surface-muted/40 shadow-sm"
+        ? "ticket-chat-canvas"
+        : "ticket-chat-canvas rounded-2xl border border-border shadow-sm"
       : layout === "fullscreen"
-        ? "bg-white"
+        ? "bg-stone-50"
         : "rounded-xl border border-stone-200 bg-gradient-to-b from-white to-stone-50 shadow-sm",
   );
 }
@@ -158,8 +168,14 @@ export function renderLightMarkdown(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   return escaped
-    .replace(/```([\s\S]*?)```/g, "<pre class=\"mt-1 overflow-x-auto rounded-lg bg-black/10 p-2 text-xs\"><code>$1</code></pre>")
-    .replace(/`([^`]+)`/g, "<code class=\"rounded bg-black/10 px-1 text-[0.85em]\">$1</code>")
+    .replace(
+      /```([\s\S]*?)```/g,
+      '<pre class="mt-1 overflow-x-auto rounded-xl bg-black/10 p-2 text-xs"><code>$1</code></pre>',
+    )
+    .replace(
+      /`([^`]+)`/g,
+      '<code class="rounded-md bg-black/10 px-1 text-[0.85em]">$1</code>',
+    )
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { WifiSlash } from "@phosphor-icons/react";
+import { WifiSlash, WarningCircle } from "@phosphor-icons/react";
 import { TicketComposer } from "./TicketComposer";
 import { TicketMessageList } from "./TicketMessageList";
 import { TicketThreadHeader } from "./TicketThreadHeader";
@@ -100,6 +100,8 @@ export function TicketChat({
       ? crypto.randomUUID()
       : `tab_${Date.now()}`,
   );
+  const isStore = variant === "storefront";
+  const isFullscreen = layout === "fullscreen";
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -249,7 +251,14 @@ export function TicketChat({
     });
   };
 
-  const isFullscreen = layout === "fullscreen";
+  const banner = (
+    className: string,
+    content: React.ReactNode,
+  ) => (
+    <div className={cn("relative z-[1] shrink-0 px-3 py-2 text-xs sm:text-sm", className)}>
+      {content}
+    </div>
+  );
 
   return (
     <div className={cn(shellClass(variant, layout), className)}>
@@ -267,50 +276,62 @@ export function TicketChat({
         actions={headerActions}
       />
 
-      {contextChip && !isFullscreen ? (
-        <div
-          className={cn(
-            "shrink-0 border-b px-4 py-1.5 text-[11px]",
-            variant === "storefront"
-              ? "border-border bg-surface-muted/50 text-secondary"
-              : "border-stone-100 bg-stone-50 text-stone-600",
-          )}
-        >
-          {contextChip}
-        </div>
-      ) : null}
-      {lockLabel ? (
-        <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-1.5 text-xs text-amber-900">
-          {lockLabel}
-        </div>
-      ) : null}
-      {presenceLabel ? (
-        <div className="shrink-0 border-b border-stone-100 px-4 py-1 text-[11px] text-stone-500">
-          {presenceLabel}
-        </div>
-      ) : null}
-      {!online ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-          <Icon icon={WifiSlash} size={16} />
-          اتصال قطع است. پس از وصل شدن، ارسال از سر گرفته می‌شود
-        </div>
-      ) : null}
+      {contextChip && !isFullscreen
+        ? banner(
+            isStore
+              ? "border-b border-border/60 bg-surface/70 text-secondary"
+              : "border-b border-stone-100 bg-stone-50 text-stone-600",
+            contextChip,
+          )
+        : null}
+      {lockLabel
+        ? banner(
+            "border-b border-amber-200/70 bg-amber-50 text-amber-950",
+            lockLabel,
+          )
+        : null}
+      {presenceLabel
+        ? banner(
+            isStore
+              ? "border-b border-border/50 bg-transparent text-secondary"
+              : "border-b border-stone-100 text-stone-500",
+            presenceLabel,
+          )
+        : null}
+      {!online
+        ? banner(
+            "flex items-center gap-2 border-b border-amber-200 bg-amber-50 text-amber-950",
+            <>
+              <Icon icon={WifiSlash} size={16} />
+              اتصال قطع است. پس از وصل شدن، ارسال از سر گرفته می‌شود
+            </>,
+          )
+        : null}
 
-      {error ? (
-        <div className="shrink-0 border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
-          {error}
-          {onRetryLoad ? (
-            <button type="button" className="ms-2 underline" onClick={onRetryLoad}>
-              تلاش مجدد
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {localError ? (
-        <div className="shrink-0 border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-700">
-          {localError}
-        </div>
-      ) : null}
+      {error
+        ? banner(
+            "flex flex-wrap items-center gap-2 border-b border-rose-200/80 bg-rose-50 text-rose-800",
+            <>
+              <Icon icon={WarningCircle} size={16} />
+              <span className="min-w-0 flex-1">{error}</span>
+              {onRetryLoad ? (
+                <button
+                  type="button"
+                  className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-medium underline-offset-2 hover:underline"
+                  onClick={onRetryLoad}
+                >
+                  تلاش مجدد
+                </button>
+              ) : null}
+            </>,
+          )
+        : null}
+      {localError
+        ? banner(
+            "border-b border-rose-200/80 bg-rose-50 text-rose-800",
+            localError,
+          )
+        : null}
 
       <TicketMessageList
         messages={displayMessages}
@@ -324,15 +345,22 @@ export function TicketChat({
       {typingLabel ? (
         <p
           className={cn(
-            "shrink-0 px-4 pb-1 text-[11px]",
-            variant === "storefront" ? "text-secondary" : "text-stone-500",
+            "relative z-[1] shrink-0 px-4 pb-1.5 text-[11px]",
+            isStore ? "text-secondary" : "text-stone-500",
           )}
         >
-          {typingLabel}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="flex gap-0.5" aria-hidden>
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:0ms]" />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:120ms]" />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-current [animation-delay:240ms]" />
+            </span>
+            {typingLabel}
+          </span>
         </p>
       ) : null}
 
-      <div className="shrink-0">
+      <div className="relative z-[1] shrink-0">
         <TicketComposer
           variant={variant}
           ticketId={ticketId}

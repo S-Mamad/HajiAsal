@@ -18,8 +18,8 @@ test.describe("Haji Asal checkout payment gate", () => {
   test("checkout without gateway does not fake-success", async ({ page }) => {
     const availability = await page.request.get("/api/checkout/availability");
     const gates = availability.ok()
-      ? ((await availability.json()) as { zarinpal?: boolean; snappay?: boolean })
-      : { zarinpal: false, snappay: false };
+      ? ((await availability.json()) as { zibal?: boolean; snappay?: boolean })
+      : { zibal: false, snappay: false };
 
     await addFirstShopProductToCart(page);
     await loginAsTestUser(page, "/checkout");
@@ -35,7 +35,7 @@ test.describe("Haji Asal checkout payment gate", () => {
 
     await page.getByRole("button", { name: "بعدی" }).click();
 
-    if (!gates.zarinpal && !gates.snappay) {
+    if (!gates.zibal && !gates.snappay) {
       // No gateway configured: submit must not land on success page.
       const submit = page.getByRole("button", { name: /ثبت سفارش/ });
       if (await submit.isEnabled().catch(() => false)) {

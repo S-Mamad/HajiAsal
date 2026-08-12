@@ -16,8 +16,8 @@ interface EnvStatus {
   sms: boolean;
   transactionalSms: boolean;
   orderSms: boolean;
-  zarinpal: boolean;
-  zarinpalRefund: boolean;
+  zibal: boolean;
+  zibalRefund: boolean;
   authSecret: boolean;
   adminOtp: boolean;
   siteUrl: boolean;
@@ -31,8 +31,8 @@ const LABELS: Record<keyof Omit<EnvStatus, "mysqlError">, string> = {
   sms: "پیامک (OTP ورود)",
   transactionalSms: "پیامک آزاد (ارسال دستی ادمین)",
   orderSms: "پیامک خودکار سفارش",
-  zarinpal: "زرین‌پال",
-  zarinpalRefund: "استرداد زرین‌پال (ACCESS_TOKEN)",
+  zibal: "زیبال",
+  zibalRefund: "استرداد زیبال (بانکداری شرکتی)",
   authSecret: "AUTH_SESSION_SECRET",
   adminOtp: "ورود ادمین با OTP",
   siteUrl: "NEXT_PUBLIC_SITE_URL",
@@ -51,6 +51,43 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const [telegram, setTelegram] = useState<{
+    enabled: boolean;
+    tokenConfigured: boolean;
+    chatCount: number;
+    usingCloudflareProxy: boolean;
+    note?: string;
+  } | null>(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramPinging, setTelegramPinging] = useState(false);
+
+  const loadTelegram = useCallback(async () => {
+    setTelegramLoading(true);
+    try {
+      const res = await fetch("/api/admin/telegram");
+      if (res.status === 401) {
+        router.push(hajiasalPath("/admin"));
+        return;
+      }
+      if (res.status === 403) {
+        setTelegram(null);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "خطا در وضعیت تلگرام");
+      setTelegram({
+        enabled: Boolean(data.enabled),
+        tokenConfigured: Boolean(data.tokenConfigured),
+        chatCount: Number(data.chatCount ?? 0),
+        usingCloudflareProxy: Boolean(data.usingCloudflareProxy),
+        note: typeof data.note === "string" ? data.note : undefined,
+      });
+    } catch {
+      setTelegram(null);
+    } finally {
+      setTelegramLoading(false);
+    }
+  }, [router]);
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
@@ -71,8 +108,8 @@ export default function AdminSettingsPage() {
         sms: Boolean(rawEnv.sms),
         transactionalSms: Boolean(rawEnv.transactionalSms),
         orderSms: Boolean(rawEnv.orderSms),
-        zarinpal: Boolean(rawEnv.zarinpal),
-        zarinpalRefund: Boolean(rawEnv.zarinpalRefund),
+        zibal: Boolean(rawEnv.zibal),
+        zibalRefund: Boolean(rawEnv.zibalRefund),
         authSecret: Boolean(rawEnv.authSecret),
         adminOtp: Boolean(rawEnv.adminOtp ?? true),
         siteUrl: Boolean(rawEnv.siteUrl),
@@ -84,12 +121,13 @@ export default function AdminSettingsPage() {
       if (data.settings) {
         setShippingCost(String(data.settings.shippingCost ?? ""));
       }
+      void loadTelegram();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, loadTelegram]);
 
   useEffect(() => {
     void loadSettings();
@@ -129,6 +167,22 @@ export default function AdminSettingsPage() {
       router.push(hajiasalPath("/admin"));
     } finally {
       setLoggingOut(false);
+    }
+  };
+
+  const pingTelegram = async () => {
+    setTelegramPinging(true);
+    try {
+      const res = await fetch("/api/admin/telegram", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "ارسال تست ناموفق بود");
+      toast.success(data.message ?? "پیام تست ارسال شد");
+      void loadTelegram();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "خطای ناشناخته";
+      toast.error(message);
+    } finally {
+      setTelegramPinging(false);
     }
   };
 
@@ -225,6 +279,53 @@ export default function AdminSettingsPage() {
             {savingShipping ? "در حال ذخیره..." : "ذخیره ارسال"}
           </AdminButton>
         </div>
+      </div>
+
+      <div className="panel-card p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-zinc-900">تلگرام ادمین</h3>
+          <AdminButton
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadTelegram()}
+            disabled={telegramLoading}
+          >
+            {telegramLoading ? "…" : "بروزرسانی وضعیت"}
+          </AdminButton>
+        </div>
+        {telegram ? (
+          <div className="space-y-3 text-sm text-zinc-600">
+            <ul className="space-y-1">
+              <li>
+                وضعیت:{" "}
+                <span className={telegram.enabled ? "text-emerald-700" : "text-amber-700"}>
+                  {telegram.enabled ? "فعال" : "غیرفعال / ناقص"}
+                </span>
+              </li>
+              <li>توکن: {telegram.tokenConfigured ? "تنظیم شده" : "نیست"}</li>
+              <li>تعداد چت ادمین: {telegram.chatCount.toLocaleString("fa-IR")}</li>
+              <li>
+                پروکسی Cloudflare:{" "}
+                {telegram.usingCloudflareProxy ? "بله" : "خیر (مستقیم api.telegram.org)"}
+              </li>
+            </ul>
+            {telegram.note ? (
+              <p className="text-xs text-zinc-500">{telegram.note}</p>
+            ) : null}
+            <AdminButton
+              type="button"
+              onClick={() => void pingTelegram()}
+              disabled={telegramPinging || !telegram.enabled}
+            >
+              {telegramPinging ? "در حال ارسال..." : "ارسال پیام تست"}
+            </AdminButton>
+          </div>
+        ) : (
+          <p className="text-sm text-zinc-500">
+            وضعیت تلگرام در دسترس نیست (دسترسی یا پیکربندی).
+          </p>
+        )}
       </div>
 
       <div className="panel-card p-5">

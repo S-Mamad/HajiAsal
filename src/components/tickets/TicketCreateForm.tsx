@@ -56,7 +56,7 @@ export function TicketCreateForm({
       className={cn(
         "space-y-4",
         variant === "storefront"
-          ? "rounded-2xl border border-border bg-surface p-5"
+          ? "rounded-2xl bg-transparent p-0"
           : "rounded-xl border border-stone-200 bg-white p-4",
         className,
       )}

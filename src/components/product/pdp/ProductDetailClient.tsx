@@ -31,6 +31,7 @@ import {
   DEFAULT_TRUST_TITLE,
 } from "../lib/build-accordion-items";
 import type { ProductDetailClientProps } from "../types";
+import { getEffectiveWeightPrice } from "@/lib/products";
 
 const featureBadges = [
   { icon: Leaf, label: "۱۰۰٪ طبیعی" },
@@ -169,6 +170,7 @@ export function ProductDetailClient({
             options={product.weightOptions}
             selected={selectedWeight}
             onChange={setSelectedWeight}
+            getPrice={(option) => getEffectiveWeightPrice(product, option)}
           />
 
           <div className="flex items-center gap-4">
@@ -219,6 +221,16 @@ export function ProductDetailClient({
             </div>
           </div>
 
+          {/* Sentinel must sit next to main ATC so sticky only appears after it leaves the viewport */}
+          <StickyAddToCart
+            title={product.title}
+            price={listPrice}
+            discountPrice={salePrice < listPrice ? salePrice : undefined}
+            inStock={purchasable}
+            onAddToCart={addToCart}
+            busy={adding}
+          />
+
           <div className="flex flex-wrap gap-6 border-t border-border pt-4 text-xs text-secondary">
             <div className="flex items-center gap-2">
               <Truck size={14} className="text-gold" weight="duotone" />
@@ -250,14 +262,6 @@ export function ProductDetailClient({
           categoryLabel={product.categoryLabel}
         />
       ) : null}
-
-      <StickyAddToCart
-        title={product.title}
-        price={listPrice}
-        discountPrice={salePrice < listPrice ? salePrice : undefined}
-        inStock={purchasable}
-        onAddToCart={addToCart}
-      />
     </div>
   );
 }

@@ -37,7 +37,10 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
               : null}
           </p>
         </div>
-        <OrderStatusBadge status={order.status} />
+        <OrderStatusBadge
+          status={order.status}
+          refunded={Boolean(order.refundedAt)}
+        />
       </div>
 
       {preview.length > 0 ? (
@@ -91,9 +94,17 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
         </div>
 
         <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {order.status === "pending_payment" ? (
+            <Link
+              href={`${hajiasalPath("/checkout")}?payment=failed&orderId=${encodeURIComponent(order.id)}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-gold transition-colors hover:text-gold-bright focus-visible:outline-none focus-visible:underline"
+            >
+              ادامه پرداخت
+            </Link>
+          ) : null}
           {order.trackingCode ? (
             <Link
-              href={`${hajiasalPath("/track-order")}?tracking=${order.trackingCode}`}
+              href={`${hajiasalPath("/track-order")}?tracking=${encodeURIComponent(order.trackingCode)}`}
               className="inline-flex items-center gap-1 text-sm text-gold transition-colors hover:text-gold-bright focus-visible:outline-none focus-visible:underline"
             >
               <Package size={15} />

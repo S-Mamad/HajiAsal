@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { adminHasPermission } from "@/lib/server/admin-auth";
 import { gateAdmin } from "@/lib/server/admin-gate";
+import { logAdminAction } from "@/lib/server/audit-log";
 import { getContactMessagesBySource } from "@/lib/server/newsletter";
 import {
   getAllOrders,
+  getOrderById,
   updateOrderStatus,
   type OrderStatus,
 } from "@/lib/server/orders";
+import {
+  notifyOrderStatusChange,
+  resolveOrderNotifyEvent,
+} from "@/lib/server/order-notify";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 const statusSchema = z.object({
   orderId: z.string().min(1),
@@ -52,6 +59,11 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const before = await getOrderById(parsed.data.orderId);
+    if (!before) {
+      return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
+    }
+
     const order = await updateOrderStatus(
       parsed.data.orderId,
       parsed.data.status as OrderStatus,
@@ -60,6 +72,38 @@ export async function PATCH(request: Request) {
     if (!order) {
       return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
     }
+
+    const notifyEvent = resolveOrderNotifyEvent({
+      prevStatus: before.status,
+      nextStatus: order.status,
+      refunded: false,
+      trackingCode: order.trackingCode,
+    });
+    if (notifyEvent) {
+      void notifyOrderStatusChange(order, notifyEvent);
+    }
+
+    if (order.status === "cancelled" && before.status !== "cancelled") {
+      void notifyTelegram("order.cancelled", {
+        order,
+        prevStatus: before.status,
+        nextStatus: order.status,
+      });
+    } else if (order.status !== before.status) {
+      void notifyTelegram("order.status_changed", {
+        order,
+        prevStatus: before.status,
+        nextStatus: order.status,
+      });
+    }
+
+    await logAdminAction({
+      action: "order.update",
+      entityType: "order",
+      entityId: parsed.data.orderId,
+      adminUserId: gate.ctx.user?.id,
+      payload: parsed.data as Record<string, unknown>,
+    });
 
     return NextResponse.json({ success: true, order });
   } catch (error) {

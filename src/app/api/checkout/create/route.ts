@@ -5,10 +5,14 @@ import { getOrderById } from "@/lib/server/orders";
 import { normalizePhone } from "@/lib/auth/phone";
 import { setOrderPaymentRef } from "@/lib/server/payment-refs";
 import {
-  getZarinpalMerchantId,
-  zarinpalRequestUrl,
-  zarinpalStartPayUrl,
-} from "@/lib/server/zarinpal";
+  getZibalMerchant,
+  isZibalConfigured,
+  zibalPostJson,
+  zibalRequestResultMessage,
+  zibalRequestUrl,
+  zibalStartPayUrl,
+  type ZibalRequestResult,
+} from "@/lib/server/zibal";
 
 const createSchema = z.object({
   orderId: z.string().min(1),
@@ -24,14 +28,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const merchantId = getZarinpalMerchantId();
-  if (!merchantId) {
+  const merchant = getZibalMerchant();
+  if (!merchant || !isZibalConfigured()) {
     return NextResponse.json(
       {
         success: false,
         available: false,
         message:
-          "درگاه زرین‌پال پیکربندی نشده است. از روش پرداخت دیگری استفاده کنید.",
+          "درگاه زیبال پیکربندی نشده است. از روش پرداخت دیگری استفاده کنید.",
       },
       { status: 503 },
     );
@@ -87,38 +91,49 @@ export async function POST(request: Request) {
     const callbackUrl = `${siteUrl}/api/checkout/verify?orderId=${encodeURIComponent(order.id)}`;
     const amountRial = Math.round(order.total * 10);
 
-    const zarinRes = await fetch(zarinpalRequestUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        merchant_id: merchantId,
-        amount: amountRial,
-        callback_url: callbackUrl,
-        description: parsed.data.description ?? `سفارش ${order.id}`,
-        metadata: { order_id: order.id, mobile: session.phone },
-      }),
-    });
-
-    const zarinData = await zarinRes.json();
-    const authority = zarinData.data?.authority;
-
-    if (zarinData.data?.code !== 100 || !authority) {
+    if (!Number.isFinite(amountRial) || amountRial < 1000) {
       return NextResponse.json(
         {
           success: false,
-          message: zarinData.errors?.message ?? "خطا در اتصال به زرین‌پال",
+          message: "مبلغ سفارش برای درگاه زیبال معتبر نیست (حداقل ۱۰۰۰ ریال)",
+        },
+        { status: 400 },
+      );
+    }
+
+    const zibalData = await zibalPostJson<ZibalRequestResult>(
+      zibalRequestUrl(),
+      {
+        merchant,
+        amount: amountRial,
+        callbackUrl,
+        description: parsed.data.description ?? `سفارش ${order.id}`,
+        orderId: order.id,
+        mobile: session.phone,
+      },
+    );
+
+    const trackId = zibalData.trackId;
+    if (zibalData.result !== 100 || trackId == null) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            zibalData.message ||
+            zibalRequestResultMessage(Number(zibalData.result ?? 0)) ||
+            "خطا در اتصال به زیبال",
         },
         { status: 502 },
       );
     }
 
-    await setOrderPaymentRef(order.id, "zarinpal", String(authority));
+    await setOrderPaymentRef(order.id, "zibal", String(trackId));
 
     return NextResponse.json({
       success: true,
       available: true,
-      authority,
-      redirectUrl: zarinpalStartPayUrl(String(authority)),
+      trackId: String(trackId),
+      redirectUrl: zibalStartPayUrl(trackId),
       callbackUrl,
     });
   } catch (error) {

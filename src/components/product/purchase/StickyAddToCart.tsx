@@ -13,6 +13,7 @@ export function StickyAddToCart({
   discountPrice,
   inStock,
   onAddToCart,
+  busy = false,
 }: StickyAddToCartProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
@@ -23,7 +24,7 @@ export function StickyAddToCart({
 
     const observer = new IntersectionObserver(
       ([entry]) => setIsSticky(!entry.isIntersecting),
-      { threshold: 0 },
+      { threshold: 0, rootMargin: "0px 0px 0px 0px" },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -31,7 +32,7 @@ export function StickyAddToCart({
 
   return (
     <>
-      <div ref={sentinelRef} className="h-px" aria-hidden />
+      <div ref={sentinelRef} className="h-px w-full" aria-hidden />
       <AnimatePresence>
         {isSticky ? (
           <motion.div
@@ -54,12 +55,12 @@ export function StickyAddToCart({
               </div>
               <Button
                 size="sm"
-                disabled={!inStock}
+                disabled={!inStock || busy}
                 onClick={onAddToCart}
                 className="shrink-0"
               >
                 <ShoppingBag size={16} />
-                {inStock ? "افزودن" : "ناموجود"}
+                {!inStock ? "ناموجود" : busy ? "..." : "افزودن"}
               </Button>
             </div>
           </motion.div>

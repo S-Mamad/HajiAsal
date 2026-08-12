@@ -11,6 +11,7 @@ import { hajiasalPath } from "@/lib/paths";
 
 export default function WishlistPage() {
   const ids = useWishlistStore((s) => s.ids);
+  const hasHydrated = useWishlistStore((s) => s._hasHydrated);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export default function WishlistPage() {
       <SectionHeading
         title="علاقه‌مندی‌ها"
         subtitle={
-          loading
+          !hasHydrated || loading
             ? "در حال بارگذاری..."
             : error
               ? "خطا در دریافت فهرست"
@@ -70,7 +71,7 @@ export default function WishlistPage() {
         className="mb-8 shrink-0 md:mb-10"
       />
 
-      {loading ? (
+      {!hasHydrated || loading ? (
         <div
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4"
           aria-busy="true"

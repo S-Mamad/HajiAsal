@@ -8,6 +8,7 @@ import {
   getZarinpalMerchantId,
   zarinpalRefundUrl,
 } from "./zarinpal";
+import { isZibalRefundConfigured } from "./zibal";
 
 export type GatewayRefundResult =
   | { ok: true; provider: PaymentProvider; message?: string }
@@ -19,7 +20,7 @@ function zarinpalAccessToken(): string | null {
 
 /**
  * Zarinpal refund requires a Personal Access Token from the panel.
- * Docs: POST https://api.zarinpal.com/pg/v4/payment/refund.json
+ * Kept for legacy bindings only (online checkout is Zibal now).
  */
 export async function refundZarinpal(input: {
   authority: string;
@@ -97,6 +98,40 @@ export async function refundZarinpal(input: {
 }
 
 /**
+ * Zibal refund needs corporate-banking (بانکداری شرکتی) + API key.
+ * We do not invent the refund endpoint: fail-closed and direct ops to panel / manualRefund.
+ */
+export async function refundZibal(input: {
+  trackId: string;
+  amountRial?: number;
+}): Promise<GatewayRefundResult> {
+  if (!input.trackId) {
+    return {
+      ok: false,
+      error: "مرجع پرداخت زیبال (trackId) یافت نشد",
+      status: 400,
+    };
+  }
+
+  if (!isZibalRefundConfigured()) {
+    return {
+      ok: false,
+      error:
+        "استرداد خودکار زیبال فعال نیست. از پنل زیبال استرداد کنید یا در ادمین manualRefund بزنید (ZIBAL_REFUND_ENABLED + ZIBAL_API_KEY پس از بانکداری شرکتی).",
+      status: 503,
+    };
+  }
+
+  // Corporate refund API is separate from IPG; do not guess URLs/payloads.
+  return {
+    ok: false,
+    error:
+      "استرداد API زیبال هنوز به endpoint بانکداری شرکتی وصل نشده است. از پنل زیبال یا manualRefund استفاده کنید.",
+    status: 503,
+  };
+}
+
+/**
  * SnappPay (اسنپ‌پی) cancel/revert after settle.
  * Uses /api/online/payment/v1/cancel with paymentToken.
  */
@@ -160,9 +195,9 @@ export async function refundOrderAtGateway(
   }
 
   const binding = await getOrderPaymentBinding(order.id);
-  const provider =
+  const provider: PaymentProvider =
     binding?.provider ??
-    (order.paymentMethod === "snappay" ? "snappay" : "zarinpal");
+    (order.paymentMethod === "snappay" ? "snappay" : "zibal");
 
   if (provider === "snappay") {
     const token = binding?.paymentRef;
@@ -176,17 +211,32 @@ export async function refundOrderAtGateway(
     return refundSnappay({ paymentToken: token });
   }
 
-  const authority = binding?.paymentRef;
-  if (!authority) {
+  if (provider === "zarinpal") {
+    const authority = binding?.paymentRef;
+    if (!authority) {
+      return {
+        ok: false,
+        error: "مرجع پرداخت زرین‌پال (authority) برای این سفارش یافت نشد",
+        status: 400,
+      };
+    }
+    return refundZarinpal({
+      authority,
+      amountRial: Math.round(order.total * 10),
+    });
+  }
+
+  const trackId = binding?.paymentRef;
+  if (!trackId) {
     return {
       ok: false,
-      error: "مرجع پرداخت زرین‌پال (authority) برای این سفارش یافت نشد",
+      error: "مرجع پرداخت زیبال (trackId) برای این سفارش یافت نشد",
       status: 400,
     };
   }
 
-  return refundZarinpal({
-    authority,
+  return refundZibal({
+    trackId,
     amountRial: Math.round(order.total * 10),
   });
 }

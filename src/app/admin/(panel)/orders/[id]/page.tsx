@@ -9,7 +9,7 @@ import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { AdminInput, AdminTextarea, FormField } from "@/components/admin/ui/AdminForm";
 import { useAdminToast } from "@/components/admin/ui/AdminToast";
 import { Can } from "@/components/admin/auth/AdminAuthProvider";
-import { ConfirmModal } from "@/components/admin/ui/AdminModal";
+import { AdminModal } from "@/components/admin/ui/AdminModal";
 import { Icon } from "@/components/ui/Icon";
 import type { OrderStatus, StoredOrder } from "@/lib/server/orders";
 import { hajiasalPath } from "@/lib/paths";
@@ -259,7 +259,7 @@ export default function AdminOrderDetailPage() {
                   disabled={saving || Boolean(order.refundedAt)}
                   onClick={() => setRefundOpen(true)}
                 >
-                  {order.refundedAt ? "بازپرداخت انجام شده" : "بازپرداخت از درگاه"}
+                  {order.refundedAt ? "بازپرداخت انجام شده" : "استرداد سفارش"}
                 </AdminButton>
               </Can>
             </div>
@@ -299,27 +299,68 @@ export default function AdminOrderDetailPage() {
         </section>
       </div>
 
-      <ConfirmModal
+      <AdminModal
         open={refundOpen}
         onClose={() => {
           if (!saving) setRefundOpen(false);
         }}
-        onConfirm={() => {
-          void (async () => {
-            const ok = await patchOrder({
-              refund: true,
-              refundNote: "بازپرداخت از درگاه از پنل ادمین",
-              status: "cancelled",
-            });
-            if (ok) setRefundOpen(false);
-          })();
-        }}
-        title="بازپرداخت از درگاه"
-        description="مبلغ از طریق درگاه به مشتری برمی‌گردد. در صورت شکست درگاه، سفارش تغییر نمی‌کند. برای ثبت دستی بدون درگاه از API با manualRefund استفاده کنید."
-        confirmLabel="تأیید بازپرداخت درگاه"
-        danger
-        loading={saving}
-      />
+        title="استرداد سفارش"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setRefundOpen(false)}
+              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50"
+            >
+              انصراف
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                void (async () => {
+                  const ok = await patchOrder({
+                    refund: true,
+                    manualRefund: true,
+                    refundNote: "ثبت استرداد دستی از پنل ادمین",
+                    status: "cancelled",
+                  });
+                  if (ok) setRefundOpen(false);
+                })();
+              }}
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-100 disabled:opacity-60"
+            >
+              {saving ? "…" : "ثبت دستی (بدون درگاه)"}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                void (async () => {
+                  const ok = await patchOrder({
+                    refund: true,
+                    refundNote: "بازپرداخت از درگاه از پنل ادمین",
+                    status: "cancelled",
+                  });
+                  if (ok) setRefundOpen(false);
+                })();
+              }}
+              className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:opacity-60"
+            >
+              {saving ? "…" : "استرداد از درگاه"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-zinc-600">
+          استرداد از درگاه فقط وقتی موفق می‌شود که API درگاه (مثلاً بانکداری
+          شرکتی زیبال یا توکن زرین‌پال) آماده باشد؛ در غیر این صورت سفارش تغییر
+          نمی‌کند. اگر مبلغ را در پنل درگاه برگرداندید، از «ثبت دستی» استفاده
+          کنید تا سفارش و کیف‌پول فروشنده همسان شوند.
+        </p>
+      </AdminModal>
     </div>
   );
 }

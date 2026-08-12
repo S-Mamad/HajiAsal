@@ -11,6 +11,7 @@ import {
   getSellerByPhoneAsync,
   updateSellerAsync,
 } from "@/lib/server/sellers";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -80,12 +81,49 @@ export async function PATCH(request: Request, { params }: Params) {
         entityId: id,
         payload: { phone: application.phone },
       });
+      void notifyTelegram("seller.application_status", {
+        id,
+        fullName: application.fullName,
+        phone: application.phone,
+        status: "rejected",
+      });
       return NextResponse.json({ success: true, application: updated });
     }
 
-    // approve
+    // approve — recover partial approve if seller row already exists for this phone
     const existingSeller = await getSellerByPhoneAsync(application.phone);
     if (existingSeller) {
+      if (application.status === "pending") {
+        const updated = await updateSellerApplicationAsync(id, {
+          status: "approved",
+          reviewNote: parsed.data.reviewNote?.trim() || null,
+          reviewedAt: now,
+          reviewedBy: String(reviewer),
+          sellerId: existingSeller.id,
+        });
+        await logAdminAction({
+          action: "seller_application.approve",
+          entityType: "seller_application",
+          entityId: id,
+          payload: {
+            sellerId: existingSeller.id,
+            phone: application.phone,
+            recovered: true,
+          },
+        });
+        void notifyTelegram("seller.application_status", {
+          id,
+          fullName: application.fullName,
+          phone: application.phone,
+          status: "approved",
+        });
+        return NextResponse.json({
+          success: true,
+          application: updated,
+          sellerId: existingSeller.id,
+          recovered: true,
+        });
+      }
       return NextResponse.json(
         {
           error:
@@ -108,32 +146,48 @@ export async function PATCH(request: Request, { params }: Params) {
       commissionPercent: parsed.data.commissionPercent ?? 10,
     });
 
-    await updateSellerAsync(seller.id, {
-      address: application.address,
-      bankCard: application.bankCard,
-      contactPhone: application.phone,
-    });
+    try {
+      await updateSellerAsync(seller.id, {
+        address: application.address,
+        bankCard: application.bankCard,
+        contactPhone: application.phone,
+      });
 
-    const updated = await updateSellerApplicationAsync(id, {
-      status: "approved",
-      reviewNote: parsed.data.reviewNote?.trim() || null,
-      reviewedAt: now,
-      reviewedBy: String(reviewer),
-      sellerId: seller.id,
-    });
+      const updated = await updateSellerApplicationAsync(id, {
+        status: "approved",
+        reviewNote: parsed.data.reviewNote?.trim() || null,
+        reviewedAt: now,
+        reviewedBy: String(reviewer),
+        sellerId: seller.id,
+      });
 
-    await logAdminAction({
-      action: "seller_application.approve",
-      entityType: "seller_application",
-      entityId: id,
-      payload: { sellerId: seller.id, phone: application.phone },
-    });
+      await logAdminAction({
+        action: "seller_application.approve",
+        entityType: "seller_application",
+        entityId: id,
+        payload: { sellerId: seller.id, phone: application.phone },
+      });
 
-    return NextResponse.json({
-      success: true,
-      application: updated,
-      sellerId: seller.id,
-    });
+      void notifyTelegram("seller.application_status", {
+        id,
+        fullName: application.fullName,
+        phone: application.phone,
+        status: "approved",
+      });
+
+      return NextResponse.json({
+        success: true,
+        application: updated,
+        sellerId: seller.id,
+      });
+    } catch (approveError) {
+      // Seller already created — surface clear error so ops can retry (recover path above).
+      const message =
+        approveError instanceof Error
+          ? approveError.message
+          : "تأیید درخواست بعد از ایجاد فروشنده ناقص ماند؛ دوباره تلاش کنید.";
+      return NextResponse.json({ error: message, sellerId: seller.id }, { status: 503 });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "خطای سرور";
     const status = message.includes("قبلاً") ? 409 : 500;

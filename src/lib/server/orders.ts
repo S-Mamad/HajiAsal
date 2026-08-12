@@ -25,6 +25,7 @@ import {
   decrementStockForPaidOrder,
   restoreStockForPaidOrder,
 } from "./order-stock";
+import { notifyTelegram } from "./telegram-notify";
 
 export { computeOrderTotal } from "@/lib/commerce/money";
 
@@ -504,6 +505,15 @@ export async function confirmPaidOrder(
   await burnCouponAfterPaid(previous);
   const updated = await getOrderById(orderId);
   if (!updated) return { ok: false, reason: "not_found" };
+
+  void notifyTelegram("order.paid", { order: updated });
+  if (stockShortages.length > 0) {
+    void notifyTelegram("inventory.out_of_stock", {
+      orderId: updated.id,
+      productNames: stockShortages,
+    });
+  }
+
   return {
     ok: true,
     order: updated,
@@ -658,7 +668,16 @@ export async function updateOrderAdmin(
         );
         if (result.affectedRows === 0) return null;
         updated = await getOrderById(orderId);
-      } catch {
+      } catch (error) {
+        // Never silently drop refund fields: that can show success without refundedAt.
+        if (
+          patch.refundedAt !== undefined ||
+          patch.refundNote !== undefined
+        ) {
+          throw error instanceof Error
+            ? error
+            : new Error("ذخیره استرداد سفارش ناموفق بود");
+        }
         const basicSets = ["updated_at = ?"];
         const basicParams: unknown[] = [now];
         if (patch.status !== undefined) {
@@ -772,6 +791,27 @@ export async function updateOrderAdmin(
         await memoryUpdateOrder<StoredOrder>(orderId, { adminNote: mergedNote });
       }
       updated = { ...updated, adminNote: mergedNote };
+    }
+  }
+
+  // Claw back seller sale credits on cancel/refund (idempotent via ledger).
+  if (updated && previous) {
+    const refunding = Boolean(patch.refundedAt) && !previous.refundedAt;
+    const cancelling =
+      patch.status === "cancelled" && previous.status !== "cancelled";
+    if (refunding || cancelling) {
+      try {
+        const { reverseSaleCreditsForOrder } = await import("./seller-wallet");
+        await reverseSaleCreditsForOrder(previous);
+      } catch (error) {
+        console.error(
+          "[orders] wallet clawback failed:",
+          error instanceof Error ? error.message : error,
+        );
+        throw error instanceof Error
+          ? error
+          : new Error("برگشت اعتبار فروشنده ناموفق بود");
+      }
     }
   }
 

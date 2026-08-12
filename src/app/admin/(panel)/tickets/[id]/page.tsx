@@ -297,7 +297,7 @@ function AdminTicketDetailInner() {
           error={error || null}
           onRetryLoad={() => void load()}
           onPollUpdate={() => void load({ silent: true })}
-          pollUrl={`/api/admin/tickets/${ticket.id}`}
+          pollUrl={`/api/admin/tickets/${ticket.id}?channel=${ticket.channel}`}
           allowInternal={ticket.channel === "customer"}
           typingLabel={typingLabel}
           lockLabel={lockLabel}

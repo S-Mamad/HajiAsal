@@ -72,8 +72,8 @@ export default function AdminOrdersPage() {
       if (!query) return true;
       return (
         order.id.toLowerCase().includes(query) ||
-        order.customer.fullName.toLowerCase().includes(query) ||
-        order.customer.phone.includes(query) ||
+        (order.customer?.fullName ?? "").toLowerCase().includes(query) ||
+        (order.customer?.phone ?? "").includes(query) ||
         order.trackingCode?.toLowerCase().includes(query)
       );
     });
@@ -132,7 +132,7 @@ export default function AdminOrdersPage() {
           <Icon
             icon={MagnifyingGlass}
             size={16}
-            className="pointer-events-none absolute start-3 top-1/2 -tranzinc-y-1/2 text-zinc-400"
+            className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-zinc-400"
           />
           <input
             type="search"
@@ -190,7 +190,9 @@ export default function AdminOrdersPage() {
                 {new Date(row.createdAt).toLocaleDateString("fa-IR")}
               </span>
             </div>
-            <p className="font-medium text-zinc-900">{row.customer.fullName}</p>
+                  <p className="font-medium text-zinc-900">
+                    {row.customer?.fullName || "—"}
+                  </p>
             <p className="mt-0.5 text-xs text-zinc-500">
               {row.customer.city}
               <span className="mx-1.5 text-zinc-300">·</span>
@@ -272,12 +274,12 @@ export default function AdminOrdersPage() {
               key: "customer",
               header: "مشتری",
               sortable: true,
-              getSortValue: (row) => row.customer.fullName,
+              getSortValue: (row) => row.customer?.fullName ?? "",
               render: (row) => (
                 <div>
-                  <p className="font-medium">{row.customer.fullName}</p>
+                  <p className="font-medium">{row.customer?.fullName ?? "—"}</p>
                   <p className="text-xs text-zinc-400" dir="ltr">
-                    {row.customer.phone}
+                    {row.customer?.phone ?? ""}
                   </p>
                 </div>
               ),
@@ -286,9 +288,9 @@ export default function AdminOrdersPage() {
               key: "city",
               header: "شهر",
               hideOnMobile: true,
-              getSortValue: (row) => row.customer.city,
+              getSortValue: (row) => row.customer?.city ?? "",
               sortable: true,
-              render: (row) => row.customer.city,
+              render: (row) => row.customer?.city ?? "—",
             },
             {
               key: "total",

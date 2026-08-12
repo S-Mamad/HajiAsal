@@ -4,21 +4,30 @@ export default function AccountTicketDetailLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className={[
-        // Mobile: break out of account padding and fill viewport above bottom nav
-        "-mx-4 -mt-8",
-        "h-[calc(100dvh-6.5rem-env(safe-area-inset-bottom,0px))]",
-        "max-h-[calc(100dvh-6.5rem-env(safe-area-inset-bottom,0px))]",
-        "-mb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]",
-        // Desktop: normal embedded card height inside account shell
-        "md:mx-0 md:mt-0 md:mb-0",
-        "md:h-[min(70vh,40rem)] md:max-h-none",
-        "flex min-h-0 flex-col overflow-hidden",
-        "md:rounded-2xl md:border md:border-border md:shadow-sm",
-      ].join(" ")}
-    >
-      {children}
-    </div>
+    <>
+      {/* Keeps account main from collapsing while chat is position:fixed on mobile */}
+      <div
+        aria-hidden
+        className="pointer-events-none md:hidden"
+        style={{
+          height:
+            "calc(100dvh - var(--site-header-h, 4rem) - var(--account-bottom-chrome, 6.75rem) - env(safe-area-inset-bottom, 0px))",
+        }}
+      />
+      <div
+        className={[
+          // Mobile: true app shell between site header and account bottom nav
+          "fixed inset-x-0 z-[105] flex min-h-0 flex-col overflow-hidden",
+          "top-[var(--site-header-h,4rem)]",
+          "bottom-[calc(var(--account-bottom-chrome,6.75rem)+env(safe-area-inset-bottom,0px))]",
+          // Desktop: sit inside account main as an elevated panel
+          "md:static md:inset-auto md:z-auto",
+          "md:h-[min(70vh,40rem)] md:max-h-none",
+          "md:rounded-2xl md:border md:border-border md:shadow-sm",
+        ].join(" ")}
+      >
+        {children}
+      </div>
+    </>
   );
 }

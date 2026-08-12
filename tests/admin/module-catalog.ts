@@ -618,6 +618,23 @@ export const ADMIN_API_CATALOG: AdminModuleEndpoint[] = [
     body: { shippingCost: 1000 },
     skipAllowedProbe: true,
   },
+  {
+    id: "telegram.GET",
+    module: "telegram",
+    method: "GET",
+    path: "/api/admin/telegram",
+    permission: "settings.view",
+    importPath: "@/app/api/admin/telegram/route",
+  },
+  {
+    id: "telegram.POST",
+    module: "telegram",
+    method: "POST",
+    path: "/api/admin/telegram",
+    permission: "settings.edit",
+    importPath: "@/app/api/admin/telegram/route",
+    skipAllowedProbe: true,
+  },
 ];
 
 export const ADMIN_NAV_PATHS = [

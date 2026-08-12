@@ -123,7 +123,10 @@ function SuccessContent() {
       </p>
       <div className="mb-8 flex flex-col gap-2 sm:flex-row">
         {resolvedTracking ? (
-          <Button href={hajiasalPath("/track-order")} variant="outline">
+          <Button
+            href={`${hajiasalPath("/track-order")}?tracking=${encodeURIComponent(resolvedTracking)}`}
+            variant="outline"
+          >
             پیگیری سفارش
           </Button>
         ) : null}

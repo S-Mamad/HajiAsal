@@ -13,6 +13,10 @@ export default function CartPage() {
   const itemCount = useCartStore((s) => s.getItemCount());
   const hasHydrated = useCartStore((s) => s._hasHydrated);
   const total = useCartStore((s) => s.getTotal());
+  const appliedCouponCode = useCartStore((s) => s.appliedCouponCode);
+  const checkoutHref = appliedCouponCode
+    ? `${hajiasalPath("/checkout")}?coupon=${encodeURIComponent(appliedCouponCode)}`
+    : hajiasalPath("/checkout");
 
   if (!hasHydrated) {
     return (
@@ -72,7 +76,7 @@ export default function CartPage() {
             </h2>
             <CartSummary />
             <div className="mt-5 flex flex-col gap-2.5">
-              <Button href={hajiasalPath("/checkout")} className="w-full">
+              <Button href={checkoutHref} className="w-full">
                 تکمیل خرید
               </Button>
               <Button
@@ -95,7 +99,7 @@ export default function CartPage() {
                 </p>
               </div>
               <Button
-                href={hajiasalPath("/checkout")}
+                href={checkoutHref}
                 size="sm"
                 className="shrink-0"
               >

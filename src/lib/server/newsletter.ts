@@ -8,6 +8,7 @@ import {
   newId,
   toIso,
 } from "./mysql";
+import { notifyTelegram } from "./telegram-notify";
 
 export interface NewsletterSubscriber {
   email: string;
@@ -35,6 +36,7 @@ export async function subscribeNewsletter(email: string): Promise<boolean> {
         "INSERT INTO newsletter_subscribers (id, email, subscribed_at) VALUES (?, ?, ?)",
         [newId(), email, new Date().toISOString()],
       );
+      void notifyTelegram("newsletter.subscribe", { email });
       return true;
     } catch (error) {
       if (isDuplicateKeyError(error)) return false;
@@ -51,6 +53,7 @@ export async function subscribeNewsletter(email: string): Promise<boolean> {
     email,
     subscribedAt: new Date().toISOString(),
   });
+  void notifyTelegram("newsletter.subscribe", { email });
   return true;
 }
 
@@ -80,6 +83,14 @@ export async function saveContactMessage(
           message.source,
         ],
       );
+      void notifyTelegram("contact.message", {
+        id: message.id,
+        name: message.name,
+        phone: message.phone,
+        email: message.email,
+        subject: message.subject,
+        message: message.message,
+      });
       return message;
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
@@ -87,6 +98,14 @@ export async function saveContactMessage(
   }
 
   await appendToJsonArray("contact.json", message);
+  void notifyTelegram("contact.message", {
+    id: message.id,
+    name: message.name,
+    phone: message.phone,
+    email: message.email,
+    subject: message.subject,
+    message: message.message,
+  });
   return message;
 }
 

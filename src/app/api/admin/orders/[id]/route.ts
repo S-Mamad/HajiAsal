@@ -12,6 +12,7 @@ import {
   notifyOrderStatusChange,
   resolveOrderNotifyEvent,
 } from "@/lib/server/order-notify";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 const patchSchema = z.object({
   status: z
@@ -105,12 +106,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "سفارش یافت نشد" }, { status: 404 });
     }
 
-    if (parsed.data.refund && before.status === "delivered") {
-      const { reverseSaleCreditsForOrder } = await import(
-        "@/lib/server/seller-wallet"
-      );
-      await reverseSaleCreditsForOrder(before);
-    }
+    // Wallet clawback runs inside updateOrderAdmin (cancel/refund).
 
     const notifyEvent = resolveOrderNotifyEvent({
       prevStatus: before.status,
@@ -120,6 +116,29 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
     if (notifyEvent) {
       void notifyOrderStatusChange(order, notifyEvent);
+    }
+
+    if (parsed.data.refund) {
+      void notifyTelegram("order.refunded", {
+        order,
+        prevStatus: before.status,
+        nextStatus: order.status,
+      });
+    } else if (order.status === "cancelled" && before.status !== "cancelled") {
+      void notifyTelegram("order.cancelled", {
+        order,
+        prevStatus: before.status,
+        nextStatus: order.status,
+      });
+    } else if (
+      order.status !== before.status ||
+      (order.trackingCode && order.trackingCode !== before.trackingCode)
+    ) {
+      void notifyTelegram("order.status_changed", {
+        order,
+        prevStatus: before.status,
+        nextStatus: order.status,
+      });
     }
 
     await logAdminAction({

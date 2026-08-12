@@ -35,8 +35,10 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const itemCount = useCartStore((s) => s.getItemCount());
-  const hasHydrated = useCartStore((s) => s._hasHydrated);
+  const hasCartHydrated = useCartStore((s) => s._hasHydrated);
+  const hasWishlistHydrated = useWishlistStore((s) => s._hasHydrated);
   const wishlistCount = useWishlistStore((s) => s.count());
+  const badgesReady = hasCartHydrated && hasWishlistHydrated;
 
   const navItems = useMemo(
     () => buildResolvedNavItems(siteData.nav),
@@ -110,7 +112,7 @@ export function Header() {
               aria-label="علاقه‌مندی‌ها"
             >
               <Icon icon={Heart} size={18} />
-              {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
+              {badgesReady ? <CountBadge count={wishlistCount} /> : null}
             </Link>
             <button
               type="button"
@@ -146,7 +148,7 @@ export function Header() {
               }
             >
               <Icon icon={Heart} size={18} />
-              {hasHydrated ? <CountBadge count={wishlistCount} /> : null}
+              {badgesReady ? <CountBadge count={wishlistCount} /> : null}
             </Link>
             <span className="mx-1 h-4 w-px bg-border" aria-hidden />
             <UserAccountMenu
@@ -169,7 +171,7 @@ export function Header() {
               }
             >
               <Icon icon={ShoppingBag} size={18} />
-              {hasHydrated ? <CountBadge count={itemCount} /> : null}
+              {hasCartHydrated ? <CountBadge count={itemCount} /> : null}
             </Link>
           </div>
         </div>

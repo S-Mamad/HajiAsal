@@ -104,9 +104,9 @@ describe("admin media multipart", () => {
     expect(createMedia).toHaveBeenCalled();
   });
 
-  it("rejects multipart non-image", async () => {
-    const file = new File([new Uint8Array([1])], "doc.pdf", {
-      type: "application/pdf",
+  it("rejects multipart disallowed mime", async () => {
+    const file = new File([new Uint8Array([1])], "notes.txt", {
+      type: "text/plain",
     });
     const form = new FormData();
     form.append("file", file);

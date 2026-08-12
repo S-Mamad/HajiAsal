@@ -18,12 +18,8 @@ import {
   applySnappayFee,
   isSnappayConfigured,
 } from "@/lib/server/snappay";
+import { isZibalConfigured } from "@/lib/server/zibal";
 import type { PaymentMethod } from "@/lib/server/orders";
-
-function isZarinpalConfigured(): boolean {
-  const merchantId = process.env.ZARINPAL_MERCHANT_ID;
-  return Boolean(merchantId && merchantId !== "your_merchant_id");
-}
 
 export async function POST(request: Request) {
   try {
@@ -111,9 +107,9 @@ export async function POST(request: Request) {
     const paymentMethod = parsed.data.paymentMethod as PaymentMethod;
     const shippingMethod = extra.shippingMethod ?? "standard";
 
-    if (paymentMethod === "online" && !isZarinpalConfigured()) {
+    if (paymentMethod === "online" && !isZibalConfigured()) {
       return NextResponse.json(
-        { success: false, message: "درگاه زرین‌پال در دسترس نیست" },
+        { success: false, message: "درگاه زیبال در دسترس نیست" },
         { status: 400 },
       );
     }

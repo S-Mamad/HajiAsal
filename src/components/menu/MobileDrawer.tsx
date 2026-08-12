@@ -59,7 +59,7 @@ export function MobileDrawer({ open, onClose, items }: MobileDrawerProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overlay-scrim fixed inset-0 z-[80] lg:hidden"
+            className="overlay-scrim fixed inset-0 z-[120] lg:hidden"
             onClick={backdropReady ? onClose : undefined}
             aria-hidden
           />
@@ -68,7 +68,7 @@ export function MobileDrawer({ open, onClose, items }: MobileDrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-            className="fixed bottom-0 start-0 top-16 z-[90] flex w-[min(100vw-2.5rem,19rem)] flex-col border-e border-border bg-surface shadow-2xl sm:top-[4.75rem] lg:hidden"
+            className="fixed bottom-0 start-0 top-16 z-[130] flex w-[min(100vw-2.5rem,19rem)] flex-col border-e border-border bg-surface shadow-2xl sm:top-[4.75rem] lg:hidden"
             aria-label="منوی موبایل"
             id="mobile-nav"
             role="dialog"

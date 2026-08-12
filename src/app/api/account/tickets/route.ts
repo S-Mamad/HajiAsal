@@ -6,6 +6,7 @@ import {
   listSupportTicketsByCustomer,
 } from "@/lib/server/support-tickets";
 import { assertMessageRateLimitAsync } from "@/lib/server/ticket-runtime";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 export async function GET(request: Request) {
   const session = getSessionFromRequest(request);
@@ -65,6 +66,13 @@ export async function POST(request: Request) {
         ...(parsed.data.meta ?? {}),
         userAgent: request.headers.get("user-agent") ?? undefined,
       },
+    });
+
+    void notifyTelegram("ticket.new", {
+      id: ticket.id,
+      subject: ticket.subject ?? parsed.data.subject,
+      customerName: session.fullName ?? undefined,
+      customerPhone: session.phone,
     });
 
     return NextResponse.json({ success: true, id: ticket.id, ticket });

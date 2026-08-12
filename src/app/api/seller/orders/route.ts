@@ -13,6 +13,7 @@ import {
   notifyOrderStatusChange,
   resolveOrderNotifyEvent,
 } from "@/lib/server/order-notify";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 import {
   isMysqlConfigured,
   mysqlExecute,
@@ -290,6 +291,7 @@ export async function PATCH(request: Request) {
 
     if (
       parsed.data.action === "confirm" ||
+      parsed.data.action === "prepare" ||
       parsed.data.action === "tracking"
     ) {
       const full = await getOrderById(parsed.data.orderId);
@@ -301,6 +303,17 @@ export async function PATCH(request: Request) {
         });
         if (event) {
           void notifyOrderStatusChange(full, event);
+        }
+        const statusChanged = full.status !== order.status;
+        const trackingChanged = Boolean(
+          full.trackingCode && full.trackingCode !== order.trackingCode,
+        );
+        if (statusChanged || trackingChanged) {
+          void notifyTelegram("order.status_changed", {
+            order: full,
+            prevStatus: order.status,
+            nextStatus: full.status,
+          });
         }
       }
     }

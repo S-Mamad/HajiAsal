@@ -31,17 +31,17 @@ export function TicketCsatPrompt({ onSubmit, className }: Props) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface px-4 py-5 text-center",
+        "rounded-[1.35rem] border border-border/80 bg-gradient-to-b from-surface to-gold-dim/40 px-4 py-4 text-center",
         className,
       )}
     >
-      <p className="mb-1 text-sm font-medium text-primary">
+      <p className="mb-0.5 text-sm font-semibold text-primary">
         کیفیت پشتیبانی را امتیاز دهید
       </p>
-      <p className="mb-4 text-xs text-secondary">
+      <p className="mb-3 text-xs text-secondary">
         {active ? LABELS[active - 1] : "روی ستاره بزنید"}
       </p>
-      <div className="flex justify-center gap-1.5" dir="ltr">
+      <div className="flex justify-center gap-1" dir="ltr">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
@@ -53,13 +53,13 @@ export function TicketCsatPrompt({ onSubmit, className }: Props) {
             onFocus={() => setHover(n)}
             onBlur={() => setHover(0)}
             onClick={() => void pick(n)}
-            className="flex h-11 w-11 items-center justify-center rounded-xl transition hover:bg-gold-dim disabled:opacity-50"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl transition hover:bg-gold-dim active:scale-[0.94] disabled:opacity-50"
           >
             <Icon
               icon={Star}
               size={26}
               weight={active >= n ? "fill" : "regular"}
-              className={active >= n ? "text-gold" : "text-secondary/50"}
+              className={active >= n ? "text-gold" : "text-secondary/45"}
             />
           </button>
         ))}

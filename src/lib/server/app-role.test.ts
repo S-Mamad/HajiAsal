@@ -60,6 +60,12 @@ describe("resolveAppRolePath", () => {
       "not_found",
     );
     expect(resolveAppRolePath("admin", "/admin/dashboard").type).toBe("next");
+    expect(resolveAppRolePath("admin", "/api/telegram/webhook").type).toBe(
+      "next",
+    );
+    expect(resolveAppRolePath("admin", "/api/cron/telegram-digest").type).toBe(
+      "next",
+    );
     expect(resolveAppRolePath("admin", "/robots.txt").type).toBe("not_found");
   });
 

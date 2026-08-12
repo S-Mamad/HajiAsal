@@ -9,6 +9,7 @@ import { PriceDisplay } from "@/components/ui/PriceDisplay";
 import { RatingStars } from "@/components/ui/RatingStars";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { useWishlistStore } from "@/store/wishlist";
+import { pushWishlistReplace } from "@/lib/client/wishlist-sync";
 import { cn } from "@/lib/utils";
 import { hajiasalPath } from "@/lib/paths";
 
@@ -46,6 +47,11 @@ export function ProductCard({ product }: ProductCardProps) {
   const toggleWishlist = useWishlistStore((s) => s.toggle);
   const isWishlisted = useWishlistStore((s) => s.has(product.id));
   const mark = <ProductMark product={product} />;
+
+  const onToggleWishlist = () => {
+    toggleWishlist(product.id);
+    void pushWishlistReplace();
+  };
 
   return (
     <article className="group h-full">
@@ -89,7 +95,7 @@ export function ProductCard({ product }: ProductCardProps) {
         </Link>
         <button
           type="button"
-          onClick={() => toggleWishlist(product.id)}
+          onClick={onToggleWishlist}
           className={cn(
             "absolute end-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-sm transition-all touch-manipulation",
             isWishlisted

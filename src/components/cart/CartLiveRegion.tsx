@@ -30,7 +30,7 @@ export function CartLiveRegion() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           className={cn(
-            "pointer-events-none fixed start-1/2 z-[100] -translate-x-1/2 rounded-full border border-border bg-brown px-5 py-2.5 text-sm font-medium text-cream shadow-lg",
+            "pointer-events-none fixed start-1/2 z-[112] -translate-x-1/2 rounded-full border border-border bg-brown px-5 py-2.5 text-sm font-medium text-cream shadow-lg",
             liftForNav
               ? "bottom-[var(--mobile-dock-toast-clearance)] lg:bottom-6"
               : "bottom-6",

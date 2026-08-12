@@ -23,7 +23,7 @@ interface PaymentMethodSelectorProps {
 
 const onlineOption: PaymentOption = {
   id: "online",
-  label: "پرداخت آنلاین با درگاه زرین‌پال",
+  label: "پرداخت آنلاین با درگاه زیبال",
   description: "پرداخت امن با کارت بانکی",
 };
 
@@ -46,9 +46,9 @@ export function PaymentMethodSelector({
   onSnappayAcceptedChange,
 }: PaymentMethodSelectorProps) {
   const [available, setAvailable] = useState<{
-    zarinpal: boolean;
+    zibal: boolean;
     snappay: boolean;
-  }>({ zarinpal: false, snappay: false });
+  }>({ zibal: false, snappay: false });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,22 +56,30 @@ export function PaymentMethodSelector({
       .then((r) => r.json())
       .then((d) => {
         setAvailable({
-          zarinpal: Boolean(d.zarinpal),
+          zibal: Boolean(d.zibal),
           snappay: Boolean(d.snappay),
         });
       })
-      .catch(() => setAvailable({ zarinpal: false, snappay: false }))
+      .catch(() => setAvailable({ zibal: false, snappay: false }))
       .finally(() => setLoaded(true));
   }, []);
 
   const options = [
-    ...(available.zarinpal ? [onlineOption] : []),
+    ...(available.zibal ? [onlineOption] : []),
     ...(available.snappay ? [snappayOption] : []),
   ];
 
   const snappayTotal = Math.round(cashTotal * (1 + SNAPPPAY_FEE_PERCENT / 100));
 
-  if (loaded && options.length === 0) {
+  if (!loaded) {
+    return (
+      <div className="rounded-xl border border-border bg-surface-elevated/50 p-4 text-sm text-secondary">
+        در حال بارگذاری روش‌های پرداخت...
+      </div>
+    );
+  }
+
+  if (options.length === 0) {
     return (
       <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
         درگاه پرداخت در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.

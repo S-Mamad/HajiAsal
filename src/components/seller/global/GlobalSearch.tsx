@@ -43,8 +43,10 @@ export function GlobalSearch({
   }, [open, onOpenChange]);
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) {
+    const trimmed = query.trim();
+    if (!open || !trimmed) {
       setResults([]);
+      setLoading(false);
       return;
     }
     const t = window.setTimeout(() => {
@@ -52,7 +54,7 @@ export function GlobalSearch({
         setLoading(true);
         try {
           const res = await fetch(
-            `/api/seller/search?q=${encodeURIComponent(query.trim())}`,
+            `/api/seller/search?q=${encodeURIComponent(trimmed)}`,
           );
           const data = (await res.json()) as { results?: SearchHit[] };
           setResults(data.results ?? []);
@@ -62,7 +64,7 @@ export function GlobalSearch({
           setLoading(false);
         }
       })();
-    }, 250);
+    }, 220);
     return () => window.clearTimeout(t);
   }, [query, open]);
 
@@ -115,9 +117,9 @@ export function GlobalSearch({
           )}
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-2">
-          {query.trim().length < 2 ? (
+          {!query.trim() ? (
             <p className="px-3 py-6 text-center text-sm text-zinc-500">
-              حداقل ۲ کاراکتر وارد کنید
+              نام محصول، سفارش یا تیکت را بنویسید
             </p>
           ) : results.length === 0 && !loading ? (
             <p className="px-3 py-6 text-center text-sm text-zinc-500">

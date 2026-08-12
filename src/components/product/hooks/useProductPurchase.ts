@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Product, WeightOption } from "@/types";
 import { getEffectiveWeightPrice } from "@/lib/products";
 import {
@@ -26,6 +26,7 @@ export function useProductPurchase({
   const [quantity, setQuantity] = useState(1);
   const [addedFlash, setAddedFlash] = useState(false);
   const [adding, setAdding] = useState(false);
+  const addingLock = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +68,8 @@ export function useProductPurchase({
   }, [purchasable, maxQty]);
 
   const handleAddToCart = useCallback(async () => {
-    if (!purchasable || adding) return;
+    if (!purchasable || addingLock.current) return;
+    addingLock.current = true;
     setAdding(true);
     try {
       const res = await fetch("/api/cart/validate-add", {
@@ -133,11 +135,11 @@ export function useProductPurchase({
     } catch {
       setAnnouncement("خطا در بررسی موجودی محصول");
     } finally {
+      addingLock.current = false;
       setAdding(false);
     }
   }, [
     purchasable,
-    adding,
     product,
     quantity,
     selectedWeight,

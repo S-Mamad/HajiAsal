@@ -685,9 +685,12 @@ export async function getRelatedProductsAsync(
     .slice(0, limit);
 }
 
-export async function searchProductsAsync(query: string): Promise<Product[]> {
+export async function searchProductsAsync(
+  query: string,
+  limit = 24,
+): Promise<Product[]> {
   const catalog = await getAllProductsAsync();
-  return searchProductsSync(query, catalog);
+  return searchProductsSync(query, catalog).slice(0, limit);
 }
 
 async function readLocalRevisions(): Promise<ProductRevision[]> {

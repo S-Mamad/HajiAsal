@@ -14,6 +14,7 @@ const PAGE_TITLES: Record<string, string> = {
   [hajiasalPath("/admin/product-fields")]: "فیلدهای سفارشی",
   [hajiasalPath("/admin/brands")]: "برندها",
   [hajiasalPath("/admin/sellers")]: "فروشندگان",
+  [hajiasalPath("/admin/seller-applications")]: "درخواست‌های فروشنده",
   [hajiasalPath("/admin/categories")]: "دسته‌بندی‌ها",
   [hajiasalPath("/admin/inventory")]: "موجودی",
   [hajiasalPath("/admin/customers")]: "مشتریان",
@@ -56,6 +57,12 @@ function matchDetail(
 function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
   return (
     matchDetail(pathname, "/admin/sellers", "فروشندگان", "مدیریت فروشنده") ??
+    matchDetail(
+      pathname,
+      "/admin/seller-applications",
+      "درخواست‌های فروشنده",
+      "جزئیات درخواست",
+    ) ??
     matchDetail(pathname, "/admin/products", "محصولات", "جزئیات محصول") ??
     matchDetail(pathname, "/admin/orders", "سفارش‌ها", "جزئیات سفارش") ??
     matchDetail(pathname, "/admin/customers", "مشتریان", "پروفایل مشتری") ??

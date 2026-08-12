@@ -31,9 +31,7 @@ function LoginPageContent() {
   );
   const wantComplete = searchParams.get("step") === "complete";
 
-  const [step, setStep] = useState<Step>(
-    wantComplete ? "complete-profile" : "auth",
-  );
+  const [step, setStep] = useState<Step>("auth");
   const [phone, setPhone] = useState("");
   const [welcomeUser, setWelcomeUser] = useState<WelcomeUser | null>(null);
 
@@ -58,8 +56,14 @@ function LoginPageContent() {
     ) {
       setPhone(user.phone);
       setStep("complete-profile");
+      return;
     }
-  }, [authLoading, user, step, welcomeUser, redirect, router]);
+
+    // ?step=complete without session → force OTP first (no empty phone form).
+    if (wantComplete && !user && step === "complete-profile") {
+      setStep("auth");
+    }
+  }, [authLoading, user, step, welcomeUser, redirect, router, wantComplete]);
 
   const handleNeedsRegister = (p: string) => {
     setPhone(p);

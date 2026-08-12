@@ -5,6 +5,8 @@ import { persist } from "zustand/middleware";
 
 interface WishlistStore {
   ids: string[];
+  _hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
   toggle: (productId: string) => void;
   has: (productId: string) => boolean;
   clear: () => void;
@@ -15,6 +17,8 @@ export const useWishlistStore = create<WishlistStore>()(
   persist(
     (set, get) => ({
       ids: [],
+      _hasHydrated: false,
+      setHasHydrated: (value) => set({ _hasHydrated: value }),
       toggle: (productId) => {
         set((state) => ({
           ids: state.ids.includes(productId)
@@ -26,6 +30,12 @@ export const useWishlistStore = create<WishlistStore>()(
       clear: () => set({ ids: [] }),
       count: () => get().ids.length,
     }),
-    { name: "haji-asal-wishlist" },
+    {
+      name: "haji-asal-wishlist",
+      partialize: (state) => ({ ids: state.ids }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    },
   ),
 );

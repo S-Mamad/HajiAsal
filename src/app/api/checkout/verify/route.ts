@@ -9,9 +9,14 @@ import {
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { refundOrderAtGateway } from "@/lib/server/payment-refund";
 import {
-  getZarinpalMerchantId,
-  zarinpalVerifyUrl,
-} from "@/lib/server/zarinpal";
+  getZibalMerchant,
+  isZibalVerifySuccess,
+  zibalPostJson,
+  zibalVerifyResultMessage,
+  zibalVerifyUrl,
+  type ZibalVerifyResult,
+} from "@/lib/server/zibal";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 const PAYABLE_STATUSES = new Set(["pending_payment"]);
 
@@ -55,10 +60,75 @@ function successRedirect(orderId: string, tracking: string, ref?: string) {
   );
 }
 
+function alreadyPaidRedirect(orderId: string, tracking: string) {
+  return successRedirect(orderId, tracking);
+}
+
+async function verifyAndConfirm(input: {
+  orderId: string;
+  trackId: string;
+  order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>;
+}): Promise<
+  | { ok: true; settleRef: string; tracking: string; alreadyConfirmed?: boolean }
+  | { ok: false; reason: "verify" | "amount" | "confirm" }
+> {
+  const merchant = getZibalMerchant();
+  if (!merchant) return { ok: false, reason: "verify" };
+
+  const amountRial = Math.round(input.order.total * 10);
+  const trackIdNum = Number(input.trackId);
+  if (!Number.isFinite(trackIdNum)) {
+    return { ok: false, reason: "verify" };
+  }
+
+  let verifyData: ZibalVerifyResult;
+  try {
+    verifyData = await zibalPostJson<ZibalVerifyResult>(zibalVerifyUrl(), {
+      merchant,
+      trackId: trackIdNum,
+    });
+  } catch {
+    return { ok: false, reason: "verify" };
+  }
+
+  if (!isZibalVerifySuccess(Number(verifyData.result))) {
+    return { ok: false, reason: "verify" };
+  }
+
+  // Fail-closed: amount must be present and match (coerce string/number from API).
+  const paidAmount = Number(verifyData.amount);
+  if (!Number.isFinite(paidAmount) || paidAmount !== amountRial) {
+    return { ok: false, reason: "amount" };
+  }
+
+  const settleRef = String(verifyData.refNumber ?? "");
+  if (settleRef) await setOrderSettleRef(input.orderId, settleRef);
+
+  const confirmed = await confirmPaidOrder(input.orderId);
+  if (!confirmed.ok) {
+    try {
+      await refundOrderAtGateway(input.order);
+    } catch (error) {
+      console.error(
+        "[checkout/verify] auto-refund after confirm failure:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+    return { ok: false, reason: "confirm" };
+  }
+
+  return {
+    ok: true,
+    settleRef,
+    tracking: confirmed.order.trackingCode ?? "",
+    alreadyConfirmed: confirmed.alreadyConfirmed,
+  };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const authority = searchParams.get("Authority");
-  const status = searchParams.get("Status");
+  const trackId = searchParams.get("trackId");
+  const success = searchParams.get("success");
   const orderId = searchParams.get("orderId");
 
   const ip = getClientIp(request);
@@ -71,16 +141,20 @@ export async function GET(request: Request) {
     return failedRedirect(request.url, orderId ?? undefined);
   }
 
-  if (!authority || !orderId) {
+  if (!trackId || !orderId) {
     return failedRedirect(request.url);
   }
 
-  if (status !== "OK") {
+  if (success !== "1") {
+    void notifyTelegram("order.payment_failed", {
+      orderId,
+      gateway: "zibal",
+      reason: "cancelled",
+    });
     return cancelledRedirect(orderId);
   }
 
-  const merchantId = getZarinpalMerchantId();
-  if (!merchantId) {
+  if (!getZibalMerchant()) {
     return failedRedirect(request.url, orderId);
   }
 
@@ -96,54 +170,27 @@ export async function GET(request: Request) {
       order.status === "shipped" ||
       order.status === "delivered"
     ) {
-      return successRedirect(orderId, order.trackingCode ?? "");
+      return alreadyPaidRedirect(orderId, order.trackingCode ?? "");
     }
     return failedRedirect(request.url, orderId);
   }
 
   // Auth via bound payment_ref (session optional — cookie may expire on gateway return).
-  const refOk = await assertOrderPaymentRef(orderId, "zarinpal", authority);
+  const refOk = await assertOrderPaymentRef(orderId, "zibal", trackId);
   if (!refOk) {
     return failedRedirect(request.url, orderId);
   }
 
-  const amountRial = Math.round(order.total * 10);
-
-  try {
-    const verifyRes = await fetch(zarinpalVerifyUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        merchant_id: merchantId,
-        amount: amountRial,
-        authority,
-      }),
-    });
-
-    const verifyData = await verifyRes.json();
-    if (verifyData.data?.code === 100 || verifyData.data?.code === 101) {
-      const settleRef = String(verifyData.data.ref_id ?? "");
-      if (settleRef) await setOrderSettleRef(orderId, settleRef);
-      const confirmed = await confirmPaidOrder(orderId);
-      if (!confirmed.ok) {
-        // Money already settled at gateway — attempt auto-refund so we don't leave unpaid charged orders.
-        try {
-          await refundOrderAtGateway(order);
-        } catch (error) {
-          console.error(
-            "[checkout/verify] auto-refund after confirm failure:",
-            error instanceof Error ? error.message : error,
-          );
-        }
-        return failedRedirect(request.url, orderId);
-      }
-      const tracking = confirmed.order.trackingCode ?? "";
-      return successRedirect(orderId, tracking, settleRef);
-    }
-  } catch {
-    // fall through
+  const result = await verifyAndConfirm({ orderId, trackId, order });
+  if (result.ok) {
+    return successRedirect(orderId, result.tracking, result.settleRef);
   }
 
+  void notifyTelegram("order.payment_failed", {
+    orderId,
+    gateway: "zibal",
+    reason: result.reason === "amount" ? "amount_mismatch" : "failed",
+  });
   return failedRedirect(request.url, orderId);
 }
 
@@ -158,23 +205,22 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const authority = body.authority as string;
+    const trackId = String(body.trackId ?? body.authority ?? "");
     const orderId = body.orderId as string;
 
-    if (!authority || !orderId) {
+    if (!trackId || !orderId) {
       return NextResponse.json(
         { success: false, message: "اطلاعات تأیید نامعتبر است" },
         { status: 400 },
       );
     }
 
-    const merchantId = getZarinpalMerchantId();
-    if (!merchantId) {
+    if (!getZibalMerchant()) {
       return NextResponse.json(
         {
           success: false,
           verified: false,
-          message: "درگاه زرین‌پال پیکربندی نشده است",
+          message: "درگاه زیبال پیکربندی نشده است",
         },
         { status: 503 },
       );
@@ -216,7 +262,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const refOk = await assertOrderPaymentRef(orderId, "zarinpal", authority);
+    const refOk = await assertOrderPaymentRef(orderId, "zibal", trackId);
     if (!refOk) {
       return NextResponse.json(
         { success: false, message: "مرجع پرداخت با سفارش هم‌خوانی ندارد" },
@@ -224,56 +270,49 @@ export async function POST(request: Request) {
       );
     }
 
-    const verifyRes = await fetch(zarinpalVerifyUrl(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        merchant_id: merchantId,
-        amount: Math.round(order.total * 10),
-        authority,
-      }),
-    });
-
-    const verifyData = await verifyRes.json();
-    const verified =
-      verifyData.data?.code === 100 || verifyData.data?.code === 101;
-
-    if (verified) {
-      const settleRef = String(verifyData.data?.ref_id ?? "");
-      if (settleRef) await setOrderSettleRef(orderId, settleRef);
-      const confirmed = await confirmPaidOrder(orderId);
-      if (!confirmed.ok) {
-        try {
-          await refundOrderAtGateway(order);
-        } catch {
-          /* best-effort */
-        }
-        return NextResponse.json(
-          {
-            success: false,
-            verified: false,
-            message: "تأیید سفارش پس از پرداخت ناموفق بود",
-          },
-          { status: 409 },
-        );
-      }
+    const result = await verifyAndConfirm({ orderId, trackId, order });
+    if (result.ok) {
       return NextResponse.json({
         success: true,
         verified: true,
-        refId: settleRef || null,
-        trackingCode: confirmed.order.trackingCode ?? null,
-        message: confirmed.alreadyConfirmed
+        refId: result.settleRef || null,
+        trackingCode: result.tracking || null,
+        message: result.alreadyConfirmed
           ? "این سفارش قبلاً تأیید شده است"
           : "پرداخت تأیید شد",
       });
     }
 
+    if (result.reason === "confirm") {
+      void notifyTelegram("order.payment_failed", {
+        orderId,
+        gateway: "zibal",
+        reason: "failed",
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          verified: false,
+          message: "تأیید سفارش پس از پرداخت ناموفق بود",
+        },
+        { status: 409 },
+      );
+    }
+
+    void notifyTelegram("order.payment_failed", {
+      orderId,
+      gateway: "zibal",
+      reason: result.reason === "amount" ? "amount_mismatch" : "failed",
+    });
     return NextResponse.json({
       success: false,
       verified: false,
       refId: null,
       trackingCode: order.trackingCode ?? null,
-      message: "تأیید پرداخت ناموفق بود",
+      message:
+        result.reason === "amount"
+          ? "مبلغ پرداخت با سفارش هم‌خوانی ندارد"
+          : zibalVerifyResultMessage(202),
     });
   } catch {
     return NextResponse.json(

@@ -46,7 +46,7 @@ export function TicketStatusBadge({
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+          "inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
           PRIORITY_STYLES[priority] ?? "bg-stone-100 text-stone-600 ring-stone-200/80",
           className,
         )}
@@ -64,7 +64,7 @@ export function TicketStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+        "inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
         styles ?? "bg-stone-100 text-stone-600 ring-stone-200/80",
         className,
       )}

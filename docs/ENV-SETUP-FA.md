@@ -23,7 +23,8 @@
 | `AUTH_OTP_IP_MAX` / `AUTH_OTP_PHONE_MAX` / `AUTH_OTP_COOLDOWN_SEC` / `AUTH_OTP_GLOBAL_HOURLY` | ضد‌اسپم کوتاه‌مدت |
 | `AUTH_OTP_PHONE_DAILY` / `AUTH_OTP_IP_DAILY` / `AUTH_OTP_DEVICE_DAILY` | سقف روزانه پیامک موفق |
 | `MELIPAYAMAK_SMS_URL` یا `SMS_API_KEY` / `SMS_SENDER` | پیامک دستی ادمین (اختیاری؛ برای OTP ترجیح داده نمی‌شود) |
-| `ZARINPAL_MERCHANT_ID` / `ZARINPAL_ACCESS_TOKEN` | فقط فروشگاه — پرداخت/استرداد |
+| `ZIBAL_MERCHANT` | فقط فروشگاه — پرداخت آنلاین زیبال (تست: `zibal`) |
+| `ZIBAL_REFUND_ENABLED` / `ZIBAL_API_KEY` | فقط فروشگاه — استرداد API (نیاز به بانکداری شرکتی) |
 | `TRUST_X_FORWARDED_FOR` | معمولاً `true` پشت پروکسی cPanel |
 
 ورود ادمین و فروشنده فقط OTP است؛ `ADMIN_PASSWORD` و `SELLER_*_PASSWORD` دیگر مسیر ورود production نیستند.

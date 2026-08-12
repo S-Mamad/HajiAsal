@@ -114,9 +114,9 @@ export function Footer() {
           className="mx-auto mt-5 max-w-sm"
         />
 
-        <div className="mt-5 flex items-center justify-center gap-4 border-t border-border pt-4">
+        <div className="mt-5 flex flex-col items-center gap-3 border-t border-border pt-5">
           <EnamadSeal />
-          <p className="text-[11px] text-dim">
+          <p className="text-center text-[11px] leading-relaxed text-dim">
             © {new Date().getFullYear()} {siteData.brand.name}
           </p>
         </div>

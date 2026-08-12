@@ -8,6 +8,7 @@ import {
   createSellerApplicationAsync,
 } from "@/lib/server/seller-applications-store";
 import { getSellerByPhoneAsync } from "@/lib/server/sellers";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 import {
   isAtLeast18,
   isNonEmptyText,
@@ -142,6 +143,13 @@ export async function POST(request: Request) {
       nationalIdBackUrl: backUrl,
       commitmentLetterUrl: data.commitmentLetterUrl,
       termsAcceptedAt: new Date().toISOString(),
+    });
+
+    void notifyTelegram("seller.application_new", {
+      id: app.id,
+      fullName: app.fullName,
+      phone: app.phone,
+      productsIntro: app.productsIntro,
     });
 
     const response = NextResponse.json({

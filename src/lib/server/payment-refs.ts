@@ -8,7 +8,13 @@ import {
 } from "./mysql";
 import { isProduction } from "./production";
 
-export type PaymentProvider = "zarinpal" | "snappay";
+export type PaymentProvider = "zibal" | "snappay" | "zarinpal";
+
+const KNOWN_PROVIDERS = new Set<PaymentProvider>([
+  "zibal",
+  "snappay",
+  "zarinpal",
+]);
 
 export type PaymentBinding = {
   provider: PaymentProvider;
@@ -120,7 +126,7 @@ export async function setOrderSettleRef(
     memoryStore().set(orderId, { ...prev, settleRef: value });
   } else {
     memoryStore().set(orderId, {
-      provider: "zarinpal",
+      provider: "zibal",
       paymentRef: "",
       settleRef: value,
     });
@@ -154,7 +160,7 @@ export async function getOrderPaymentBinding(
       );
       if (row) {
         const provider = String(row.provider) as PaymentProvider;
-        if (provider !== "zarinpal" && provider !== "snappay") return null;
+        if (!KNOWN_PROVIDERS.has(provider)) return null;
         return {
           provider,
           paymentRef: String(row.payment_ref ?? ""),

@@ -1,4 +1,9 @@
 import productsData from "@/data/products.json";
+import {
+  rankProductsForSearch,
+  scoreProductSearch,
+} from "@/lib/search/product-ranking";
+import { normalizeSearchText } from "@/lib/search/text";
 import type { Product, ProductCategory, ProductFilters, SortOption } from "@/types";
 
 const products = productsData as Product[];
@@ -83,34 +88,8 @@ export function getPriceRange(): { min: number; max: number } {
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }
 
-/** Normalize Arabic/Persian yeh/kaf so search matches typed variants. */
-export function normalizeSearchText(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/ي/g, "ی")
-    .replace(/ك/g, "ک");
-}
-
-export function scoreProductSearch(product: Product, normalizedQuery: string): number {
-  if (!normalizedQuery) return 0;
-  const title = normalizeSearchText(product.title);
-  const slug = product.slug.toLowerCase();
-  const category = normalizeSearchText(
-    `${product.categoryLabel} ${product.category}`,
-  );
-  const body = normalizeSearchText(
-    `${product.shortDescription} ${product.longDescription}`,
-  );
-  let score = 0;
-  if (title === normalizedQuery) score += 100;
-  else if (title.startsWith(normalizedQuery)) score += 80;
-  else if (title.includes(normalizedQuery)) score += 60;
-  if (slug.includes(normalizedQuery)) score += 40;
-  if (category.includes(normalizedQuery)) score += 30;
-  if (body.includes(normalizedQuery)) score += 10;
-  return score;
-}
+export { normalizeSearchText } from "@/lib/search/text";
+export { scoreProductSearch } from "@/lib/search/product-ranking";
 
 function productRecencyTs(product: Product): number {
   const raw = product.publishedAt ?? product.createdAt;
@@ -186,11 +165,5 @@ export function getAllSlugs(): string[] {
 }
 
 export function searchProducts(query: string, catalog?: Product[]): Product[] {
-  const q = normalizeSearchText(query);
-  if (!q) return [];
-  return (catalog ?? products)
-    .map((p) => ({ p, score: scoreProductSearch(p, q) }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.p);
+  return rankProductsForSearch(catalog ?? products, query).map((r) => r.product);
 }

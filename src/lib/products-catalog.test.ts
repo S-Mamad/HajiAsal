@@ -28,6 +28,10 @@ describe("normalizeSearchText", () => {
   it("maps Arabic yeh/kaf to Persian forms", () => {
     expect(normalizeSearchText("عسل كوهي")).toBe("عسل کوهی");
   });
+
+  it("maps Persian digits to ASCII", () => {
+    expect(normalizeSearchText("سفارش ۱۲۳")).toContain("123");
+  });
 });
 
 describe("searchProducts", () => {
@@ -67,9 +71,14 @@ describe("searchProducts", () => {
   });
 
   it("scores title higher than body", () => {
-    const titleHit = scoreProductSearch(catalog[0]!, normalizeSearchText("عسل"));
-    const bodyHit = scoreProductSearch(catalog[2]!, normalizeSearchText("مراتع"));
+    const titleHit = scoreProductSearch(catalog[0]!, "عسل");
+    const bodyHit = scoreProductSearch(catalog[2]!, "مراتع");
     expect(titleHit).toBeGreaterThan(bodyHit);
+  });
+
+  it("matches multi-word queries when all tokens hit", () => {
+    const results = searchProducts("عسل کوهستان", catalog);
+    expect(results[0]?.id).toBe("a");
   });
 });
 

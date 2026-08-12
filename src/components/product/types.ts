@@ -17,6 +17,8 @@ export interface WeightSelectorProps {
   options: WeightOption[];
   selected: WeightOption;
   onChange: (option: WeightOption) => void;
+  /** Display price per option (sale price). Falls back to option.price. */
+  getPrice?: (option: WeightOption) => number;
 }
 
 export interface ProductGalleryProps {
@@ -44,6 +46,7 @@ export interface StickyAddToCartProps {
   discountPrice?: number;
   inStock: boolean;
   onAddToCart: () => void;
+  busy?: boolean;
 }
 
 export interface RelatedProductsProps {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Package, MagnifyingGlass } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +15,7 @@ interface OrderInfo {
   trackingCode: string;
   total: number;
   createdAt: string;
+  refundedAt?: string;
   items: Array<{ title: string; quantity: number; weight: string }>;
 }
 
@@ -26,25 +28,27 @@ const statusLabels: Record<string, string> = {
   cancelled: "لغو شده",
   pending: "در انتظار پرداخت",
   paid: "پرداخت شده",
+  refunded: "بازپرداخت شده",
 };
 
-export default function TrackOrderPage() {
+function TrackOrderInner() {
+  const searchParams = useSearchParams();
   const [tracking, setTracking] = useState("");
   const [phone, setPhone] = useState("");
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [autoTried, setAutoTried] = useState(false);
 
-  const handleTrack = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runTrack = useCallback(async (code: string, phoneValue: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
     setLoading(true);
     setError("");
     setOrder(null);
     try {
-      const params = new URLSearchParams({
-        tracking: tracking.trim(),
-      });
-      if (phone.trim()) params.set("phone", phone.trim());
+      const params = new URLSearchParams({ tracking: trimmed });
+      if (phoneValue.trim()) params.set("phone", phoneValue.trim());
       const res = await fetch(`/api/orders?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
@@ -57,6 +61,23 @@ export default function TrackOrderPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const qTracking = searchParams.get("tracking")?.trim() ?? "";
+    const qPhone = searchParams.get("phone")?.trim() ?? "";
+    if (!qTracking) return;
+    setTracking(qTracking);
+    if (qPhone) setPhone(qPhone);
+    if (!autoTried) {
+      setAutoTried(true);
+      void runTrack(qTracking, qPhone);
+    }
+  }, [searchParams, autoTried, runTrack]);
+
+  const handleTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runTrack(tracking, phone);
   };
 
   const invoiceQuery =
@@ -68,6 +89,10 @@ export default function TrackOrderPage() {
     order && phone.trim()
       ? `?download=1&phone=${encodeURIComponent(phone.trim())}&tracking=${encodeURIComponent(order.trackingCode)}`
       : null;
+
+  const statusText = order?.refundedAt
+    ? statusLabels.refunded
+    : statusLabels[order?.status ?? ""] ?? order?.status;
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 md:px-8 md:py-24">
@@ -93,7 +118,7 @@ export default function TrackOrderPage() {
         />
         <Button type="submit" disabled={loading} className="w-full">
           <Icon icon={MagnifyingGlass} size={16} />
-          پیگیری
+          {loading ? "در حال جستجو..." : "پیگیری"}
         </Button>
       </form>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -107,9 +132,7 @@ export default function TrackOrderPage() {
               <p className="font-medium text-primary" dir="ltr">
                 {order.id}
               </p>
-              <p className="text-sm text-secondary">
-                {statusLabels[order.status] ?? order.status}
-              </p>
+              <p className="text-sm text-secondary">{statusText}</p>
             </div>
           </div>
           <p className="mb-2 text-sm text-secondary">
@@ -155,5 +178,19 @@ export default function TrackOrderPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function TrackOrderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center text-secondary">
+          در حال بارگذاری...
+        </div>
+      }
+    >
+      <TrackOrderInner />
+    </Suspense>
   );
 }

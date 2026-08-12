@@ -13,6 +13,8 @@ function isAdminSurface(pathname: string): boolean {
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
     pathname.startsWith("/api/admin") ||
+    pathname.startsWith("/api/telegram") ||
+    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/uploads/")
   );
 }

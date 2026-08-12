@@ -6,6 +6,7 @@ interface AccountPageHeaderProps {
   subtitle?: string;
   action?: ReactNode;
   className?: string;
+  eyebrow?: string;
 }
 
 export function AccountPageHeader({
@@ -13,20 +14,26 @@ export function AccountPageHeader({
   subtitle,
   action,
   className,
+  eyebrow,
 }: AccountPageHeaderProps) {
   return (
     <header
       className={cn(
-        "mb-6 flex flex-col gap-4 border-b border-border/80 pb-5 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:pb-6",
+        "mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between",
         className,
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-balance text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-[1.75rem] md:leading-tight">
+        {eyebrow ? (
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-gold/90">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h1 className="font-display text-balance text-2xl font-bold leading-tight tracking-tight text-primary sm:text-[1.85rem] md:text-[2rem]">
           {title}
         </h1>
         {subtitle ? (
-          <p className="mt-1.5 max-w-xl text-pretty text-sm leading-relaxed text-secondary">
+          <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-secondary">
             {subtitle}
           </p>
         ) : null}

@@ -52,6 +52,7 @@
 | SELL-02 | High | API | wallet | hold ledger می‌افتاد به memory | **fixed** | withMysqlTransaction؛ بدون memory fallback |
 | SELL-04 | Med | API | wallet | برداشت بدون شبا | **fixed** | createWithdrawal + wallet route |
 | SELL-05 | High | API | tickets | create memory / detail 404 | **fixed** | seller-tickets-memory مشترک |
+| TKT-UI-01 | High | UI | account tickets | ارتفاع چت با header/nav overlap | **fixed** | fixed shell + CSS chrome vars |
 | SELL-06 | Med | UI | seller | URL بدون capability | **fixed** | SellerRouteGuard |
 | SELL-08/09 | Med | API | coupons | preview + used_count بدون seller_id | **fixed** | lineItems + increment by seller |
 | SELL-10 | Med | API | orders | note success بدون persist | **fixed** | 503 بدون MySQL |
@@ -106,6 +107,22 @@
 باگ‌های Critical/High ادمین و فروشندهٔ این اسکن فیکس شدند. Residualهای P0 و Commerce harden و شکاف‌های عملیاتی پولی/اعلان/رسانه (`GAP-01/02/04`) هم بسته شدند. جزئیات تحویل در `plans/qa-report.md`.
 
 **چک‌لیست دستی sandbox زرین‌پال:** یک سفارش تست → verify → استرداد از ادمین با `ZARINPAL_ACCESS_TOKEN` → تأیید برگشت در پنل زرین‌پال.
+
+---
+
+## Frontend commerce UI (آگوست ۲۰۲۶ — UI-C)
+
+| ID | سطح | بخش | symptom | وضعیت |
+|----|------|------|---------|--------|
+| UI-C01 | High | checkout | فلش سبد خالی بدون hydrate | **fixed** |
+| UI-C02 | High | coupon | کد بدون اعمال تخفیف | **fixed** (auto-validate + persist) |
+| UI-C03/04/13 | High | payment resume | سفارش یتیم / بدون resume در حساب | **fixed** |
+| UI-C05/09 | High | wishlist | merge مانع حذف؛ sync روی toggle | **fixed** |
+| UI-C06 | High | snappay | مجموع بدون کارمزد | **fixed** |
+| UI-C07/08 | Med | track | deep-link و لینک success | **fixed** |
+| UI-02/03 | High | sticky ATC / z-index | sentinel ته صفحه؛ drawer زیر sticky | **fixed** |
+| UI-04 | High | login | step=complete بدون session | **fixed** |
+| UI-C11/15 | Med | cart/PDP | stock pool؛ قیمت فروش وزن | **fixed** |
 
 ---
 

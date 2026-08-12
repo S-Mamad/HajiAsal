@@ -44,7 +44,7 @@ vi.mock("@/lib/server/audit-log", () => ({
 vi.mock("@/lib/server/payment-refund", () => ({
   refundOrderAtGateway: vi.fn(async () => ({
     ok: true,
-    provider: "zarinpal",
+    provider: "zibal",
     message: "ok",
   })),
 }));
@@ -73,7 +73,7 @@ describe("admin orders behavior", () => {
     } as Awaited<ReturnType<typeof getOrderById>>);
     vi.mocked(refundOrderAtGateway).mockResolvedValue({
       ok: true,
-      provider: "zarinpal",
+      provider: "zibal",
       message: "ok",
     });
   });

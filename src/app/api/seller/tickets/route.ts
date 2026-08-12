@@ -17,6 +17,7 @@ import {
 } from "@/lib/server/mysql";
 import { allowTicketMysqlFallthrough } from "@/lib/server/production";
 import { maskSensitiveText } from "@/lib/tickets/types";
+import { notifyTelegram } from "@/lib/server/telegram-notify";
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "tickets.manage");
@@ -149,6 +150,13 @@ export async function POST(request: Request) {
         ip: clientIpFromRequest(request),
       });
 
+      void notifyTelegram("ticket.new", {
+        id,
+        subject: parsed.data.subject,
+        customerName: gated.ctx.seller.shopName ?? gated.ctx.seller.ownerName,
+        customerPhone: gated.ctx.seller.phone,
+      });
+
       return NextResponse.json({ success: true, id });
     } catch (error) {
       console.error(
@@ -183,6 +191,13 @@ export async function POST(request: Request) {
     entityType: "ticket",
     entityId: ticket.id,
     ip: clientIpFromRequest(request),
+  });
+
+  void notifyTelegram("ticket.new", {
+    id: ticket.id,
+    subject: ticket.subject,
+    customerName: gated.ctx.seller.shopName ?? gated.ctx.seller.ownerName,
+    customerPhone: gated.ctx.seller.phone,
   });
 
   return NextResponse.json({ success: true, id: ticket.id });

@@ -299,21 +299,70 @@ html {
 /* Account panel shell */
 .account-shell {
   min-height: min(100%, 100dvh);
+  --site-header-h: 4rem;
+  --account-bottom-chrome: 6.75rem;
+}
+
+@media (min-width: 640px) {
+  .account-shell {
+    --site-header-h: 4.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .account-shell {
+    --account-bottom-chrome: 0rem;
+  }
+}
+
+/* Ticket chat: soft ambient canvas (mobile-first messaging) */
+.ticket-chat-canvas {
+  background-color: var(--surface-muted);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 100% 0%, var(--gold-dim), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 0% 100%, color-mix(in srgb, var(--gold) 6%, transparent), transparent 50%);
+}
+
+.ticket-chat-canvas::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a16207' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.hajiasal-root[data-theme="dark"] .ticket-chat-canvas::before {
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4a056' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
 .account-surface {
   box-shadow:
-    0 1px 0 rgb(28 25 23 / 0.03),
-    0 8px 24px -16px rgb(28 25 23 / 0.18);
+    0 1px 0 rgb(28 25 23 / 0.02),
+    0 6px 20px -14px rgb(28 25 23 / 0.14);
 }
 
 .hajiasal-root[data-theme="dark"] .account-surface {
   box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.03),
-    0 10px 28px -16px rgb(0 0 0 / 0.55);
+    0 1px 0 rgb(255 255 255 / 0.02),
+    0 8px 24px -14px rgb(0 0 0 / 0.45);
 }
 
-/* Account pill nav (solid, no backdrop-filter) */
+.account-stat {
+  box-shadow:
+    0 1px 0 rgb(28 25 23 / 0.02),
+    0 4px 16px -12px rgb(28 25 23 / 0.1);
+}
+
+.hajiasal-root[data-theme="dark"] .account-stat {
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.02),
+    0 6px 18px -12px rgb(0 0 0 / 0.35);
+}
+
+/* Account mobile nav (solid pill) */
+.account-mobile-nav,
 .floating-solid-nav,
 .floating-glass-nav {
   isolation: isolate;
@@ -326,6 +375,7 @@ html {
     0 0 0 1px rgb(161 98 7 / 0.04);
 }
 
+.account-mobile-nav::before,
 .floating-solid-nav::before,
 .floating-glass-nav::before {
   content: "";
@@ -341,6 +391,7 @@ html {
   pointer-events: none;
 }
 
+.hajiasal-root[data-theme="dark"] .account-mobile-nav,
 .hajiasal-root[data-theme="dark"] .floating-solid-nav,
 .hajiasal-root[data-theme="dark"] .floating-glass-nav {
   border-color: var(--border-bright);
@@ -351,6 +402,7 @@ html {
     0 0 0 1px rgb(212 160 86 / 0.08);
 }
 
+.hajiasal-root[data-theme="dark"] .account-mobile-nav::before,
 .hajiasal-root[data-theme="dark"] .floating-solid-nav::before,
 .hajiasal-root[data-theme="dark"] .floating-glass-nav::before {
   background: linear-gradient(

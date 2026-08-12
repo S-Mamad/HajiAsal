@@ -12,6 +12,8 @@ const STATUS_STYLES: Record<string, string> = {
     "bg-emerald-50 text-emerald-900 ring-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-800/50",
   cancelled:
     "bg-red-50 text-red-800 ring-red-200/70 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-800/50",
+  refunded:
+    "bg-orange-50 text-orange-900 ring-orange-200/70 dark:bg-orange-950/40 dark:text-orange-200 dark:ring-orange-800/50",
 };
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -21,24 +23,28 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   shipped: "ارسال شده",
   delivered: "تحویل شده",
   cancelled: "لغو شده",
+  refunded: "بازپرداخت شده",
 };
 
 export function OrderStatusBadge({
   status,
+  refunded = false,
   className,
 }: {
   status: string;
+  refunded?: boolean;
   className?: string;
 }) {
+  const key = refunded ? "refunded" : status;
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-md px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-        STATUS_STYLES[status] ?? "bg-surface-muted text-secondary ring-border",
+        STATUS_STYLES[key] ?? "bg-surface-muted text-secondary ring-border",
         className,
       )}
     >
-      {ORDER_STATUS_LABELS[status] ?? status}
+      {ORDER_STATUS_LABELS[key] ?? status}
     </span>
   );
 }

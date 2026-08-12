@@ -87,6 +87,7 @@ export function TicketComposer({
   const fileRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isStore = variant === "storefront";
 
   const draftKey =
     ticketId && roleKey ? draftStorageKey(ticketId, roleKey) : null;
@@ -117,7 +118,7 @@ export function TicketComposer({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }, []);
 
   useEffect(() => {
@@ -228,10 +229,10 @@ export function TicketComposer({
     return (
       <div
         className={cn(
-          "border-t px-4 py-3 text-center text-sm",
-          variant === "storefront"
-            ? "border-border text-secondary"
-            : "border-stone-200 text-stone-500",
+          "relative z-[1] border-t px-4 py-4 text-center text-sm",
+          isStore
+            ? "border-border/70 bg-surface/90 text-secondary backdrop-blur-md"
+            : "border-stone-200 bg-white text-stone-500",
         )}
       >
         این تیکت بسته شده است. برای ادامه گفتگو آن را دوباره باز کنید.
@@ -242,9 +243,11 @@ export function TicketComposer({
   return (
     <div
       className={cn(
-        "border-t p-3 sm:p-4",
-        variant === "storefront" ? "border-border bg-surface" : "border-stone-200 bg-white",
-        dragOver && "ring-2 ring-inset ring-amber-400",
+        "relative z-[1] border-t p-2.5 sm:p-3",
+        isStore
+          ? "border-border/70 bg-surface/92 backdrop-blur-md supports-[backdrop-filter]:bg-surface/85"
+          : "border-stone-200 bg-white/95 backdrop-blur-md",
+        dragOver && "ring-2 ring-inset ring-gold/50",
       )}
       onDragOver={(e) => {
         e.preventDefault();
@@ -254,21 +257,40 @@ export function TicketComposer({
       onDrop={onDrop}
     >
       {replyTo ? (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-stone-100 px-2.5 py-1.5 text-xs">
-          <span className="truncate">پاسخ به: {replyTo.body.slice(0, 80) || "پیام"}</span>
-          <button type="button" className="ms-auto" onClick={onClearReply} aria-label="لغو پاسخ">
+        <div
+          className={cn(
+            "mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs",
+            isStore ? "bg-gold-dim text-primary" : "bg-stone-100 text-stone-700",
+          )}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            پاسخ به: {replyTo.body.slice(0, 80) || "پیام"}
+          </span>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl hover:bg-black/5"
+            onClick={onClearReply}
+            aria-label="لغو پاسخ"
+          >
             <Icon icon={X} size={14} />
           </button>
         </div>
       ) : null}
 
       {attachmentUrl ? (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700">
+        <div
+          className={cn(
+            "mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs",
+            isStore ? "bg-surface-muted text-primary" : "bg-stone-100 text-stone-700",
+          )}
+        >
           <Icon icon={Paperclip} size={14} />
-          <span className="truncate">{attachmentName ?? "پیوست"}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {attachmentName ?? "پیوست"}
+          </span>
           <button
             type="button"
-            className="ms-auto rounded p-0.5 hover:bg-stone-200"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl hover:bg-black/5"
             onClick={() => {
               setAttachmentUrl(null);
               setAttachmentName(null);
@@ -280,9 +302,11 @@ export function TicketComposer({
           </button>
         </div>
       ) : null}
-      {uploadError ? <p className="mb-2 text-xs text-rose-600">{uploadError}</p> : null}
+      {uploadError ? (
+        <p className="mb-2 px-1 text-xs text-rose-600">{uploadError}</p>
+      ) : null}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-1.5 sm:gap-2">
         {onUpload ? (
           <>
             <input
@@ -297,10 +321,10 @@ export function TicketComposer({
               disabled={locked}
               onClick={() => fileRef.current?.click()}
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition",
-                variant === "storefront"
-                  ? "border border-border text-secondary hover:bg-border/40"
-                  : "border border-stone-200 text-stone-600 hover:bg-stone-50",
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.97]",
+                isStore
+                  ? "text-secondary hover:bg-surface-muted hover:text-primary"
+                  : "text-stone-600 hover:bg-stone-50",
                 locked && "opacity-50",
                 shake && "motion-safe:animate-pulse ring-2 ring-rose-400",
               )}
@@ -308,7 +332,7 @@ export function TicketComposer({
             >
               <Icon
                 icon={uploading ? SpinnerGap : Paperclip}
-                size={18}
+                size={20}
                 className={uploading ? "animate-spin" : undefined}
               />
             </button>
@@ -321,10 +345,10 @@ export function TicketComposer({
             title="یادداشت داخلی"
             onClick={() => setInternal((v) => !v)}
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.97]",
               internal
-                ? "border-amber-300 bg-amber-50 text-amber-900"
-                : "border-stone-200 text-stone-500",
+                ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200"
+                : "text-stone-500 hover:bg-stone-50",
             )}
           >
             <Icon icon={NoteBlank} size={18} />
@@ -354,10 +378,10 @@ export function TicketComposer({
               internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
             }
             className={cn(
-              "max-h-40 min-h-11 w-full resize-none rounded-xl px-3 py-2.5 text-sm leading-relaxed outline-none transition",
-              "focus-visible:ring-2 focus-visible:ring-amber-700/25",
-              variant === "storefront"
-                ? "border border-border bg-surface-elevated text-primary placeholder:text-secondary/70"
+              "max-h-36 min-h-11 w-full resize-none rounded-[1.35rem] px-4 py-2.5 text-sm leading-relaxed outline-none transition",
+              "focus-visible:ring-2 focus-visible:ring-gold/30",
+              isStore
+                ? "border border-border/80 bg-surface-elevated text-primary placeholder:text-secondary/65"
                 : "border border-stone-200 bg-stone-50 text-zinc-900 placeholder:text-stone-400",
               locked && "opacity-60",
             )}
@@ -365,8 +389,10 @@ export function TicketComposer({
           {text.length > MAX_CHARS - 200 ? (
             <span
               className={cn(
-                "pointer-events-none absolute bottom-1.5 left-2 text-[10px]",
-                text.length > MAX_CHARS - 100 ? "text-rose-500" : "text-stone-400",
+                "pointer-events-none absolute bottom-1.5 left-3 text-[10px] tabular-nums",
+                text.length > MAX_CHARS - 100
+                  ? "text-rose-500"
+                  : "text-stone-400",
               )}
             >
               {text.length}/{MAX_CHARS}
@@ -379,9 +405,9 @@ export function TicketComposer({
           disabled={!canSend}
           onClick={() => void submit()}
           className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition active:scale-[0.97]",
-            variant === "storefront"
-              ? "bg-gold text-primary hover:brightness-95 disabled:opacity-40"
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.94]",
+            isStore
+              ? "bg-gold text-primary shadow-[0_8px_18px_-10px_var(--gold-glow)] hover:brightness-95 disabled:opacity-35 disabled:shadow-none"
               : "bg-zinc-900 text-white hover:bg-zinc-800 disabled:bg-zinc-300",
           )}
           aria-label="ارسال پیام"
@@ -395,8 +421,8 @@ export function TicketComposer({
       </div>
       <p
         className={cn(
-          "mt-1.5 hidden text-[11px] sm:block",
-          variant === "storefront" ? "text-secondary" : "text-stone-400",
+          "mt-1.5 hidden px-1 text-[11px] sm:block",
+          isStore ? "text-secondary" : "text-stone-400",
         )}
       >
         Enter ارسال · Shift+Enter خط جدید · Paste/Drop برای فایل
