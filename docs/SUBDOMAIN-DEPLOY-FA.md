@@ -8,7 +8,8 @@
 | ادمین | `~/hajiasal-admin` | `https://admin.hajiasal.ir` | `admin` |
 | فروشنده | `~/hajiasal-seller` | `https://seller.hajiasal.ir` | `seller` |
 
-ورود ادمین و فروشنده فقط با **OTP موبایل** است. لاگین مشتری روی دامنه اصلی تغییر نکرده.
+ورود ادمین و فروشنده از **همان سشن مشتری سایت اصلی** است (OTP روی `hajiasal.ir/login`).
+واجد شرایط بودن با تلفن در `admin_users` / `sellers` (وضعیت `active`) چک می‌شود.
 
 ## DNS و cPanel
 
@@ -57,7 +58,7 @@ ln -sfn ~/hajiasal-shared/uploads ~/hajiasal-seller/public/uploads
 
 جزئیات متغیرها: `docs/ENV-SETUP-FA.md` و `.env.example`.
 
-**مشترک هر سه:** `MYSQL_*`, `AUTH_SESSION_SECRET`, `SMS_*` / `MELIPAYAMAK_*`,  
+**مشترک هر سه:** `MYSQL_*`, `AUTH_SESSION_SECRET`, `AUTH_COOKIE_DOMAIN=.hajiasal.ir`, `SMS_*` / `MELIPAYAMAK_*`,  
 `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ADMIN_URL`, `NEXT_PUBLIC_SELLER_URL`, `TRUST_X_FORWARDED_FOR=true`
 
 | فایل | اضافه |
@@ -73,14 +74,16 @@ ln -sfn ~/hajiasal-shared/uploads ~/hajiasal-seller/public/uploads
 | چه | آدرس |
 |---|---|
 | فروشگاه | https://hajiasal.ir/ |
-| ورود مشتری | https://hajiasal.ir/login |
-| ادمین | https://admin.hajiasal.ir/ (rewrite به `/admin`) |
-| فروشنده | https://seller.hajiasal.ir/ (rewrite به `/seller`) |
+| ورود مشتری / پنل‌ها | https://hajiasal.ir/login (بعد از ورود، واجد شرایط‌ها به پنل برمی‌گردند) |
+| ادمین | https://admin.hajiasal.ir/ (بدون سشن → ریدایرکت به لاگین فروشگاه) |
+| فروشنده | https://seller.hajiasal.ir/ (بدون سشن → ریدایرکت به لاگین فروشگاه) |
 
 روی فروشگاه، مسیرهای `/admin` و `/seller` به ساب‌دامین ریدایرکت ۳۰۱ می‌شوند.
 
 ## ادمین‌های اصلی
 
-با بالا آمدن پنل ادمین، شماره‌های `ADMIN_PRIMARY_PHONES` (پیش‌فرض دو شماره اصلی) به‌صورت `super_admin` و `active` seed می‌شوند. ورود فقط با OTP همان موبایل.
+با بالا آمدن پنل ادمین، شماره‌های `ADMIN_PRIMARY_PHONES` (پیش‌فرض دو شماره اصلی) به‌صورت `super_admin` و `active` seed می‌شوند. ورود از لاگین فروشگاه با همان موبایل.
 
-فروشنده باید در پنل ادمین با موبایل معتبر ساخته و `active` باشد؛ سپس OTP روی `seller.hajiasal.ir`.
+فروشنده باید در پنل ادمین با موبایل معتبر ساخته و `active` باشد؛ سپس با همان شماره از `hajiasal.ir/login` وارد شود و به `seller.hajiasal.ir` برگردد.
+
+**اجباری روی production سه‌اپ:** `AUTH_COOKIE_DOMAIN` و `AUTH_SESSION_SECRET` یکسان روی هر سه `.env` — بدون Domain مشترک، سشن فروشگاه روی ساب‌دامین پنل دیده نمی‌شود.

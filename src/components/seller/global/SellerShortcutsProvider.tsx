@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { GlobalSearch } from "./GlobalSearch";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { isTypingTarget, SELLER_SHORTCUTS } from "@/lib/seller/shortcuts";
@@ -16,6 +16,7 @@ import { useSellerCapabilities } from "@/components/seller/layout/SellerCapabili
 
 export function SellerShortcutsProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const capabilities = useSellerCapabilities();
   const [searchOpen, setSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -42,6 +43,11 @@ export function SellerShortcutsProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("seller:open-help", onHelp);
     };
   }, [openSearch, openHelp]);
+
+  useEffect(() => {
+    setSearchOpen(false);
+    setHelpOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,24 +1,15 @@
 import { redirect } from "next/navigation";
-import { isAdminAuthenticated } from "@/lib/server/admin";
-import { ensurePrimaryAdmins } from "@/lib/server/admin-auth";
-import { AdminLogin } from "@/components/admin/AdminLogin";
+import { loadAdminPanelSession } from "@/lib/auth/admin-panel-session";
+import { PanelAccessDenied } from "@/components/auth/PanelAccessDenied";
 import { hajiasalPath } from "@/lib/paths";
 
 export default async function AdminPage() {
-  try {
-    await ensurePrimaryAdmins();
-  } catch (error) {
-    console.error(
-      "[admin] ensurePrimaryAdmins:",
-      error instanceof Error ? error.message : error,
-    );
+  const state = await loadAdminPanelSession(hajiasalPath("/admin/dashboard"));
+  if (state.kind === "login") {
+    redirect(state.loginUrl);
   }
-
-  const authenticated = await isAdminAuthenticated();
-
-  if (authenticated) {
+  if (state.kind === "ok") {
     redirect(hajiasalPath("/admin/dashboard"));
   }
-
-  return <AdminLogin />;
+  return <PanelAccessDenied panelLabel="پنل مدیریت" />;
 }

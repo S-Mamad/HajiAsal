@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const productImageFitSchema = z.object({
+  scale: z.number().min(1).max(3),
+  x: z.number().min(-50).max(50),
+  y: z.number().min(-50).max(50),
+});
+
+export const productImageFitsSchema = z
+  .record(z.string().min(1), productImageFitSchema)
+  .optional();
+
 export const weightOptionSchema = z.object({
   label: z.string().min(1),
   grams: z.number().positive(),
@@ -53,6 +63,7 @@ export const productPatchSchema = z.object({
   category: productCategorySchema.optional(),
   categoryLabel: z.string().optional(),
   images: z.array(z.string().min(1)).optional(),
+  imageFits: productImageFitsSchema,
   weightOptions: z.array(weightOptionSchema).optional(),
   discountPrice: z.number().nullable().optional(),
   inStock: z.boolean().optional(),
@@ -63,6 +74,7 @@ export const productPatchSchema = z.object({
   shippingInfo: z.string().optional(),
   rating: z.number().optional(),
   reviewCount: z.number().optional(),
+  viewsLast24h: z.number().int().nonnegative().optional(),
   status: productStatusSchema.optional(),
   sku: z.string().optional(),
   brandId: z.string().nullable().optional(),
@@ -82,6 +94,7 @@ export const productCreateSchema = z.object({
   category: productCategorySchema,
   categoryLabel: z.string().default(""),
   images: z.array(z.string().min(1)).default([]),
+  imageFits: productImageFitsSchema,
   weightOptions: z.array(weightOptionSchema).min(1),
   discountPrice: z.number().nullable().optional(),
   inStock: z.boolean().default(true),
@@ -92,6 +105,7 @@ export const productCreateSchema = z.object({
   shippingInfo: z.string().optional(),
   rating: z.number().default(0),
   reviewCount: z.number().default(0),
+  viewsLast24h: z.number().int().nonnegative().optional(),
   status: productStatusSchema.default("draft"),
   sku: z.string().optional(),
   brandId: z.string().nullable().optional(),

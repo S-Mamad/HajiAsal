@@ -26,7 +26,7 @@ import {
   UserGear,
   Scroll,
 } from "@phosphor-icons/react";
-import { hajiasalPath } from "@/lib/paths";
+import { hajiasalPath, sitePublicUrl } from "@/lib/paths";
 import { can, type AdminPermission, type AdminRole } from "./permissions";
 
 export interface AdminNavItem {
@@ -35,6 +35,8 @@ export interface AdminNavItem {
   icon: Icon;
   permission: AdminPermission;
   badgeKey?: "tickets" | "messages" | "qa";
+  /** Absolute storefront URL (opens main site from admin subdomain). */
+  external?: boolean;
 }
 
 export interface AdminNavGroup {
@@ -244,10 +246,11 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         permission: "settings.view",
       },
       {
-        href: hajiasalPath("/"),
+        href: `${sitePublicUrl()}/shop`,
         label: "فروشگاه",
         icon: Storefront,
         permission: "dashboard.view",
+        external: true,
       },
     ],
   },
@@ -260,11 +263,11 @@ export function filterNavForRole(role: AdminRole | string | null | undefined) {
   })).filter((group) => group.items.length > 0);
 }
 
-/** Longest matching nav href for a panel pathname (excludes storefront `/`). */
+/** Longest matching nav href for a panel pathname (excludes storefront shop URL). */
 export function findNavItemForPath(pathname: string): AdminNavItem | null {
-  const storefront = hajiasalPath("/");
+  const storefront = `${sitePublicUrl()}/shop`;
   const candidates = ADMIN_NAV_GROUPS.flatMap((g) => g.items).filter(
-    (item) => item.href !== storefront,
+    (item) => item.href !== storefront && !item.external,
   );
   let best: AdminNavItem | null = null;
   for (const item of candidates) {

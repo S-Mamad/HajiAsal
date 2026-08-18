@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ShopContent } from "@/components/shop/ShopContent";
 import { hajiasalCanonical } from "@/lib/paths";
+import { getAllCategoriesAsync } from "@/lib/server/categories";
 
 export const metadata: Metadata = {
   title: "فروشگاه",
@@ -9,6 +10,11 @@ export const metadata: Metadata = {
   alternates: { canonical: hajiasalCanonical("/shop") },
 };
 
-export default function ShopPage() {
-  return <ShopContent />;
+export default async function ShopPage() {
+  const categories = await getAllCategoriesAsync();
+  return (
+    <ShopContent
+      categories={categories.map((c) => ({ id: c.id, label: c.name }))}
+    />
+  );
 }

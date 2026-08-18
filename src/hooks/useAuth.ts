@@ -9,13 +9,20 @@ export function useAuth() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/session");
+      const res = await fetch("/api/auth/session", {
+        credentials: "include",
+        signal: AbortSignal.timeout(4000),
+      });
       if (!res.ok) {
         setUser(null);
         return;
       }
       const data = await res.json();
-      setUser(data.user ?? null);
+      setUser(
+        data.user
+          ? { ...data.user, sellerPanel: data.sellerPanel ?? null }
+          : null,
+      );
     } catch {
       setUser(null);
     } finally {
@@ -28,14 +35,22 @@ export function useAuth() {
 
     void (async () => {
       try {
-        const res = await fetch("/api/auth/session");
+        const res = await fetch("/api/auth/session", {
+          credentials: "include",
+          signal: AbortSignal.timeout(4000),
+        });
         if (!active) return;
         if (!res.ok) {
           setUser(null);
           return;
         }
         const data = await res.json();
-        setUser(data.user ?? null);
+        if (!active) return;
+        setUser(
+          data.user
+            ? { ...data.user, sellerPanel: data.sellerPanel ?? null }
+            : null,
+        );
       } catch {
         if (active) setUser(null);
       } finally {

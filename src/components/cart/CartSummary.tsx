@@ -14,14 +14,15 @@ interface CartSummaryProps {
 }
 
 export function CartSummary({
-  showShipping = true,
+  showShipping = false,
   shippingOverride,
   discount = 0,
   feeLabel,
   feeAmount = 0,
   payableOverride,
 }: CartSummaryProps) {
-  const subtotal = useCartStore((s) => s.getSubtotal());
+  // Payable only — OOS lines must not inflate checkout totals.
+  const subtotal = useCartStore((s) => s.getPayableSubtotal());
   const storeShipping = useCartStore((s) => s.getShippingCost());
   const shipping = shippingOverride ?? storeShipping;
   const cashTotal = Math.max(
@@ -37,13 +38,17 @@ export function CartSummary({
         <span>جمع جزء</span>
         <span className="tabular-nums">{formatPrice(subtotal)}</span>
       </div>
-      {showShipping ? (
+      {showShipping && subtotal > 0 ? (
         <div className="flex justify-between text-secondary">
           <span>هزینه ارسال</span>
           <span className="tabular-nums">
             {shipping === 0 ? "بدون هزینه" : formatPrice(shipping)}
           </span>
         </div>
+      ) : subtotal > 0 ? (
+        <p className="text-xs text-secondary">
+          هزینه ارسال بعد از ادامه خرید محاسبه می‌شود.
+        </p>
       ) : null}
       {discount > 0 ? (
         <div className="flex justify-between text-gold">

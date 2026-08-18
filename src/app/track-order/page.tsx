@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { OrderStatusStepper } from "@/components/orders/OrderStatusStepper";
 import { formatPrice } from "@/lib/utils";
+import { hajiasalPath } from "@/lib/paths";
 
 interface OrderInfo {
   id: string;
@@ -80,14 +82,9 @@ function TrackOrderInner() {
     await runTrack(tracking, phone);
   };
 
-  const invoiceQuery =
+  const invoiceAuthQuery =
     order && phone.trim()
-      ? `?print=1&phone=${encodeURIComponent(phone.trim())}&tracking=${encodeURIComponent(order.trackingCode)}`
-      : null;
-
-  const invoiceDownloadQuery =
-    order && phone.trim()
-      ? `?download=1&phone=${encodeURIComponent(phone.trim())}&tracking=${encodeURIComponent(order.trackingCode)}`
+      ? `phone=${encodeURIComponent(phone.trim())}&tracking=${encodeURIComponent(order.trackingCode)}`
       : null;
 
   const statusText = order?.refundedAt
@@ -144,6 +141,9 @@ function TrackOrderInner() {
           <p className="mb-4 text-sm font-semibold text-gold">
             {formatPrice(order.total)}
           </p>
+          <div className="mb-5 border-t border-border pt-4">
+            <OrderStatusStepper status={order.refundedAt ? "refunded" : order.status} />
+          </div>
           <ul className="border-t border-border pt-4 text-sm text-secondary">
             {order.items.map((item, i) => (
               <li key={i} className="py-1">
@@ -152,22 +152,35 @@ function TrackOrderInner() {
               </li>
             ))}
           </ul>
-          {invoiceQuery && invoiceDownloadQuery ? (
-            <div className="mt-5 flex flex-wrap gap-3 border-t border-border pt-4">
+          <div className="mt-5 flex flex-col gap-2 border-t border-border pt-4">
+            <Button
+              href={`${hajiasalPath("/contact")}?orderId=${encodeURIComponent(order.id)}&tracking=${encodeURIComponent(order.trackingCode)}`}
+              variant="outline"
+              className="w-full"
+            >
+              پشتیبانی این سفارش
+            </Button>
+            <p className="text-[11px] text-dim">
+              مهمان‌ها از تماس پشتیبانی استفاده می‌کنند؛ پس از ورود می‌توانید تیکت
+              ثبت کنید. شناسه سفارش در لینک همراه است.
+            </p>
+          </div>
+          {invoiceAuthQuery ? (
+            <div className="mt-4 flex flex-wrap gap-3">
               <a
-                href={`/api/orders/${order.id}/invoice${invoiceQuery}`}
+                href={`/api/orders/${order.id}/invoice?${invoiceAuthQuery}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-amber hover:underline"
               >
-                مشاهده / پرینت فاکتور
+                مشاهده فاکتور
               </a>
               <a
-                href={`/api/orders/${order.id}/invoice${invoiceDownloadQuery}`}
-                download
+                href={`/api/orders/${order.id}/invoice?download=1&${invoiceAuthQuery}`}
+                download={`invoice-${order.id}.pdf`}
                 className="text-sm text-muted hover:text-primary hover:underline"
               >
-                دانلود فاکتور
+                دانلود PDF
               </a>
             </div>
           ) : (
@@ -175,6 +188,9 @@ function TrackOrderInner() {
               برای دانلود فاکتور، شماره موبایل سفارش را هم وارد کنید.
             </p>
           )}
+          <p className="mt-4 text-[11px] leading-relaxed text-dim">
+            لغو یا مرجوعی پس از شروع آماده‌سازی فقط از طریق پشتیبانی ممکن است.
+          </p>
         </div>
       ) : null}
     </div>

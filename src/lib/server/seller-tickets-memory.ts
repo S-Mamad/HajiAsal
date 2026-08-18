@@ -16,6 +16,7 @@ import {
 import type { TicketMessage } from "@/lib/tickets/types";
 import { isTicketClosed, statusAfterSenderReply } from "@/lib/tickets/types";
 import { maskSensitiveText } from "@/lib/tickets/types";
+import { sanitizeTicketAttachmentUrl } from "@/lib/tickets/attachment-url";
 
 export type MemoryTicketMessage = TicketMessage;
 
@@ -341,7 +342,7 @@ export async function addSellerTicketMessage(input: {
     senderType: input.senderType,
     senderId: input.senderId ?? null,
     body,
-    attachmentUrl: input.attachmentUrl ?? null,
+    attachmentUrl: sanitizeTicketAttachmentUrl(input.attachmentUrl),
     attachmentName: input.attachmentName ?? null,
     attachmentMime: input.attachmentMime ?? null,
     clientMessageId: input.clientMessageId ?? null,
@@ -402,7 +403,7 @@ export async function addSellerTicketMessage(input: {
     const msg = adminReplyMemoryTicket(
       input.ticketId,
       body,
-      input.attachmentUrl,
+      message.attachmentUrl,
       input.senderId,
     );
     if (!msg) throw new Error("TICKET_NOT_FOUND");
@@ -415,7 +416,7 @@ export async function addSellerTicketMessage(input: {
     input.ticketId,
     input.sellerId ?? ticket.sellerId,
     body,
-    input.attachmentUrl,
+    message.attachmentUrl,
   );
   if (!msg) throw new Error("TICKET_NOT_FOUND");
   msg.clientMessageId = message.clientMessageId;

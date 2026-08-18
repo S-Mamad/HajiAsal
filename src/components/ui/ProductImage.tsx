@@ -1,11 +1,13 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { resolveProductImageSrc } from "@/lib/product-image";
+import {
+  productImageFitStyle,
+  resolveProductImageSrc,
+  type ProductImageFit,
+} from "@/lib/product-image";
 
 interface ProductImageProps {
   src: string;
@@ -14,6 +16,9 @@ interface ProductImageProps {
   sizes?: string;
   priority?: boolean;
   className?: string;
+  style?: React.CSSProperties;
+  fit?: "cover" | "contain";
+  imageFit?: ProductImageFit | null;
 }
 
 export function ProductImage({
@@ -23,6 +28,9 @@ export function ProductImage({
   sizes,
   priority = false,
   className,
+  style,
+  fit = "cover",
+  imageFit,
 }: ProductImageProps) {
   const resolved = resolveProductImageSrc(src);
   const [imgSrc, setImgSrc] = useState(resolved);
@@ -32,6 +40,8 @@ export function ProductImage({
   }, [resolved]);
 
   const isSvg = imgSrc.toLowerCase().endsWith(".svg");
+  const cropStyle = productImageFitStyle(imageFit);
+  const objectFit = cropStyle ? "cover" : fit;
 
   return (
     <Image
@@ -41,7 +51,30 @@ export function ProductImage({
       sizes={sizes}
       priority={priority}
       unoptimized={isSvg}
-      className={cn(className)}
+      className={cn(
+        fill && "h-full w-full",
+        objectFit === "contain" ? "object-contain" : "object-cover",
+        "object-center",
+        className,
+      )}
+      style={{
+        ...(fill
+          ? {
+              position: "absolute",
+              inset: 0,
+              insetInlineStart: 0,
+              insetInlineEnd: 0,
+              width: "100%",
+              height: "100%",
+              maxWidth: "none",
+              maxHeight: "none",
+            }
+          : null),
+        objectFit,
+        objectPosition: "50% 50%",
+        ...style,
+        ...cropStyle,
+      }}
       onError={() => setImgSrc("/images/hajiasal/placeholder.svg")}
     />
   );

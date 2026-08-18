@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { SignOut, Storefront } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
-import { hajiasalPath } from "@/lib/paths";
+import { hajiasalPath, sitePublicUrl } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { getSellerNavGroups } from "@/lib/seller/nav";
 import type { SellerCapabilitiesMap } from "@/lib/seller/capabilities";
@@ -29,7 +29,6 @@ export function SellerSidebar({
   badges?: Partial<Record<SellerBadgeKey, number>>;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const groups = getSellerNavGroups(capabilities);
   const [badges, setBadges] = useState<Partial<Record<SellerBadgeKey, number>>>(
     badgesProp ?? {},
@@ -78,9 +77,10 @@ export function SellerSidebar({
   }, [badgesProp]);
 
   const logout = async () => {
-    await fetch("/api/seller/auth", { method: "DELETE" });
-    router.push(hajiasalPath("/seller"));
-    router.refresh();
+    await fetch("/api/seller/auth", { method: "DELETE", credentials: "include" });
+    const host = window.location.hostname;
+    const local = host === "localhost" || host === "127.0.0.1";
+    window.location.assign(local ? "/login" : `${sitePublicUrl()}/login`);
   };
 
   return (
@@ -118,9 +118,15 @@ export function SellerSidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      onClick={onNavigate}
+                      prefetch
+                      onClick={(event) => {
+                        onNavigate?.();
+                        if (pathname === item.href) {
+                          event.preventDefault();
+                        }
+                      }}
                       data-active={active}
-                      className="panel-nav-item"
+                      className="panel-nav-item relative z-[1]"
                     >
                       <Icon
                         icon={item.icon}
@@ -146,9 +152,11 @@ export function SellerSidebar({
 
       <div className="space-y-0.5 border-t border-[var(--panel-sidebar-border)] p-2.5">
         <Link
-          href={hajiasalPath("/shop")}
+          href={`${sitePublicUrl()}/shop`}
           onClick={onNavigate}
           className="panel-nav-item"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           <Icon icon={Storefront} size={17} />
           مشاهده فروشگاه

@@ -77,13 +77,16 @@ export default function SellerOrdersPage() {
   );
 
   const bulkAction = async (action: "bulkConfirm" | "bulkPrepare") => {
-    if (!selected.length) return;
+    if (!actionableSelected.length) return;
     setMessage("");
     setError("");
     const res = await fetch("/api/seller/orders", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderIds: selected, action }),
+      body: JSON.stringify({
+        orderIds: actionableSelected.map((o) => o.id),
+        action,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -331,7 +334,7 @@ export default function SellerOrdersPage() {
                   <AdminButton
                     size="sm"
                     variant="ghost"
-                    href={`/api/orders/${r.id}/invoice?print=1`}
+                    href={`/api/orders/${r.id}/invoice`}
                     external
                     target="_blank"
                   >

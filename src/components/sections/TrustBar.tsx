@@ -1,11 +1,8 @@
 "use client";
 
 import { ShieldCheck, Truck, Headset } from "@phosphor-icons/react";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { Reveal } from "@/components/ui/Reveal";
-
-const siteData = site as SiteConfig;
 
 const icons = {
   authentic: ShieldCheck,
@@ -14,6 +11,8 @@ const icons = {
 };
 
 export function TrustBar() {
+  const siteData = useSiteSettings();
+
   return (
     <section className="border-y border-border py-7 md:py-12">
       <div className="mx-auto max-w-5xl px-3 sm:px-4 md:px-8">

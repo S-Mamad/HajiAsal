@@ -31,13 +31,17 @@ export async function decrementStockForPaidOrder(
 
     if (isMysqlConfigured()) {
       try {
+        // NULL stock_qty = unlimited catalog stock. Never COALESCE(NULL,0):
+        // that falsely treats unlimited as zero and soft-zeros the whole catalog.
         const sql = `UPDATE products
-          SET stock_qty = GREATEST(0, COALESCE(stock_qty, 0) - ?),
+          SET stock_qty = GREATEST(0, stock_qty - ?),
               in_stock = CASE
-                WHEN GREATEST(0, COALESCE(stock_qty, 0) - ?) > 0 THEN 1
+                WHEN GREATEST(0, stock_qty - ?) > 0 THEN 1
                 ELSE 0
               END
-          WHERE id = ? AND COALESCE(stock_qty, 0) >= ?`;
+          WHERE id = ?
+            AND stock_qty IS NOT NULL
+            AND stock_qty >= ?`;
         const params = [qty, qty, productId, qty];
         const result = conn
           ? (
@@ -46,16 +50,22 @@ export async function decrementStockForPaidOrder(
           : await mysqlExecute(sql, params);
 
         if (result.affectedRows === 0) {
-          // Partial / zero stock: clamp to zero and report shortage (payment already taken).
+          // Tracked stock that could not cover qty: clamp to zero (never touch NULL/unlimited).
           const softSql = `UPDATE products
             SET stock_qty = 0, in_stock = 0
-            WHERE id = ? AND COALESCE(stock_qty, 0) < ?`;
-          if (conn) {
-            await conn.execute(softSql, [productId, qty]);
-          } else {
-            await mysqlExecute(softSql, [productId, qty]);
+            WHERE id = ?
+              AND stock_qty IS NOT NULL
+              AND stock_qty < ?`;
+          const softResult = conn
+            ? (
+                await conn.execute<ResultSetHeader>(softSql, [productId, qty])
+              )[0]
+            : await mysqlExecute(softSql, [productId, qty]);
+          if (softResult.affectedRows > 0) {
+            shortages.push(title);
           }
-          shortages.push(title);
+          // affectedRows === 0 here means unlimited (NULL) stock or missing row —
+          // do not invent a shortage for unlimited catalog items.
         }
         continue;
       } catch (error) {
@@ -117,10 +127,13 @@ export async function restoreStockForPaidOrder(
 
     if (isMysqlConfigured()) {
       try {
+        // Only restore tracked (non-NULL) stock. COALESCE(NULL,0)+qty would
+        // turn unlimited catalog rows into finite stock after refunds.
         const sql = `UPDATE products
-          SET stock_qty = COALESCE(stock_qty, 0) + ?,
+          SET stock_qty = stock_qty + ?,
               in_stock = 1
-          WHERE id = ?`;
+          WHERE id = ?
+            AND stock_qty IS NOT NULL`;
         const params = [qty, productId];
         if (conn) {
           await conn.execute(sql, params);

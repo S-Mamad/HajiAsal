@@ -2,19 +2,17 @@
 
 import { getImageProps } from "next/image";
 import { motion, useReducedMotion } from "motion/react";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { Button } from "@/components/ui/Button";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { hajiasalPath } from "@/lib/paths";
 import { ArrowLeft } from "@phosphor-icons/react";
-
-const siteData = site as SiteConfig;
+import site from "@/data/site.json";
 
 const HERO_DESKTOP =
-  siteData.hero.image || "/images/hajiasal/hero-studio.webp";
+  site.hero.image || "/images/hajiasal/hero-studio.webp";
 const HERO_MOBILE =
-  siteData.hero.imageMobile || "/images/hajiasal/hero-mobile.webp";
+  site.hero.imageMobile || "/images/hajiasal/hero-mobile.webp";
 
 const common = {
   alt: "شیشه عسل طلایی حاجی عسل با شهد روان و موم طبیعی",
@@ -28,7 +26,7 @@ const {
   src: HERO_DESKTOP,
   width: 2400,
   height: 1350,
-  quality: 90,
+  quality: 82,
 });
 
 const {
@@ -38,15 +36,16 @@ const {
   src: HERO_MOBILE,
   width: 1200,
   height: 1600,
-  quality: 90,
+  quality: 82,
   priority: true,
 });
 
 export function Hero() {
   const reduced = useReducedMotion();
+  const siteData = useSiteSettings();
 
   return (
-    <section className="relative -mt-16 flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-void sm:-mt-[4.75rem] md:h-auto md:min-h-[100dvh] md:max-h-none">
+    <section className="relative -mt-16 flex h-[100svh] max-h-[100svh] flex-col overflow-hidden bg-void sm:-mt-[4.75rem] md:h-auto md:min-h-[100svh] md:max-h-none">
       <div className="absolute inset-0">
         <picture>
           <source media="(min-width: 768px)" srcSet={desktopSrcSet} />
@@ -55,7 +54,7 @@ export function Hero() {
             {...mobileImg}
             srcSet={mobileSrcSet}
             alt={common.alt}
-            className="hero-ken absolute inset-0 h-full w-full object-cover object-[center_32%] md:object-[32%_42%]"
+            className="absolute inset-0 h-full w-full object-cover object-[center_32%] md:object-[32%_42%]"
           />
         </picture>
         <div className="hero-wash absolute inset-0" />

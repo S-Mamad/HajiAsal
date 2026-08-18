@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getSessionFromRequest } from "@/lib/auth/session";
+import { resolveSupportActor } from "@/lib/server/support-guest";
 import { validateChatFile } from "@/lib/tickets/types";
 
 function extForMime(mime: string): string {
@@ -14,8 +15,8 @@ function extForMime(mime: string): string {
 }
 
 export async function POST(request: Request) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
+  const actor = resolveSupportActor(getSessionFromRequest(request), request);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -32,17 +33,18 @@ export async function POST(request: Request) {
 
     const id = randomUUID();
     const filename = `${id}${extForMime(file.type)}`;
+    const ownerDir = actor.customerId.replace(/[^a-zA-Z0-9_-]/g, "_");
     const dir = path.join(
       process.cwd(),
       "public",
       "uploads",
       "tickets",
-      session.userId,
+      ownerDir,
     );
     await mkdir(dir, { recursive: true });
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(dir, filename), buffer);
-    const url = `/uploads/tickets/${session.userId}/${filename}`;
+    const url = `/uploads/tickets/${ownerDir}/${filename}`;
 
     return NextResponse.json({
       success: true,

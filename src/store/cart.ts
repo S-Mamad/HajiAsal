@@ -2,7 +2,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { CartItem, WeightOption } from "@/types";
+import type { CartItem, CartItemAvailability, WeightOption } from "@/types";
+import type { ProductImageFit } from "@/lib/product-image";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
 import {
@@ -15,9 +16,23 @@ const defaultSite = site as SiteConfig;
 
 interface ShippingConfig {
   shippingCost: number;
+  freeShippingThreshold: number;
 }
 
 type AddItemInput = Omit<CartItem, "quantity">;
+
+interface CartRevalidatePatch {
+  productId: string;
+  weightGrams: number;
+  availability: CartItemAvailability;
+  inStock: boolean;
+  stockQty?: number;
+  livePrice: number;
+  title?: string;
+  image?: string;
+  imageFit?: ProductImageFit | null;
+  sellerId?: string;
+}
 
 interface CartStore {
   items: CartItem[];
@@ -25,12 +40,14 @@ interface CartStore {
   announcement: string;
   appliedCouponCode: string | null;
   shippingConfig: ShippingConfig;
+  lastInteractedAt: number | null;
   _hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
-  setShippingConfig: (config: ShippingConfig) => void;
+  setShippingConfig: (config: Partial<ShippingConfig>) => void;
   setAppliedCouponCode: (code: string | null) => void;
   setAnnouncement: (message: string) => void;
   clearAnnouncement: () => void;
+  touchInteraction: () => void;
   addItem: (item: AddItemInput, quantity?: number) => boolean;
   removeItem: (productId: string, weightGrams: number) => void;
   updateQuantity: (
@@ -38,13 +55,21 @@ interface CartStore {
     weightGrams: number,
     quantity: number,
   ) => void;
+  applyRevalidate: (patches: CartRevalidatePatch[]) => void;
   clearCart: () => void;
   openCart: () => void;
   closeCart: () => void;
   toggleCart: () => void;
   getSubtotal: () => number;
+  getPayableSubtotal: () => number;
   getItemCount: () => number;
   getShippingCost: () => number;
+  getFreeShippingProgress: () => {
+    threshold: number;
+    remaining: number;
+    progress: number;
+    qualified: boolean;
+  };
   getTotal: () => number;
 }
 
@@ -82,13 +107,19 @@ export const useCartStore = create<CartStore>()(
       appliedCouponCode: null,
       shippingConfig: {
         shippingCost: defaultSite.shippingCost,
+        freeShippingThreshold: defaultSite.freeShippingThreshold ?? 0,
       },
+      lastInteractedAt: null,
       _hasHydrated: false,
       setHasHydrated: (value) => set({ _hasHydrated: value }),
-      setShippingConfig: (config) => set({ shippingConfig: config }),
+      setShippingConfig: (config) =>
+        set((state) => ({
+          shippingConfig: { ...state.shippingConfig, ...config },
+        })),
       setAppliedCouponCode: (code) => set({ appliedCouponCode: code }),
       setAnnouncement: (message) => set({ announcement: message }),
       clearAnnouncement: () => set({ announcement: "" }),
+      touchInteraction: () => set({ lastInteractedAt: Date.now() }),
 
       addItem: (item, quantity = 1) => {
         const stock = stockSnapshot(item);
@@ -135,10 +166,18 @@ export const useCartStore = create<CartStore>()(
                       quantity: nextQty,
                       inStock: true,
                       stockQty: item.stockQty ?? i.stockQty,
+                      availability: "ok",
+                      image: item.image,
+                      imageFit: item.imageFit,
+                      weight: {
+                        ...i.weight,
+                        price: item.weight.price,
+                      },
                     }
                   : i,
               ),
               isOpen: false,
+              lastInteractedAt: Date.now(),
               announcement: `تعداد ${item.title} در سبد به‌روزرسانی شد`,
             };
           }
@@ -150,9 +189,12 @@ export const useCartStore = create<CartStore>()(
                 quantity: nextQty,
                 inStock: true,
                 stockQty: item.stockQty,
+                priceAtAdd: item.priceAtAdd ?? item.weight.price,
+                availability: "ok",
               },
             ],
             isOpen: false,
+            lastInteractedAt: Date.now(),
             announcement: `${item.title} به سبد خرید اضافه شد`,
           };
         });
@@ -167,6 +209,7 @@ export const useCartStore = create<CartStore>()(
                 i.productId === productId && i.weight.grams === weightGrams
               ),
           ),
+          lastInteractedAt: Date.now(),
         }));
       },
 
@@ -182,7 +225,7 @@ export const useCartStore = create<CartStore>()(
           );
           if (!target) return state;
 
-          if (target.inStock === false) {
+          if (target.inStock === false || target.availability === "out_of_stock") {
             return {
               announcement: `محصول «${target.title}» ناموجود است`,
             };
@@ -217,6 +260,7 @@ export const useCartStore = create<CartStore>()(
                   ? { ...i, quantity: capped }
                   : i,
               ),
+              lastInteractedAt: Date.now(),
               announcement: `موجودی «${target.title}» کافی نیست (حداکثر ${capped})`,
             };
           }
@@ -227,11 +271,50 @@ export const useCartStore = create<CartStore>()(
                 ? { ...i, quantity: capped }
                 : i,
             ),
+            lastInteractedAt: Date.now(),
           };
         });
       },
 
-      clearCart: () => set({ items: [], appliedCouponCode: null }),
+      applyRevalidate: (patches) => {
+        set((state) => ({
+          items: state.items.map((item) => {
+            const patch = patches.find(
+              (p) =>
+                p.productId === item.productId &&
+                p.weightGrams === item.weight.grams,
+            );
+            if (!patch) return item;
+            const priceAtAdd = item.priceAtAdd ?? item.weight.price;
+            const quantity =
+              typeof patch.stockQty === "number"
+                ? Math.min(item.quantity, Math.max(0, patch.stockQty))
+                : item.quantity;
+            return {
+              ...item,
+              title: patch.title ?? item.title,
+              image: patch.image ?? item.image,
+              imageFit:
+                patch.imageFit === undefined
+                  ? item.imageFit
+                  : (patch.imageFit ?? undefined),
+              sellerId: patch.sellerId ?? item.sellerId,
+              inStock: patch.inStock,
+              stockQty: patch.stockQty,
+              availability: patch.availability,
+              quantity,
+              priceAtAdd,
+              weight: {
+                ...item.weight,
+                price: patch.livePrice,
+              },
+            };
+          }),
+        }));
+      },
+
+      clearCart: () =>
+        set({ items: [], appliedCouponCode: null, lastInteractedAt: Date.now() }),
       openCart: () => set({ isOpen: true }),
       closeCart: () => set({ isOpen: false }),
       toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
@@ -242,28 +325,75 @@ export const useCartStore = create<CartStore>()(
           0,
         ),
 
+      getPayableSubtotal: () =>
+        get().items.reduce((sum, item) => {
+          if (item.availability === "out_of_stock" || item.inStock === false) {
+            return sum;
+          }
+          return sum + item.weight.price * item.quantity;
+        }, 0),
+
       getItemCount: () =>
         get().items.reduce((sum, item) => sum + item.quantity, 0),
 
       getShippingCost: () => {
-        const subtotal = get().getSubtotal();
+        const subtotal = get().getPayableSubtotal();
         if (subtotal === 0) return 0;
-        return get().shippingConfig.shippingCost;
+        const { shippingCost, freeShippingThreshold } = get().shippingConfig;
+        if (freeShippingThreshold > 0 && subtotal >= freeShippingThreshold) {
+          return 0;
+        }
+        return shippingCost;
       },
 
-      getTotal: () => get().getSubtotal() + get().getShippingCost(),
+      getFreeShippingProgress: () => {
+        const threshold = get().shippingConfig.freeShippingThreshold;
+        const subtotal = get().getPayableSubtotal();
+        if (threshold <= 0) {
+          return { threshold: 0, remaining: 0, progress: 0, qualified: false };
+        }
+        const remaining = Math.max(0, threshold - subtotal);
+        const progress = Math.min(1, subtotal / threshold);
+        return {
+          threshold,
+          remaining,
+          progress,
+          qualified: remaining === 0,
+        };
+      },
+
+      getTotal: () => get().getPayableSubtotal(),
     }),
     {
       name: "haji-asal-cart",
+      version: 2,
       partialize: (state) => ({
         items: state.items,
         appliedCouponCode: state.appliedCouponCode,
+        lastInteractedAt: state.lastInteractedAt,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      migrate: (persisted) => {
+        const state = persisted as {
+          items?: CartItem[];
+          appliedCouponCode?: string | null;
+          lastInteractedAt?: number | null;
+          shippingConfig?: unknown;
+        };
+        delete state.shippingConfig;
+        return {
+          items: state.items ?? [],
+          appliedCouponCode: state.appliedCouponCode ?? null,
+          lastInteractedAt: state.lastInteractedAt ?? null,
+        };
+      },
+      onRehydrateStorage: () => (_state, error) => {
+        useCartStore.setState({ _hasHydrated: true });
+        if (error) {
+          console.warn("[cart] persist rehydrate failed", error);
+        }
       },
     },
   ),
 );
 
-export type { WeightOption };
+export type { WeightOption, CartRevalidatePatch };

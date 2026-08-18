@@ -14,6 +14,7 @@ vi.mock("@/lib/server/mysql", () => ({
 import {
   __resetOtpMemoryForTests,
   createOtpChallenge,
+  generateOtpCode,
   verifyOtpChallenge,
 } from "./otp-store";
 import { normalizeOtpDigits } from "./otp-digits";
@@ -78,5 +79,49 @@ describe("otp-store MySQL resilience", () => {
   it("normalizes Persian digits", () => {
     expect(normalizeOtpDigits("۱۲۳۴")).toBe("1234");
     expect(normalizeOtpDigits("٠١٢٣")).toBe("0123");
+  });
+
+  it("generateOtpCode is 4 digits without leading zero", () => {
+    for (let i = 0; i < 20; i += 1) {
+      const code = generateOtpCode();
+      expect(code).toMatch(/^[1-9]\d{3}$/);
+    }
+  });
+
+  it("locks after 5 wrong memory attempts", async () => {
+    mockedUsable.mockReturnValue(false);
+    await createOtpChallenge("09120001111", "2222");
+    for (let i = 0; i < 5; i += 1) {
+      const wrong = await verifyOtpChallenge("09120001111", "0000");
+      expect(wrong.valid).toBe(false);
+    }
+    const locked = await verifyOtpChallenge("09120001111", "2222");
+    expect(locked.valid).toBe(false);
+    expect(locked.message).toMatch(/تلاش/);
+  });
+
+  it("consumes OTP atomically via DELETE ... code_hash (no TOCTOU select)", async () => {
+    mockedUsable.mockReturnValue(true);
+    mockedConfigured.mockReturnValue(true);
+    mockedExecute.mockResolvedValue({ affectedRows: 1 } as never);
+
+    // Seed memory so hash exists; MySQL atomic path should win.
+    mockedUsable.mockReturnValueOnce(false);
+    await createOtpChallenge("09125556677", "3456");
+    mockedUsable.mockReturnValue(true);
+
+    const result = await verifyOtpChallenge("09125556677", "3456");
+    expect(result.valid).toBe(true);
+    expect(mockedExecute).toHaveBeenCalled();
+    const sql = String(mockedExecute.mock.calls.at(-1)?.[0] ?? "");
+    expect(sql).toMatch(/DELETE FROM otp_challenges/i);
+    expect(sql).toMatch(/code_hash/i);
+    expect(sql).toMatch(/attempts </i);
+
+    // Second verify must fail (memory cleared + MySQL would return 0 rows)
+    mockedExecute.mockResolvedValue({ affectedRows: 0 } as never);
+    mockedQueryOne.mockResolvedValue(null);
+    const replay = await verifyOtpChallenge("09125556677", "3456");
+    expect(replay.valid).toBe(false);
   });
 });

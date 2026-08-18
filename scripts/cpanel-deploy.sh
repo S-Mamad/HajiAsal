@@ -75,4 +75,28 @@ else
 fi
 
 mkdir -p tmp
+touch tmp/restart.txt 2>/dev/null || true
+
+# Best-effort Telegram production update alert (never fails deploy)
+if [ "${SKIP_TELEGRAM_DEPLOY_NOTIFY:-}" != "1" ] && [ -f "$ROOT/scripts/telegram-deploy-notify.mjs" ]; then
+  # shellcheck disable=SC1091
+  set -a
+  [ -f "$ROOT/.env" ] && . "$ROOT/.env" || true
+  set +a
+  export APP_ROLE="${APP_ROLE:-storefront}"
+  # Prefer admin URL + secret if present on multi-app hosts
+  if [ -z "${TELEGRAM_DEPLOY_NOTIFY_URL:-}" ] && [ -f "$HOME/hajiasal-admin/.env" ]; then
+    # shellcheck disable=SC1091
+    set -a
+    . "$HOME/hajiasal-admin/.env" || true
+    set +a
+  fi
+  # Refresh Persian changelog from git when available (helps next upload without .git)
+  node "$ROOT/scripts/telegram-deploy-notify.mjs" --write-changelog-only 2>/dev/null || true
+  node "$ROOT/scripts/telegram-deploy-notify.mjs" \
+    --app "${APP_ROLE}" \
+    --title "آپدیت پروداکشن حاجی‌عسل" \
+    || echo "[cpanel-deploy] telegram notify skipped"
+fi
+
 echo "[cpanel-deploy] done"

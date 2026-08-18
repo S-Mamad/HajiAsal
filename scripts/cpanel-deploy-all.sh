@@ -62,12 +62,14 @@ build_one() {
   (
     cd "$dest"
     export APP_ROLE="$role"
+    export SKIP_TELEGRAM_DEPLOY_NOTIFY=1
     # Bake public URLs into middleware/client if present in .env
     set -a
     # shellcheck disable=SC1091
     [ -f .env ] && . ./.env
     set +a
     export APP_ROLE="$role"
+    export SKIP_TELEGRAM_DEPLOY_NOTIFY=1
     if [ -x "$dest/scripts/cpanel-deploy.sh" ]; then
       bash "$dest/scripts/cpanel-deploy.sh"
     else
@@ -90,6 +92,21 @@ link_uploads "$SELLER"
 build_one "$STOREFRONT" "storefront"
 build_one "$ADMIN" "admin"
 build_one "$SELLER" "seller"
+
+# One combined Telegram summary after all three apps (best-effort)
+if [ -f "$ROOT/scripts/telegram-deploy-notify.mjs" ]; then
+  set -a
+  # Prefer admin .env for CRON_SECRET / notify URL
+  # shellcheck disable=SC1091
+  [ -f "$ADMIN/.env" ] && . "$ADMIN/.env" || true
+  # shellcheck disable=SC1091
+  [ -f "$ROOT/.env" ] && . "$ROOT/.env" || true
+  set +a
+  node "$ROOT/scripts/telegram-deploy-notify.mjs" \
+    --app all \
+    --title "آپدیت کامل پروداکشن (۳ اپ)" \
+    || echo "[cpanel-deploy-all] telegram notify skipped"
+fi
 
 echo "[cpanel-deploy-all] done"
 echo "Ensure each app .env has the matching APP_ROLE and shared MYSQL_* / AUTH_SESSION_SECRET / SMS_*."

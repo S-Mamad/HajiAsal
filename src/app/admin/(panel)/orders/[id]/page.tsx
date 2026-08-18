@@ -119,22 +119,22 @@ export default function AdminOrderDetailPage() {
         </Link>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <AdminButton
-            href={`/api/orders/${order.id}/invoice?print=1`}
+            href={`/api/orders/${order.id}/invoice`}
             variant="outline"
             size="sm"
             external
             target="_blank"
           >
-            چاپ فاکتور
+            فاکتور
           </AdminButton>
           <AdminButton
             href={`/api/orders/${order.id}/invoice?download=1`}
             variant="outline"
             size="sm"
             external
-            download
+            download={`invoice-${order.id}.pdf`}
           >
-            دانلود فاکتور
+            دانلود PDF
           </AdminButton>
           <StatusBadge status={order.status} />
           <Can permission="orders.edit">

@@ -155,6 +155,7 @@ export async function POST(request: Request) {
         subject: parsed.data.subject,
         customerName: gated.ctx.seller.shopName ?? gated.ctx.seller.ownerName,
         customerPhone: gated.ctx.seller.phone,
+        excerpt: String(parsed.data.body ?? "").slice(0, 400),
       });
 
       return NextResponse.json({ success: true, id });
@@ -198,6 +199,7 @@ export async function POST(request: Request) {
     subject: ticket.subject,
     customerName: gated.ctx.seller.shopName ?? gated.ctx.seller.ownerName,
     customerPhone: gated.ctx.seller.phone,
+    excerpt: String(parsed.data.body ?? "").slice(0, 400),
   });
 
   return NextResponse.json({ success: true, id: ticket.id });

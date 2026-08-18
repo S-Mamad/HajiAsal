@@ -18,6 +18,10 @@ vi.mock("@/lib/server/telegram-notify", () => ({
   notifyTelegram: vi.fn(),
 }));
 
+vi.mock("@/lib/server/telegram-alert-queue", () => ({
+  enqueueTelegramAlert: vi.fn(async () => ({ queued: true })),
+}));
+
 vi.mock("@/lib/server/payment-refund", () => ({
   refundOrderAtGateway: vi.fn(async () => ({ ok: true, provider: "zibal" })),
 }));
@@ -36,6 +40,7 @@ vi.mock("@/lib/server/production", () => ({
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { confirmPaidOrder, getOrderById } from "@/lib/server/orders";
 import { refundOrderAtGateway } from "@/lib/server/payment-refund";
+import { checkRateLimitAsync } from "@/lib/server/rate-limit";
 import {
   __resetPaymentRefsForTests,
   setOrderPaymentRef,
@@ -45,6 +50,14 @@ import {
   GET as verifyGet,
   POST as verifyPost,
 } from "@/app/api/checkout/verify/route";
+
+async function expectClientReplace(res: Response, pathPart: string) {
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toMatch(/text\/html/);
+  const body = await res.text();
+  expect(body).toMatch(/location\.replace/);
+  expect(body).toContain(pathPart);
+}
 
 const pendingOrder = {
   id: "ord-z1",
@@ -66,6 +79,12 @@ describe("checkout zibal create/verify", () => {
     process.env.ZIBAL_MERCHANT = "zibal";
     process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
     vi.clearAllMocks();
+    (globalThis as typeof globalThis & { __payOrderHits?: number }).__payOrderHits =
+      0;
+    vi.mocked(checkRateLimitAsync).mockResolvedValue({
+      ok: true,
+      retryAfterSec: 0,
+    });
     vi.mocked(getSessionFromRequest).mockReturnValue({
       userId: "u1",
       phone: "09121234567",
@@ -100,6 +119,60 @@ describe("checkout zibal create/verify", () => {
     expect(data.success).toBe(true);
     expect(data.trackId).toBe("15966442233311");
     expect(data.redirectUrl).toContain("/start/15966442233311");
+    expect(data.reused).toBe(false);
+  });
+
+  it("create reuses existing fresh trackId without calling gateway again", async () => {
+    process.env.ZIBAL_MERCHANT = "live-merchant-1";
+    await setOrderPaymentRef("ord-z1", "zibal", "15966442233311", {
+      amountToman: 10_000,
+      redirectUrl: "https://gateway.zibal.ir/start/15966442233311",
+    });
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await createPayment(
+      new Request("http://localhost/api/checkout/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: "ord-z1" }),
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.reused).toBe(true);
+    expect(data.trackId).toBe("15966442233311");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse a trackId on the official sandbox merchant", async () => {
+    process.env.ZIBAL_MERCHANT = "zibal";
+    await setOrderPaymentRef("ord-z1", "zibal", "15966442233311", {
+      amountToman: 10_000,
+      redirectUrl: "https://gateway.zibal.ir/start/15966442233311",
+    });
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ result: 100, trackId: 99, message: "success" }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await createPayment(
+      new Request("http://localhost/api/checkout/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: "ord-z1" }),
+      }),
+    );
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.reused).toBe(false);
+    expect(data.trackId).toBe("99");
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("create returns 503 without merchant", async () => {
@@ -114,14 +187,59 @@ describe("checkout zibal create/verify", () => {
     expect(res.status).toBe(503);
   });
 
+  it("create real-gateway spam is rate limited after 3 creates", async () => {
+    let track = 100;
+    globalThis.fetch = vi.fn(async () => {
+      track += 1;
+      return new Response(
+        JSON.stringify({ result: 100, trackId: track, message: "success" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    vi.mocked(checkRateLimitAsync).mockImplementation(async (key: string) => {
+      if (String(key).startsWith("pay-create:order:")) {
+        const g = globalThis as typeof globalThis & {
+          __payOrderHits?: number;
+        };
+        g.__payOrderHits = (g.__payOrderHits ?? 0) + 1;
+        if (g.__payOrderHits > 3) {
+          return { ok: false, retryAfterSec: 60 };
+        }
+      }
+      return { ok: true, retryAfterSec: 0 };
+    });
+
+    for (let i = 0; i < 3; i++) {
+      __resetPaymentRefsForTests();
+      const res = await createPayment(
+        new Request("http://localhost/api/checkout/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: "ord-z1" }),
+        }),
+      );
+      expect(res.status).toBe(200);
+    }
+
+    __resetPaymentRefsForTests();
+    const blocked = await createPayment(
+      new Request("http://localhost/api/checkout/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: "ord-z1" }),
+      }),
+    );
+    expect(blocked.status).toBe(429);
+  });
+
   it("GET verify fails closed without binding", async () => {
     const res = await verifyGet(
       new Request(
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toMatch(/payment=failed/);
+    await expectClientReplace(res, "payment=failed");
   });
 
   it("GET verify fails when gateway verify rejects", async () => {
@@ -138,7 +256,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/payment=failed/);
+    await expectClientReplace(res, "payment=failed");
     expect(confirmPaidOrder).not.toHaveBeenCalled();
   });
 
@@ -160,7 +278,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/payment=failed/);
+    await expectClientReplace(res, "payment=failed");
     expect(confirmPaidOrder).not.toHaveBeenCalled();
   });
 
@@ -178,7 +296,28 @@ describe("checkout zibal create/verify", () => {
     ) as typeof fetch;
     vi.mocked(confirmPaidOrder).mockResolvedValue({
       ok: true,
-      order: { ...pendingOrder, status: "confirmed", trackingCode: "TRK1" },
+      order: {
+        id: "ord-z1",
+        status: "confirmed",
+        paymentMethod: "online",
+        total: 10_000,
+        trackingCode: "TRK1",
+        userId: "u1",
+        customer: {
+          fullName: "تست",
+          phone: "09121234567",
+          address: "تهران",
+          city: "تهران",
+          province: "تهران",
+          postalCode: "1234567890",
+        },
+        items: [],
+        subtotal: 10_000,
+        shipping: 0,
+        discount: 0,
+        createdAt: "2026-08-12T12:00:00.000Z",
+        updatedAt: "2026-08-12T12:00:00.000Z",
+      },
       alreadyConfirmed: false,
       stockShortages: [],
     });
@@ -188,7 +327,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/checkout\/success/);
+    await expectClientReplace(res, "checkout/success");
   });
 
   it("GET verify fails when amount missing after success", async () => {
@@ -208,7 +347,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/payment=failed/);
+    await expectClientReplace(res, "payment=failed");
     expect(confirmPaidOrder).not.toHaveBeenCalled();
   });
 
@@ -235,7 +374,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/checkout\/success/);
+    await expectClientReplace(res, "checkout/success");
     expect(confirmPaidOrder).toHaveBeenCalledWith("ord-z1");
   });
 
@@ -262,7 +401,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/checkout\/success/);
+    await expectClientReplace(res, "checkout/success");
   });
 
   it("GET verify attempts refund when confirm fails after charge", async () => {
@@ -287,7 +426,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=1&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/payment=failed/);
+    await expectClientReplace(res, "payment=failed");
     expect(refundOrderAtGateway).toHaveBeenCalled();
   });
 
@@ -297,7 +436,7 @@ describe("checkout zibal create/verify", () => {
         "http://localhost/api/checkout/verify?trackId=9900&success=0&orderId=ord-z1",
       ),
     );
-    expect(res.headers.get("location")).toMatch(/payment=cancelled/);
+    await expectClientReplace(res, "payment=cancelled");
   });
 
   it("POST verify rejects mismatched trackId binding", async () => {

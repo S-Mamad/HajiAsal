@@ -31,14 +31,14 @@ export function TicketCsatPrompt({ onSubmit, className }: Props) {
   return (
     <div
       className={cn(
-        "rounded-[1.35rem] border border-border/80 bg-gradient-to-b from-surface to-gold-dim/40 px-4 py-4 text-center",
+        "rounded-2xl border border-border bg-surface px-3 py-3 text-center",
         className,
       )}
     >
-      <p className="mb-0.5 text-sm font-semibold text-primary">
+      <p className="mb-0.5 text-[13px] font-semibold text-primary">
         کیفیت پشتیبانی را امتیاز دهید
       </p>
-      <p className="mb-3 text-xs text-secondary">
+      <p className="mb-2 text-[11px] text-secondary">
         {active ? LABELS[active - 1] : "روی ستاره بزنید"}
       </p>
       <div className="flex justify-center gap-1" dir="ltr">
@@ -53,11 +53,11 @@ export function TicketCsatPrompt({ onSubmit, className }: Props) {
             onFocus={() => setHover(n)}
             onBlur={() => setHover(0)}
             onClick={() => void pick(n)}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl transition hover:bg-gold-dim active:scale-[0.94] disabled:opacity-50"
+            className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-gold-dim active:scale-[0.94] disabled:opacity-50"
           >
             <Icon
               icon={Star}
-              size={26}
+              size={22}
               weight={active >= n ? "fill" : "regular"}
               className={active >= n ? "text-gold" : "text-secondary/45"}
             />

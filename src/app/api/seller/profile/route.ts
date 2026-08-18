@@ -24,26 +24,6 @@ const patchSchema = z.object({
   bankName: z.string().max(120).nullable().optional(),
   bankSheba: z.string().max(34).nullable().optional(),
   bankCard: z.string().max(32).nullable().optional(),
-  shopSettings: z
-    .object({
-      workingHours: z.string().optional(),
-      prepTimeHours: z.number().optional(),
-      holidays: z.array(z.string()).optional(),
-      autoMessage: z.string().optional(),
-      shippingNotes: z.string().optional(),
-      lowStockThreshold: z.number().int().min(0).optional(),
-    })
-    .nullable()
-    .optional(),
-  notificationPrefs: z
-    .object({
-      emailOrders: z.boolean().optional(),
-      emailLowStock: z.boolean().optional(),
-      emailTickets: z.boolean().optional(),
-      emailWallet: z.boolean().optional(),
-    })
-    .nullable()
-    .optional(),
 });
 
 export async function PATCH(request: Request) {
@@ -51,6 +31,20 @@ export async function PATCH(request: Request) {
   if (!gated.ok) return gated.response;
 
   const body = await request.json().catch(() => null);
+  if (
+    body &&
+    typeof body === "object" &&
+    ("shopSettings" in body || "notificationPrefs" in body)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "تنظیمات فروشگاه و اعلان‌ها را از صفحه تنظیمات تغییر دهید.",
+      },
+      { status: 403 },
+    );
+  }
+
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "اطلاعات نامعتبر" }, { status: 400 });

@@ -16,6 +16,8 @@ interface BestsellersCarouselProps {
 export function BestsellersCarousel({ products }: BestsellersCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  if (products.length === 0) return null;
+
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return;
     const amount = scrollRef.current.clientWidth * 0.75;

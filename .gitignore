@@ -58,3 +58,14 @@ data/*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local admin session (never commit)
+.admin-session.cookie
+tmp-admin-cookie.txt
+
+# host deploy artifacts and local env patches (never commit)
+hajiasal-host-upload.tar.gz
+_host_env_patch.env
+otp-diag-*.txt
+_docker_retry.sh
+

@@ -22,7 +22,7 @@ import { isMysqlConfigured, mysqlExecute, mysqlQuery, mysqlQueryOne } from "./my
 import { readJsonFile, writeJsonFile } from "./db";
 import { canUseFilesystemPersistence } from "./production";
 
-const DEFAULT_PRIMARY_ADMIN_PHONES = ["09351925900", "09135201973"] as const;
+/** Seed-only. Never hardcode production phones into the binary. */
 
 const USERS_FILE = "admin-users.json";
 const SCRYPT_PREFIX = "scrypt$";
@@ -247,30 +247,21 @@ export async function findAdminUserByPhone(
 
 export function getPrimaryAdminPhones(): string[] {
   const raw = process.env.ADMIN_PRIMARY_PHONES?.trim();
-  if (raw) {
-    const phones = raw
-      .split(",")
-      .map((p) => normalizePhone(p.trim()))
-      .filter((p): p is string => Boolean(p));
-    if (phones.length > 0) return phones;
-  }
-  return [...DEFAULT_PRIMARY_ADMIN_PHONES];
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((p) => normalizePhone(p.trim()))
+    .filter((p): p is string => Boolean(p));
 }
 
-/** Idempotent seed of primary super_admins (OTP-only). */
+/**
+ * Seed missing primary super_admins (OTP-only).
+ * Never re-enable or re-promote an existing user — disable/demote must stick.
+ */
 export async function ensurePrimaryAdmins(): Promise<void> {
   for (const phone of getPrimaryAdminPhones()) {
     const existing = await findAdminUserByPhone(phone);
-    if (existing) {
-      const patch: Parameters<typeof updateAdminUser>[1] = {};
-      if (existing.status !== "active") patch.status = "active";
-      if (existing.role !== "super_admin") patch.role = "super_admin";
-      if (normalizePhone(existing.phone ?? "") !== phone) patch.phone = phone;
-      if (Object.keys(patch).length > 0) {
-        await updateAdminUser(existing.id, patch);
-      }
-      continue;
-    }
+    if (existing) continue;
     await createAdminUser({
       fullName: `ادمین ${phone.slice(-4)}`,
       email: null,
@@ -576,6 +567,32 @@ export async function getAdminAuthFromToken(
   return empty;
 }
 
+/**
+ * Resolve admin auth from the shared customer session (phone → admin_users).
+ * This is the primary panel/API auth path.
+ */
+export async function getAdminAuthFromCustomerSession(
+  session: { phone: string } | null | undefined,
+): Promise<AdminAuthContext> {
+  const empty: AdminAuthContext = {
+    authenticated: false,
+    user: null,
+    role: null,
+    legacy: false,
+  };
+  if (!session?.phone) return empty;
+
+  const user = await findAdminUserByPhone(session.phone);
+  if (!user || user.status !== "active") return empty;
+
+  return {
+    authenticated: true,
+    user,
+    role: user.role,
+    legacy: false,
+  };
+}
+
 export function adminHasPermission(
   ctx: AdminAuthContext,
   permission: AdminPermission,
@@ -591,10 +608,9 @@ export async function requireAdminPermission(
   | { ok: true; ctx: AdminAuthContext }
   | { ok: false; status: number; message: string }
 > {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(/hajiasal_admin_session=([^;]+)/);
-  const token = match?.[1] ? decodeURIComponent(match[1]) : null;
-  const ctx = await getAdminAuthFromToken(token);
+  const { getSessionFromRequest } = await import("@/lib/auth/session");
+  const customerSession = getSessionFromRequest(request);
+  const ctx = await getAdminAuthFromCustomerSession(customerSession);
 
   if (!ctx.authenticated) {
     return { ok: false, status: 401, message: "احراز هویت نشده‌اید" };

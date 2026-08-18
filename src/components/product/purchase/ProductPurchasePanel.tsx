@@ -56,6 +56,7 @@ export function ProductPurchasePanel({
         options={product.weightOptions}
         selected={selectedWeight}
         onChange={onWeightChange}
+        disabled={!purchasable}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">

@@ -32,6 +32,32 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
+const TONE_ICON = {
+  success: CheckCircle,
+  error: WarningCircle,
+  warning: Warning,
+  info: Info,
+} as const;
+
+const TONE_STYLE: Record<ToastTone, { icon: string; bar: string }> = {
+  success: {
+    icon: "bg-emerald-50 text-emerald-700",
+    bar: "bg-emerald-600",
+  },
+  error: {
+    icon: "bg-red-50 text-red-700",
+    bar: "bg-red-600",
+  },
+  warning: {
+    icon: "bg-amber-50 text-amber-800",
+    bar: "bg-amber-600",
+  },
+  info: {
+    icon: "bg-sky-50 text-sky-700",
+    bar: "bg-sky-600",
+  },
+};
+
 export function AdminToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
@@ -70,48 +96,54 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] start-4 z-[100] flex w-[min(100%-2rem,22rem)] flex-col gap-2">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className={cn(
-              "pointer-events-auto flex gap-3 rounded-xl border bg-white p-3 shadow-lg",
-              item.tone === "success" && "border-emerald-200",
-              item.tone === "error" && "border-red-200",
-              item.tone === "warning" && "border-amber-200",
-              item.tone === "info" && "border-zinc-200",
-            )}
-            role="status"
-          >
-            <span className="mt-0.5 shrink-0 text-zinc-600">
-              {item.tone === "success" ? (
-                <CheckCircle size={18} className="text-emerald-600" />
-              ) : item.tone === "error" ? (
-                <WarningCircle size={18} className="text-red-600" />
-              ) : item.tone === "warning" ? (
-                <Warning size={18} className="text-amber-600" />
-              ) : (
-                <Info size={18} className="text-sky-600" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-zinc-900">{item.title}</p>
-              {item.description ? (
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {item.description}
-                </p>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => dismiss(item.id)}
-              className="shrink-0 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-              aria-label="بستن"
+      <div className="pointer-events-none fixed inset-x-3 top-3 z-[110] flex flex-col items-stretch gap-2 sm:inset-x-auto sm:end-4 sm:top-4 sm:w-[min(100%-2rem,22rem)]">
+        {items.map((item) => {
+          const Icon = TONE_ICON[item.tone];
+          const style = TONE_STYLE[item.tone];
+          return (
+            <div
+              key={item.id}
+              className="panel-toast-in pointer-events-auto relative overflow-hidden rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-[var(--panel-surface)] shadow-[0_18px_40px_-24px_rgba(24,24,27,0.45)]"
+              role="status"
             >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute inset-y-0 start-0 w-0.5",
+                  style.bar,
+                )}
+              />
+              <div className="flex gap-3 p-3 ps-3.5">
+                <span
+                  className={cn(
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--panel-radius-sm)]",
+                    style.icon,
+                  )}
+                >
+                  <Icon size={16} weight="fill" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-[var(--panel-text)]">
+                    {item.title}
+                  </p>
+                  {item.description ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--panel-muted)]">
+                      {item.description}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismiss(item.id)}
+                  className="shrink-0 rounded-[var(--panel-radius-sm)] p-1 text-[var(--panel-faint)] transition hover:bg-zinc-100 hover:text-[var(--panel-text)]"
+                  aria-label="بستن"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

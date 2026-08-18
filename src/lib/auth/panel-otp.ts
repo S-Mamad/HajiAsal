@@ -2,17 +2,10 @@ import { NextResponse } from "next/server";
 import { normalizePhone } from "@/lib/auth/phone";
 import { otpSendSchema, otpVerifySchema } from "@/lib/auth/validations/auth";
 import { parseDeviceIdFromRequest } from "@/lib/auth/device-id";
-import {
-  createOtpChallenge,
-  discardOtpChallenge,
-  OTP_LENGTH,
-  verifyOtpChallenge,
-} from "@/lib/auth/otp-store";
-import {
-  getOtpProviderForPhone,
-  getTestOtpProvider,
-  isTestOtpAllowed,
-} from "@/lib/auth/get-otp-provider";
+import { dispatchOtpSend } from "@/lib/auth/dispatch-otp";
+import { withOtpLock } from "@/lib/auth/otp-lock";
+import { isTrustedMutationOrigin } from "@/lib/auth/request-origin";
+import { OTP_LENGTH, verifyOtpChallenge } from "@/lib/auth/otp-store";
 import {
   checkRateLimitAsync,
   getClientIp,
@@ -94,6 +87,13 @@ export async function handlePanelOtpSend(
   isAllowedPhone: (phone: string) => Promise<boolean>,
 ): Promise<NextResponse> {
   try {
+    if (!isTrustedMutationOrigin(request)) {
+      return NextResponse.json(
+        { success: false, message: "درخواست نامعتبر است" },
+        { status: 403 },
+      );
+    }
+
     const ip = getClientIp(request);
 
     const ipFlood = await checkRateLimitAsync(
@@ -126,6 +126,7 @@ export async function handlePanelOtpSend(
     const deviceId = parseDeviceIdFromRequest(request, parsed.data.deviceId);
     const key = challengeKey(audience, phone);
 
+    return withOtpLock(`panel-otp-send:${key}`, async () => {
     const cooldownMs = LIMITS.cooldownSec * 1000;
     const globalMs = 60 * 60 * 1000;
     const cooldownKey = `panel-otp-send:cooldown:${audience}:${phone}`;
@@ -200,7 +201,6 @@ export async function handlePanelOtpSend(
 
     const allowed = await isAllowedPhone(phone);
     if (!allowed) {
-      // Consume budgets like a real send so enumeration is not free.
       void Promise.all([
         recordRateLimitHitAsync(cooldownKey, cooldownMs),
         recordRateLimitHitAsync(phoneBurstKey, LIMITS.phoneBurstWindowMs),
@@ -213,93 +213,46 @@ export async function handlePanelOtpSend(
       return NextResponse.json(successSendBody());
     }
 
-    const testProvider = getTestOtpProvider();
-    const provider = getOtpProviderForPhone(phone);
-    const isTestPhone =
-      isTestOtpAllowed() && testProvider.isTestPhone(phone);
-
-    let storedCode: string;
-    let sendMessage = "کد تأیید ارسال شد";
-    let smsSent = false;
-
-    if (isTestPhone) {
-      storedCode = await createOtpChallenge(key, testProvider.getTestOtp());
-      const result = await provider.send(phone, storedCode);
-      if (!result.success) {
-        await discardOtpChallenge(key);
-        return NextResponse.json(
-          { success: false, message: result.message },
-          { status: 400 },
-        );
-      }
-      sendMessage = result.message;
-      smsSent = true;
-    } else if (provider.generatesOwnCode) {
-      const result = await provider.send(phone, "");
-      if (!result.success || !result.code) {
-        return NextResponse.json(
-          { success: false, message: result.message },
-          { status: 400 },
-        );
-      }
-      try {
-        storedCode = await createOtpChallenge(key, result.code);
-      } catch {
-        return NextResponse.json(
-          { success: false, message: "خطا در ذخیره کد تأیید" },
-          { status: 500 },
-        );
-      }
-      sendMessage = result.message;
-      smsSent = true;
-    } else {
-      storedCode = await createOtpChallenge(key);
-      const result = await provider.send(phone, storedCode);
-      if (!result.success) {
-        await discardOtpChallenge(key);
-        return NextResponse.json(
-          { success: false, message: result.message },
-          { status: 400 },
-        );
-      }
-      if (result.code && result.code !== storedCode) {
-        try {
-          storedCode = await createOtpChallenge(key, result.code);
-        } catch {
-          await discardOtpChallenge(key);
-          return NextResponse.json(
-            { success: false, message: "خطا در ذخیره کد تأیید" },
-            { status: 500 },
-          );
-        }
-      }
-      sendMessage = result.message;
-      smsSent = true;
+    const cooldownLock = await checkRateLimitAsync(
+      cooldownKey,
+      1,
+      cooldownMs,
+    );
+    if (!cooldownLock.ok) {
+      return tooMany(
+        `لطفاً ${LIMITS.cooldownSec} ثانیه صبر کنید و دوباره درخواست دهید`,
+        cooldownLock.retryAfterSec,
+      );
     }
 
-    // SMS already accepted by provider — do not stall the client on DB writes.
-    if (smsSent) {
-      void Promise.all([
-        recordRateLimitHitAsync(cooldownKey, cooldownMs),
-        recordRateLimitHitAsync(phoneBurstKey, LIMITS.phoneBurstWindowMs),
-        recordRateLimitHitAsync(phoneDayKey, DAY_MS),
-        recordRateLimitHitAsync(ipDayKey, DAY_MS),
-        recordRateLimitHitAsync(deviceDayKey, DAY_MS),
-        recordRateLimitHitAsync(globalKey, globalMs),
-      ]).catch((err) => {
-        console.error(
-          `[panel-otp/${audience}/send] rate-limit record`,
-          err instanceof Error ? err.message : err,
-        );
-      });
+    const dispatched = await dispatchOtpSend(key, phone);
+    if (!dispatched.ok) {
+      return NextResponse.json(
+        { success: false, message: dispatched.message },
+        { status: 400 },
+      );
     }
+
+    void Promise.all([
+      recordRateLimitHitAsync(phoneBurstKey, LIMITS.phoneBurstWindowMs),
+      recordRateLimitHitAsync(phoneDayKey, DAY_MS),
+      recordRateLimitHitAsync(ipDayKey, DAY_MS),
+      recordRateLimitHitAsync(deviceDayKey, DAY_MS),
+      recordRateLimitHitAsync(globalKey, globalMs),
+    ]).catch((err) => {
+      console.error(
+        `[panel-otp/${audience}/send] rate-limit record`,
+        err instanceof Error ? err.message : err,
+      );
+    });
 
     return NextResponse.json(
       successSendBody({
-        message: sendMessage,
-        codeLength: storedCode!.length,
+        message: dispatched.message,
+        codeLength: dispatched.code.length,
       }),
     );
+    });
   } catch (error) {
     console.error(
       `[panel-otp/${audience}/send]`,
@@ -320,6 +273,16 @@ export async function handlePanelOtpVerify(
   | { ok: false; response: NextResponse }
 > {
   try {
+    if (!isTrustedMutationOrigin(request)) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { success: false, message: "درخواست نامعتبر است" },
+          { status: 403 },
+        ),
+      };
+    }
+
     const ip = getClientIp(request);
     const limited = await checkRateLimitAsync(
       `panel-otp-verify:ip:${ip}`,
@@ -374,7 +337,9 @@ export async function handlePanelOtpVerify(
     }
 
     const key = challengeKey(audience, phone);
-    const verify = await verifyOtpChallenge(key, parsed.data.code);
+    const verify = await withOtpLock(`otp-verify:${key}`, () =>
+      verifyOtpChallenge(key, parsed.data.code),
+    );
     if (!verify.valid) {
       return {
         ok: false,

@@ -5,6 +5,7 @@ vi.mock("./mysql", () => ({
   isMysqlUsable: vi.fn(() => false),
   mysqlExecute: vi.fn(),
   mysqlQueryOne: vi.fn(),
+  withMysqlConnection: vi.fn(),
 }));
 
 vi.mock("./production", () => ({
@@ -37,10 +38,11 @@ describe("payment refs binding", () => {
     await setOrderPaymentRef("ord-2", "zibal", "15966442233311");
     await setOrderSettleRef("ord-2", "REF-42");
     const binding = await getOrderPaymentBinding("ord-2");
-    expect(binding).toEqual({
+    expect(binding).toMatchObject({
       provider: "zibal",
       paymentRef: "15966442233311",
       settleRef: "REF-42",
     });
+    expect(binding?.updatedAt).toBeTruthy();
   });
 });

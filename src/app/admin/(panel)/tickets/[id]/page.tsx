@@ -24,6 +24,7 @@ type TicketDetail = {
   assignedTo?: string | null;
   sellerId?: string;
   customerId?: string | null;
+  meta?: { vipSummary?: string; vip?: boolean } | null;
 };
 
 function AdminTicketDetailInner() {
@@ -68,7 +69,11 @@ function AdminTicketDetailInner() {
     [params.id, channelHint, router],
   );
 
-  const loadSession = useCallback(async (channel: TicketChannel, id: string) => {
+  const loadSession = useCallback(async (
+    channel: TicketChannel,
+    id: string,
+    partyName?: string | null,
+  ) => {
     try {
       const res = await fetch(
         `/api/admin/tickets/${id}/session?channel=${channel}`,
@@ -83,7 +88,9 @@ function AdminTicketDetailInner() {
         const label =
           others[0].actorType === "seller"
             ? "فروشنده در حال نوشتن…"
-            : "مشتری در حال نوشتن…";
+            : partyName
+              ? `${partyName} در حال نوشتن…`
+              : "مشتری در حال نوشتن…";
         setTypingLabel(label);
       } else {
         setTypingLabel(null);
@@ -110,14 +117,16 @@ function AdminTicketDetailInner() {
 
   useEffect(() => {
     if (!ticket) return;
-    void loadSession(ticket.channel, ticket.id);
+    const party =
+      ticket.partyName?.trim() || ticket.partyPhone?.trim() || null;
+    void loadSession(ticket.channel, ticket.id, party);
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void loadSession(ticket.channel, ticket.id);
+        void loadSession(ticket.channel, ticket.id, party);
       }
     }, 4000);
     return () => window.clearInterval(id);
-  }, [ticket?.id, ticket?.channel, loadSession]);
+  }, [ticket?.id, ticket?.channel, ticket?.partyName, ticket?.partyPhone, loadSession]);
 
   const patch = async (body: Record<string, unknown>) => {
     if (!ticket) return;
@@ -286,8 +295,15 @@ function AdminTicketDetailInner() {
           status={ticket.status}
           priority={ticket.priority}
           partyLabel={
-            [ticket.partyName, ticket.partyPhone].filter(Boolean).join(" · ") ||
-            null
+            (() => {
+              const name = ticket.partyName?.trim() || null;
+              const phone = ticket.partyPhone?.trim() || null;
+              if (name && phone && name !== phone) return `${name} · ${phone}`;
+              return name || phone || null;
+            })()
+          }
+          counterpartName={
+            ticket.partyName?.trim() || ticket.partyPhone?.trim() || null
           }
           channelLabel={ticket.channel === "seller" ? "فروشنده" : "مشتری"}
           messages={messages}
@@ -301,6 +317,7 @@ function AdminTicketDetailInner() {
           allowInternal={ticket.channel === "customer"}
           typingLabel={typingLabel}
           lockLabel={lockLabel}
+          contextChip={ticket.meta?.vipSummary ?? null}
           className="min-h-0"
           onSend={send}
           onUpload={upload}

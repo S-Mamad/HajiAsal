@@ -77,7 +77,7 @@ export function RelatedProducts({
           {products.map((product) => (
             <div
               key={product.id}
-              className="w-[220px] shrink-0 snap-start md:w-[260px]"
+              className="flex h-full w-[220px] shrink-0 snap-start md:w-[260px]"
             >
               <ProductCard product={product} />
             </div>

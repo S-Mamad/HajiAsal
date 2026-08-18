@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
+  CUSTOMER_COOKIE,
   getSessionTokenFromRequest,
   parseSessionTokenEdge,
 } from "@/lib/auth/session-edge";
@@ -12,14 +13,6 @@ import {
 import { resolveAppRolePath } from "@/lib/server/app-role-path";
 
 const PROTECTED_PREFIXES = ["/account"];
-const ADMIN_COOKIE = "hajiasal_admin_session";
-const SELLER_COOKIE = "hajiasal_seller_session";
-
-/** Edge-safe shape check — full validation happens in layout/API. */
-function looksLikeSessionToken(token: string | undefined): boolean {
-  if (!token || token.length < 16 || token.length > 512) return false;
-  return /^[A-Za-z0-9_-]+$/.test(token);
-}
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PREFIXES.some(
@@ -56,6 +49,15 @@ function notFound(): NextResponse {
   return new NextResponse("Not Found", { status: 404 });
 }
 
+function panelLoginRedirect(
+  request: NextRequest,
+  returnPath: string,
+): NextResponse {
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("redirect", returnPath);
+  return NextResponse.redirect(loginUrl);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const role = getAppRole();
@@ -82,28 +84,25 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // --- Session gates ---
-  if (isSellerPanelPath(pathname)) {
-    const token = request.cookies.get(SELLER_COOKIE)?.value;
-    if (!looksLikeSessionToken(token)) {
-      return NextResponse.redirect(new URL("/seller", request.url));
+  // Handoff copies the storefront session onto the panel host cookie.
+  if (
+    pathname === "/api/admin/auth/handoff" ||
+    pathname === "/api/seller/auth/handoff"
+  ) {
+    return NextResponse.next();
+  }
+
+  // --- Panel paths: require customer session cookie (eligibility in layout) ---
+  if (isSellerPanelPath(pathname) || isAdminPanelPath(pathname)) {
+    const token = getSessionTokenFromRequest(request);
+    const session = token ? await parseSessionTokenEdge(token) : null;
+    if (!session) {
+      return panelLoginRedirect(request, pathname);
     }
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/seller")) {
-    return NextResponse.next();
-  }
-
-  if (isAdminPanelPath(pathname)) {
-    const token = request.cookies.get(ADMIN_COOKIE)?.value;
-    if (!looksLikeSessionToken(token)) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-    return NextResponse.next();
-  }
-
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/seller") || pathname.startsWith("/admin")) {
     return NextResponse.next();
   }
 
@@ -140,3 +139,6 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|uploads/).*)",
   ],
 };
+
+// Re-export for tests that may reference cookie name
+export { CUSTOMER_COOKIE };

@@ -25,6 +25,7 @@ import { WeightSelector } from "../purchase/WeightSelector";
 import { RelatedProducts } from "../related/RelatedProducts";
 import { ReviewsSection } from "../reviews/ReviewsSection";
 import { useProductPurchase } from "../hooks/useProductPurchase";
+import { AddToCartSheet } from "@/components/cart/AddToCartSheet";
 import {
   buildProductAccordionItems,
   DEFAULT_SHIPPING_LABEL,
@@ -62,6 +63,8 @@ export function ProductDetailClient({
     maxQty,
     adding,
     addedFlash,
+    addSheetOpen,
+    setAddSheetOpen,
     handleAddToCart,
   } = useProductPurchase({ initialProduct });
 
@@ -73,139 +76,177 @@ export function ProductDetailClient({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-16">
+    <div
+      className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-16"
+      data-support-in-stock={purchasable ? "1" : "0"}
+      data-support-product={product.slug}
+    >
       <div className="grid items-start gap-10 lg:grid-cols-[1.15fr_1fr] lg:gap-12">
         <div className="order-1 min-w-0">
-          <ProductGallery images={product.images} title={product.title} />
+          <ProductGallery
+            images={product.images}
+            title={product.title}
+            imageFits={product.imageFits}
+          />
         </div>
 
-        <div className="order-2 flex flex-col gap-6 lg:sticky lg:top-28 lg:self-start">
-          <nav className="text-sm text-dim" aria-label="مسیر صفحه">
+        <div className="order-2 flex flex-col gap-4 text-start lg:sticky lg:top-28 lg:self-start">
+          <nav
+            className="flex items-center gap-1.5 text-[13px] text-dim"
+            aria-label="مسیر صفحه"
+          >
             <Link href={hajiasalPath("/shop")} className="hover:text-gold">
+              فروشگاه
+            </Link>
+            <span className="text-secondary/40" aria-hidden>
+              /
+            </span>
+            <Link
+              href={hajiasalPath(
+                `/shop?category=${encodeURIComponent(product.category)}`,
+              )}
+              className="hover:text-gold"
+            >
               {product.categoryLabel}
             </Link>
-            <span className="mx-2 text-secondary">/</span>
-            <span className="text-secondary">{product.title}</span>
           </nav>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
-            <span className="text-dim">{product.categoryLabel}</span>
-            {product.isBestseller ? (
-              <span className="text-gold">پرفروش</span>
-            ) : null}
-            {product.isNew && !product.isBestseller ? (
-              <span className="text-primary/75">جدید</span>
-            ) : null}
-            {!purchasable ? (
-              <span className="text-red-400/90">ناموجود</span>
-            ) : null}
-          </div>
-
-          <h1 className="font-display text-3xl font-bold leading-tight text-primary text-balance md:text-4xl">
-            {product.title}
-          </h1>
-
-          <RatingStars
-            rating={product.rating}
-            reviewCount={product.reviewCount}
-            size="md"
-          />
-
-          <p className="max-w-md leading-relaxed text-secondary">
-            {product.shortDescription}
-          </p>
-
-          <div className="flex flex-wrap gap-4">
-            {featureBadges.map(({ icon: Icon, label, href, downloadName }) => {
-              const inner = (
-                <>
-                  <Icon size={16} className="text-gold" weight="duotone" />
-                  <span>{label}</span>
-                </>
-              );
-              if (href) {
-                return (
-                  <a
-                    key={label}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download={downloadName}
-                    title={LAB_CERTIFICATE.label}
-                    className="flex items-center gap-2 text-sm text-secondary underline-offset-4 transition-colors hover:text-gold hover:underline"
-                  >
-                    {inner}
-                  </a>
-                );
-              }
-              return (
-                <div
-                  key={label}
-                  className="flex items-center gap-2 text-sm text-secondary"
-                >
-                  {inner}
-                </div>
-              );
-            })}
-          </div>
-
-          <PriceDisplay
-            price={listPrice}
-            discountPrice={salePrice < listPrice ? salePrice : undefined}
-            size="lg"
-          />
-
-          {purchasable ? (
-            <div className="flex items-center gap-2 text-sm text-success">
-              <Check size={16} weight="bold" />
-              <span>موجود در انبار</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-red-400/90">
-              <span>این محصول در حال حاضر موجود نیست</span>
+          {(product.isBestseller || product.isNew || !purchasable) && (
+            <div className="flex items-center gap-2 text-[12px]">
+              {product.isBestseller ? (
+                <span className="rounded-md bg-gold/15 px-2 py-0.5 font-medium text-gold">
+                  پرفروش
+                </span>
+              ) : null}
+              {product.isNew && !product.isBestseller ? (
+                <span className="rounded-md bg-primary/8 px-2 py-0.5 font-medium text-primary/80">
+                  جدید
+                </span>
+              ) : null}
+              {!purchasable ? (
+                <span className="rounded-md bg-red-500/10 px-2 py-0.5 font-medium text-red-500">
+                  ناموجود
+                </span>
+              ) : null}
             </div>
           )}
 
-          <WeightSelector
-            options={product.weightOptions}
-            selected={selectedWeight}
-            onChange={setSelectedWeight}
-            getPrice={(option) => getEffectiveWeightPrice(product, option)}
-          />
+          <div className="flex flex-col gap-2">
+            <h1 className="font-display text-[1.75rem] font-bold leading-snug text-pretty text-primary md:text-4xl">
+              {product.title}
+            </h1>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 rounded-xl bg-surface-elevated px-1">
-              <button
-                type="button"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                disabled={!purchasable}
-                className="flex h-11 w-11 items-center justify-center text-secondary transition-colors hover:text-primary disabled:opacity-40"
-                aria-label="کاهش"
-              >
-                <Minus size={16} />
-              </button>
-              <span className="min-w-[2rem] text-center font-medium tabular-nums text-primary">
-                {quantity.toLocaleString("fa-IR")}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setQuantity((q) => Math.min(maxQty || 1, q + 1))
-                }
-                disabled={!purchasable || quantity >= maxQty}
-                className="flex h-11 w-11 items-center justify-center text-secondary transition-colors hover:text-primary disabled:opacity-40"
-                aria-label="افزایش"
-              >
-                <Plus size={16} />
-              </button>
+            {product.reviewCount > 0 ? (
+              <RatingStars
+                rating={product.rating}
+                reviewCount={product.reviewCount}
+                size="md"
+              />
+            ) : null}
+
+            {product.shortDescription ? (
+              <p className="text-[15px] leading-7 text-secondary">
+                {product.shortDescription}
+              </p>
+            ) : null}
+          </div>
+
+          <ul className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-2">
+            {featureBadges.map(({ icon: Icon, label, href, downloadName }) => {
+              const inner = (
+                <>
+                  <Icon
+                    size={16}
+                    className="shrink-0 text-gold"
+                    weight="duotone"
+                  />
+                  <span>{label}</span>
+                </>
+              );
+              const className =
+                "inline-flex items-center gap-2 text-[13px] leading-none text-secondary";
+              if (href) {
+                return (
+                  <li key={label}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={downloadName}
+                      title={LAB_CERTIFICATE.label}
+                      className={`${className} transition-colors hover:text-gold`}
+                    >
+                      {inner}
+                    </a>
+                  </li>
+                );
+              }
+              return (
+                <li key={label} className={className}>
+                  {inner}
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="flex flex-col gap-4 border-t border-border pt-4">
+            <div className="space-y-1.5">
+              <PriceDisplay
+                price={listPrice}
+                discountPrice={salePrice < listPrice ? salePrice : undefined}
+                size="lg"
+              />
+              {purchasable ? (
+                <p className="flex items-center gap-1.5 text-[13px] leading-none text-success">
+                  <Check size={15} weight="bold" className="shrink-0" />
+                  موجود در انبار
+                </p>
+              ) : (
+                <p className="text-[13px] leading-none text-red-500">
+                  این محصول در حال حاضر موجود نیست
+                </p>
+              )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <WeightSelector
+              options={product.weightOptions}
+              selected={selectedWeight}
+              onChange={setSelectedWeight}
+              getPrice={(option) => getEffectiveWeightPrice(product, option)}
+              disabled={!purchasable}
+            />
+
+            <div className="flex h-12 items-stretch gap-2">
+              <div className="flex h-12 shrink-0 items-center rounded-xl border border-border bg-surface-elevated">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={!purchasable}
+                  className="flex h-12 w-11 items-center justify-center text-secondary transition-colors hover:text-primary disabled:opacity-40"
+                  aria-label="کاهش"
+                >
+                  <Minus size={16} />
+                </button>
+                <span className="min-w-[1.75rem] text-center text-sm font-medium tabular-nums leading-none text-primary">
+                  {quantity.toLocaleString("fa-IR")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuantity((q) => Math.min(maxQty || 1, q + 1))
+                  }
+                  disabled={!purchasable || quantity >= maxQty}
+                  className="flex h-12 w-11 items-center justify-center text-secondary transition-colors hover:text-primary disabled:opacity-40"
+                  aria-label="افزایش"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+
               <Button
-                size="lg"
                 disabled={!purchasable || adding}
                 onClick={addToCart}
-                className="w-full min-w-[12rem] disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-12 min-w-0 flex-1 px-4 text-sm md:h-12"
               >
                 <ShoppingBag size={18} className="shrink-0" />
                 <span className="truncate">
@@ -215,7 +256,7 @@ export function ProductDetailClient({
                       ? "در حال بررسی..."
                       : addedFlash
                         ? "به سبد اضافه شد"
-                        : "افزودن به سبد خرید"}
+                        : "افزودن به سبد"}
                 </span>
               </Button>
             </div>
@@ -231,16 +272,16 @@ export function ProductDetailClient({
             busy={adding}
           />
 
-          <div className="flex flex-wrap gap-6 border-t border-border pt-4 text-xs text-secondary">
+          <div className="flex flex-col gap-2 border-t border-border pt-4 text-[13px] leading-none text-secondary sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-2">
             <div className="flex items-center gap-2">
-              <Truck size={14} className="text-gold" weight="duotone" />
+              <Truck size={15} className="shrink-0 text-gold" weight="duotone" />
               <span>{shippingLabel}</span>
             </div>
             <Link
               href={hajiasalPath("/authenticity")}
               className="flex items-center gap-2 transition-colors hover:text-gold"
             >
-              <Shield size={14} className="text-gold" weight="duotone" />
+              <Shield size={15} className="shrink-0 text-gold" weight="duotone" />
               <span>{trustTitle}</span>
             </Link>
           </div>
@@ -262,6 +303,12 @@ export function ProductDetailClient({
           categoryLabel={product.categoryLabel}
         />
       ) : null}
+
+      <AddToCartSheet
+        open={addSheetOpen}
+        onClose={() => setAddSheetOpen(false)}
+        productTitle={product.title}
+      />
     </div>
   );
 }

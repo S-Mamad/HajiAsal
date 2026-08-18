@@ -17,10 +17,15 @@ import {
   formatJalaliDate,
 } from "@/lib/utils";
 import { hajiasalPath } from "@/lib/paths";
+import { isPendingOrderExpired } from "@/components/account/OrderExpiryPill";
+import { pendingOrderResumeHref } from "@/components/account/dashboard-types";
 
 export function AccountOrderCard({ order }: { order: StoredOrder }) {
   const preview = order.items.slice(0, 4);
   const extraCount = Math.max(0, order.items.length - preview.length);
+  const canResumePayment =
+    order.status === "pending_payment" &&
+    !isPendingOrderExpired(order.createdAt);
 
   return (
     <AccountSurface as="li" padded={false} className="list-none">
@@ -96,13 +101,15 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
         </div>
 
         <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {order.status === "pending_payment" ? (
+          {canResumePayment ? (
             <Link
-              href={`${hajiasalPath("/checkout")}?payment=failed&orderId=${encodeURIComponent(order.id)}`}
+              href={pendingOrderResumeHref(order.id)}
               className="inline-flex items-center gap-1 text-sm font-medium text-gold transition-colors hover:text-gold-bright focus-visible:outline-none focus-visible:underline"
             >
               ادامه پرداخت
             </Link>
+          ) : order.status === "pending_payment" ? (
+            <span className="text-sm text-secondary">مهلت پرداخت تمام شد</span>
           ) : null}
           {order.trackingCode ? (
             <Link
@@ -114,7 +121,7 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
             </Link>
           ) : null}
           <a
-            href={`/api/orders/${order.id}/invoice?print=1`}
+            href={`/api/orders/${order.id}/invoice`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-sm text-gold transition-colors hover:text-gold-bright focus-visible:outline-none focus-visible:underline"
@@ -124,11 +131,11 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
           </a>
           <a
             href={`/api/orders/${order.id}/invoice?download=1`}
-            download
+            download={`invoice-${order.id}.pdf`}
             className="inline-flex items-center gap-1 text-sm text-secondary transition-colors hover:text-primary focus-visible:outline-none focus-visible:underline"
           >
             <DownloadSimple size={15} />
-            دانلود
+            دانلود PDF
           </a>
         </div>
       </div>

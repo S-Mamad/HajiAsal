@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import site from "@/data/site.json";
+import faqSeed from "@/data/faq.json";
 import type { SiteConfig, SocialLinks } from "@/types";
 import { readJsonFile, writeJsonFile } from "./db";
 import {
@@ -20,8 +21,7 @@ const SITE_SETTINGS_KEY = "hajiasal";
 
 const seed = site as SiteConfig;
 
-/** Canonical public contact — keep storefront consistent even if DB overrides are stale. */
-const CANONICAL_PHONE = "09967891973";
+/** Default public Instagram when admin leaves the field empty. */
 const CANONICAL_INSTAGRAM = "https://instagram.com/hajiasal_ir";
 
 const DEFAULT_SOCIAL: SocialLinks = {
@@ -62,14 +62,7 @@ function deepMerge<T extends Record<string, unknown>>(
 function normalizeInstagramUrl(url: string | undefined): string {
   const raw = (url ?? "").trim();
   if (!raw) return CANONICAL_INSTAGRAM;
-  // Any Instagram profile that isn't hajiasal_ir → correct handle
-  if (/instagram\.com/i.test(raw)) {
-    return raw.replace(
-      /instagram\.com\/[^/?#]+/i,
-      "instagram.com/hajiasal_ir",
-    );
-  }
-  return CANONICAL_INSTAGRAM;
+  return raw;
 }
 
 function normalizeSocial(social: SocialLinks | undefined): SocialLinks {
@@ -97,11 +90,25 @@ export function mergeSiteConfig(
   merged.footer = {
     ...base.footer,
     ...merged.footer,
-    phone: CANONICAL_PHONE,
+    phone: merged.footer.phone?.trim() || base.footer.phone,
+    email: merged.footer.email?.trim() || base.footer.email,
+    address: merged.footer.address?.trim() || base.footer.address,
   };
   merged.social = normalizeSocial(merged.social ?? base.social);
+  if (!Array.isArray(merged.faq)) {
+    merged.faq = faqSeed as SiteConfig["faq"];
+  }
 
   return merged;
+}
+
+export function resolveFaq(settings: SiteConfig): NonNullable<SiteConfig["faq"]> {
+  if (Array.isArray(settings.faq)) return settings.faq;
+  return faqSeed as NonNullable<SiteConfig["faq"]>;
+}
+
+export async function getFaqItems(): Promise<NonNullable<SiteConfig["faq"]>> {
+  return resolveFaq(await getSiteSettings());
 }
 
 export async function getSiteSettings(): Promise<SiteConfig> {
@@ -118,7 +125,7 @@ export async function getSiteSettings(): Promise<SiteConfig> {
         );
       }
     } catch (error) {
-      console.error(
+      console.warn(
         "[site-settings] mysql unavailable, falling back:",
         error instanceof Error ? error.message : error,
       );
@@ -142,10 +149,13 @@ export async function updateSiteSettings(
 ): Promise<SiteConfig> {
   const current = await getSiteSettings();
   // Allowlist top-level keys only — reject prototype / unexpected mass assignment.
-  const allowedKeys = new Set(Object.keys(current) as Array<keyof SiteConfig>);
+  const allowedKeys = new Set<string>([
+    ...(Object.keys(current) as string[]),
+    "faq",
+  ]);
   const sanitized: Partial<SiteConfig> = {};
   for (const [key, value] of Object.entries(updates)) {
-    if (!allowedKeys.has(key as keyof SiteConfig)) continue;
+    if (!allowedKeys.has(key)) continue;
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
     }

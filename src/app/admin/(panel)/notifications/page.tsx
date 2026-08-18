@@ -85,13 +85,25 @@ export default function AdminNotificationsPage() {
                   type="button"
                   className="text-xs text-amber-800 hover:underline"
                   onClick={async () => {
-                    await fetch("/api/admin/notifications", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({ id: r.id }),
-                    });
-                    await load();
+                    try {
+                      const res = await fetch("/api/admin/notifications", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ id: r.id }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        throw new Error(
+                          (data as { error?: string }).error ?? "خطا",
+                        );
+                      }
+                      await load();
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error ? err.message : "خطا در به‌روزرسانی",
+                      );
+                    }
                   }}
                 >
                   خوانده شد

@@ -5,9 +5,13 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Ensure mysql2 (and natives) are always traced into the host pack
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/mysql2/**/*"],
+    "/*": [
+      "./node_modules/mysql2/**/*",
+      "./public/fonts/vazirmatn/**/*",
+      "./public/images/hajiasal/brand/**/*",
+    ],
   },
-  serverExternalPackages: ["mysql2"],
+  serverExternalPackages: ["mysql2", "pdfkit"],
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   turbopack: {
     root: path.resolve(__dirname),

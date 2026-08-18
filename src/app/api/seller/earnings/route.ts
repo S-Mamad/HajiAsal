@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { gateSeller } from "@/lib/server/seller-gate";
 import { getSellerOrders } from "@/lib/server/sellers";
+import { PAID_OR_FULFILLING } from "@/lib/server/orders";
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "wallet.view");
   if (!gated.ok) return gated.response;
 
   const orders = await getSellerOrders(gated.ctx.seller.id);
-  const active = orders.filter((o) => o.status !== "cancelled");
+  const active = orders.filter((o) => PAID_OR_FULFILLING.has(o.status));
   const byStatus: Record<string, number> = {};
   for (const o of active) {
     byStatus[o.status] = (byStatus[o.status] ?? 0) + o.sellerSubtotal;

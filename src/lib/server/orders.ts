@@ -21,6 +21,11 @@ import {
   withMysqlTransaction,
 } from "./mysql";
 import { computeOrderTotal } from "@/lib/commerce/money";
+import { PENDING_ORDER_TTL_MS } from "@/lib/order-pending";
+import {
+  getOrderPaymentBinding,
+  PAYMENT_REF_REUSE_TTL_MS,
+} from "./payment-refs";
 import {
   decrementStockForPaidOrder,
   restoreStockForPaidOrder,
@@ -275,6 +280,8 @@ export async function getAllOrders(): Promise<StoredOrder[]> {
 }
 
 export async function getOrdersByUserId(userId: string): Promise<StoredOrder[]> {
+  await expireStalePendingOrders();
+
   if (isMysqlConfigured()) {
     const rows = await mysqlQuery<RowDataPacket>(
       "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
@@ -522,19 +529,28 @@ export async function confirmPaidOrder(
   };
 }
 
-/** Cancel unpaid orders older than ttlMs (default 24h). Safe for create-order path. */
+/** Cancel unpaid orders older than ttlMs (default 30m). Safe for create-order path. */
 export async function expireStalePendingOrders(
-  ttlMs = 24 * 60 * 60 * 1000,
+  ttlMs = PENDING_ORDER_TTL_MS,
 ): Promise<number> {
   const cutoff = Date.now() - ttlMs;
+  const bindingCutoff = Date.now() - PAYMENT_REF_REUSE_TTL_MS;
   let cancelled = 0;
 
   if (isMysqlConfigured()) {
     try {
       const result = await mysqlExecute(
-        `UPDATE orders SET status = 'cancelled', updated_at = ?
-         WHERE status = 'pending_payment' AND created_at < ?`,
-        [new Date().toISOString(), new Date(cutoff).toISOString()],
+        `UPDATE orders o
+         LEFT JOIN order_payment_refs r ON r.order_id = o.id
+         SET o.status = 'cancelled', o.updated_at = ?
+         WHERE o.status = 'pending_payment'
+           AND o.created_at < ?
+           AND (r.updated_at IS NULL OR r.updated_at < ?)`,
+        [
+          new Date().toISOString(),
+          new Date(cutoff).toISOString(),
+          new Date(bindingCutoff).toISOString(),
+        ],
       );
       return result.affectedRows;
     } catch (error) {
@@ -553,6 +569,13 @@ export async function expireStalePendingOrders(
         o.status === "pending_payment" &&
         new Date(o.createdAt).getTime() < cutoff
       ) {
+        const binding = await getOrderPaymentBinding(o.id).catch(() => null);
+        const updatedMs = binding?.updatedAt
+          ? new Date(binding.updatedAt).getTime()
+          : 0;
+        if (updatedMs && updatedMs > Date.now() - PAYMENT_REF_REUSE_TTL_MS) {
+          continue;
+        }
         orders[i] = {
           ...o,
           status: "cancelled",

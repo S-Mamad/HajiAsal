@@ -87,6 +87,39 @@ export async function upsertCategoryAsync(
   }
 }
 
+export async function countProductsInCategoryAsync(
+  categoryId: string,
+): Promise<number> {
+  if (!isMysqlConfigured()) return 0;
+  try {
+    const row = await mysqlQueryOne<RowDataPacket>(
+      `SELECT COUNT(*) AS n FROM products
+       WHERE category_id = ?
+         AND (deleted_at IS NULL)`,
+      [categoryId],
+    );
+    return Number(row?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function reassignProductsCategoryAsync(
+  fromId: string,
+  toId: string,
+): Promise<boolean> {
+  if (!isMysqlConfigured()) return false;
+  try {
+    await mysqlExecute(
+      `UPDATE products SET category_id = ?, updated_at = ? WHERE category_id = ?`,
+      [toId, new Date().toISOString(), fromId],
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function deleteCategoryAsync(id: string): Promise<boolean> {
   if (!isMysqlConfigured()) return false;
   try {

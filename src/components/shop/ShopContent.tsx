@@ -5,7 +5,7 @@ import {
   Suspense,
   useState,
   useEffect,
-  useMemo,
+  useRef,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Faders, MagnifyingGlass, X } from "@phosphor-icons/react";
@@ -13,24 +13,22 @@ import type { Product, ProductCategory, SortOption } from "@/types";
 import { getPriceRange } from "@/lib/products";
 import site from "@/data/site.json";
 import type { SiteConfig } from "@/types";
-import { ProductGrid } from "@/components/product";
+import { ProductGrid, ProductCardSkeleton } from "@/components/product";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Pagination } from "@/components/ui/Pagination";
 import { ShopEmptyState } from "@/components/shop/ShopEmptyState";
+import { ShopInStockToggle } from "@/components/shop/ShopInStockToggle";
+import { ShopLoadMoreButton } from "@/components/shop/ShopLoadMoreButton";
+import { ShopSortMenu } from "@/components/shop/ShopSortMenu";
 import { ErrorState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
 import { hajiasalPath } from "@/lib/paths";
+import { parseSortOption, SHOP_PAGE_SIZE } from "@/lib/shop-catalog";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const siteData = site as SiteConfig;
 const seedPriceRange = getPriceRange();
-const PAGE_SIZE = 12;
 
-const sortOptions: { value: SortOption; label: string }[] = [
-  { value: "popular", label: "محبوب‌ترین" },
-  { value: "price-asc", label: "ارزان‌ترین" },
-  { value: "price-desc", label: "گران‌ترین" },
-  { value: "newest", label: "جدیدترین" },
-];
+export type ShopCategoryChip = { id: string; label: string };
 
 function FiltersPanel({
   category,
@@ -40,6 +38,7 @@ function FiltersPanel({
   inStockOnly,
   updateParams,
   onClose,
+  categories,
 }: {
   category: ProductCategory | null;
   sort: SortOption;
@@ -48,12 +47,13 @@ function FiltersPanel({
   inStockOnly: boolean;
   updateParams: (updates: Record<string, string | null>) => void;
   onClose?: () => void;
+  categories: ShopCategoryChip[];
 }) {
   const sliderMax = Math.max(priceBounds.max, priceBounds.min);
   const sliderValue = Math.min(Math.max(maxPrice, priceBounds.min), sliderMax);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {onClose ? (
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-primary">فیلترها</h2>
@@ -68,7 +68,9 @@ function FiltersPanel({
       ) : null}
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-primary">دسته‌بندی</h3>
+        <h3 className="mb-3 text-[13px] font-medium text-secondary">
+          دسته‌بندی
+        </h3>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -82,7 +84,7 @@ function FiltersPanel({
           >
             همه
           </button>
-          {siteData.categories.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               type="button"
@@ -101,7 +103,9 @@ function FiltersPanel({
       </div>
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-primary">محدوده قیمت</h3>
+        <h3 className="mb-3 text-[13px] font-medium text-secondary">
+          محدوده قیمت
+        </h3>
         <input
           type="range"
           min={priceBounds.min}
@@ -116,64 +120,85 @@ function FiltersPanel({
         </p>
       </div>
 
-      <div>
-        <h3 className="mb-3 text-sm font-semibold text-primary">مرتب‌سازی</h3>
-        <select
-          value={sort}
-          onChange={(e) => updateParams({ sort: e.target.value })}
-          className="w-full rounded-xl border border-border bg-surface-elevated px-3 py-2.5 text-sm text-primary focus:border-gold/50 focus:outline-none"
-        >
-          {sortOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <ShopSortMenu
+        value={sort}
+        onChange={(next) => updateParams({ sort: next === "popular" ? null : next })}
+      />
 
-      <label className="flex items-center gap-2 text-sm text-secondary">
-        <input
-          type="checkbox"
-          checked={inStockOnly}
-          onChange={(e) =>
-            updateParams({ inStock: e.target.checked ? "1" : null })
-          }
-          className="accent-[var(--gold)]"
-        />
-        فقط موجود
-      </label>
+      <ShopInStockToggle
+        checked={inStockOnly}
+        onChange={(checked) =>
+          updateParams({ inStock: checked ? "1" : null })
+        }
+      />
     </div>
   );
 }
 
-function ShopContentInner() {
+function InitialGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <ProductCardSkeleton key={`init-skel-${i}`} />
+      ))}
+    </div>
+  );
+}
+
+function ShopContentInner({
+  categories,
+}: {
+  categories: ShopCategoryChip[];
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  useBodyScrollLock(filtersOpen);
   const [products, setProducts] = useState<Product[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [priceMeta, setPriceMeta] = useState(seedPriceRange);
+  const loadingMoreLock = useRef(false);
+  const fetchGen = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const category = (searchParams.get("category") as ProductCategory) || null;
-  const sort = (searchParams.get("sort") as SortOption) || "popular";
+  const rawCategory = searchParams.get("category");
+  const category =
+    rawCategory && categories.some((c) => c.id === rawCategory)
+      ? (rawCategory as ProductCategory)
+      : null;
+  const sort = parseSortOption(searchParams.get("sort"));
   const maxPriceParam = searchParams.get("maxPrice");
   const maxPrice = maxPriceParam
     ? Number(maxPriceParam)
     : priceMeta.max || seedPriceRange.max;
   const inStockOnly = searchParams.get("inStock") === "1";
-  const pageParam = Number(searchParams.get("page") || "1");
   const searchQuery = (
     searchParams.get("q") ||
     searchParams.get("search") ||
     ""
   ).trim();
 
+  const buildQuery = useCallback(
+    (pageNum: number) => {
+      const qs = new URLSearchParams();
+      if (category) qs.set("category", category);
+      if (sort && sort !== "popular") qs.set("sort", sort);
+      if (maxPriceParam) qs.set("maxPrice", maxPriceParam);
+      if (inStockOnly) qs.set("inStock", "1");
+      if (searchQuery) qs.set("q", searchQuery);
+      qs.set("page", String(pageNum));
+      qs.set("limit", String(SHOP_PAGE_SIZE));
+      return qs;
+    },
+    [category, sort, maxPriceParam, inStockOnly, searchQuery],
+  );
+
   const updateParams = useCallback(
-    (
-      updates: Record<string, string | null>,
-      options?: { resetPage?: boolean },
-    ) => {
+    (updates: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString());
       Object.entries(updates).forEach(([key, value]) => {
         if (value === null || value === "") {
@@ -182,9 +207,7 @@ function ShopContentInner() {
           params.set(key, value);
         }
       });
-      if (options?.resetPage !== false && !("page" in updates)) {
-        params.delete("page");
-      }
+      params.delete("page");
       const qs = params.toString();
       router.push(
         qs ? `${hajiasalPath("/shop")}?${qs}` : hajiasalPath("/shop"),
@@ -195,79 +218,108 @@ function ShopContentInner() {
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const raw = searchParams.get("category");
+    if (!raw) return;
+    if (categories.some((c) => c.id === raw)) return;
+    updateParams({ category: null });
+  }, [categories, searchParams, updateParams]);
+
+  useEffect(() => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const gen = ++fetchGen.current;
+    loadingMoreLock.current = false;
+
     const run = async () => {
       setLoading(true);
+      setLoadingMore(false);
       setError("");
+      setPage(1);
       try {
-        const qs = new URLSearchParams();
-        if (category) qs.set("category", category);
-        if (sort) qs.set("sort", sort);
-        // Only constrain price when the user set maxPrice in the URL.
-        if (maxPriceParam) qs.set("maxPrice", maxPriceParam);
-        if (inStockOnly) qs.set("inStock", "1");
-        if (searchQuery) qs.set("q", searchQuery);
-        const res = await fetch(`/api/products?${qs.toString()}`);
+        const res = await fetch(`/api/products?${buildQuery(1).toString()}`, {
+          signal: controller.signal,
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری فروشگاه");
-        if (!cancelled) {
-          setProducts(data.products ?? []);
-          if (
-            data.meta?.priceRange?.min != null &&
-            data.meta?.priceRange?.max != null
-          ) {
-            setPriceMeta({
-              min: Number(data.meta.priceRange.min),
-              max: Number(data.meta.priceRange.max),
-            });
-          }
+        if (gen !== fetchGen.current) return;
+        setProducts(data.products ?? []);
+        setHasMore(Boolean(data.meta?.hasMore));
+        setPage(1);
+        if (
+          data.meta?.priceRange?.min != null &&
+          data.meta?.priceRange?.max != null
+        ) {
+          setPriceMeta({
+            min: Number(data.meta.priceRange.min),
+            max: Number(data.meta.priceRange.max),
+          });
         }
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "خطا");
-          setProducts([]);
-        }
+        if (controller.signal.aborted) return;
+        if (gen !== fetchGen.current) return;
+        setError(err instanceof Error ? err.message : "خطا");
+        setProducts([]);
+        setHasMore(false);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (gen === fetchGen.current) setLoading(false);
       }
     };
     void run();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [category, sort, maxPriceParam, inStockOnly, searchQuery]);
+  }, [buildQuery]);
 
-  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
-  const page = Math.min(Math.max(1, pageParam || 1), totalPages);
-  const paged = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return products.slice(start, start + PAGE_SIZE);
-  }, [products, page]);
-
-  const goToPage = useCallback(
-    (next: number) => {
-      const safe = Math.min(Math.max(1, next), totalPages);
-      updateParams(
-        { page: safe <= 1 ? null : String(safe) },
-        { resetPage: false },
-      );
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [totalPages, updateParams],
-  );
-
-  const subtitle = loading
-    ? "در حال بارگذاری..."
-    : searchQuery
-      ? `${products.length.toLocaleString("fa-IR")} نتیجه برای «${searchQuery}»`
-      : products.length > PAGE_SIZE
-        ? `${products.length.toLocaleString("fa-IR")} محصول · صفحه ${page.toLocaleString("fa-IR")} از ${totalPages.toLocaleString("fa-IR")}`
-        : `${products.length.toLocaleString("fa-IR")} محصول`;
+  const onLoadMore = useCallback(() => {
+    if (loadingMoreLock.current || loading || loadingMore || !hasMore) return;
+    loadingMoreLock.current = true;
+    const nextPage = page + 1;
+    const gen = fetchGen.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoadingMore(true);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/products?${buildQuery(nextPage).toString()}`,
+          { signal: controller.signal },
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری بیشتر");
+        if (gen !== fetchGen.current) return;
+        setProducts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          const appended = (data.products as Product[] | undefined)?.filter(
+            (p) => !seen.has(p.id),
+          );
+          return appended?.length ? [...prev, ...appended] : prev;
+        });
+        setHasMore(Boolean(data.meta?.hasMore));
+        setPage(nextPage);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (gen !== fetchGen.current) return;
+        setError(err instanceof Error ? err.message : "خطا");
+      } finally {
+        if (gen === fetchGen.current) {
+          setLoadingMore(false);
+          loadingMoreLock.current = false;
+        }
+      }
+    })();
+  }, [buildQuery, hasMore, loading, loadingMore, page]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-14">
       <div className="mb-6 flex items-end justify-between gap-4 md:mb-8">
-        <SectionHeading title="فروشگاه" subtitle={subtitle} />
+        <SectionHeading
+          title="فروشگاه"
+          subtitle={
+            searchQuery ? `نتایج جستجو برای «${searchQuery}»` : undefined
+          }
+        />
         <button
           type="button"
           onClick={() => setFiltersOpen(true)}
@@ -314,37 +366,41 @@ function ShopContentInner() {
               priceBounds={priceMeta}
               inStockOnly={inStockOnly}
               updateParams={(u) => updateParams(u)}
+              categories={categories}
             />
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pb-32">
           {loading ? (
-            <p className="text-sm text-secondary">در حال بارگذاری محصولات...</p>
+            <InitialGridSkeleton />
           ) : products.length > 0 ? (
             <>
-              <ProductGrid products={paged} />
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                onChange={goToPage}
+              <ProductGrid products={products} className="pb-0" />
+              <ShopLoadMoreButton
+                hasMore={hasMore}
+                loading={loadingMore}
+                onLoadMore={onLoadMore}
               />
             </>
           ) : (
-            <ShopEmptyState searchQuery={searchQuery || undefined} />
+            <ShopEmptyState
+              searchQuery={searchQuery || undefined}
+              inStockOnly={inStockOnly}
+            />
           )}
         </div>
       </div>
 
       {filtersOpen ? (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="fixed inset-0 z-[120] lg:hidden" role="dialog" aria-modal="true" aria-label="فیلتر فروشگاه">
           <button
             type="button"
             className="absolute inset-0 overlay-scrim"
             aria-label="بستن فیلتر"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border border-border-bright bg-surface p-5 pb-8 shadow-2xl">
+          <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border border-border-bright bg-surface p-5 pb-[calc(var(--mobile-dock-clearance)+1rem)] shadow-2xl">
             <FiltersPanel
               category={category}
               sort={sort}
@@ -353,6 +409,7 @@ function ShopContentInner() {
               inStockOnly={inStockOnly}
               updateParams={updateParams}
               onClose={() => setFiltersOpen(false)}
+              categories={categories}
             />
           </div>
         </div>
@@ -361,7 +418,15 @@ function ShopContentInner() {
   );
 }
 
-export function ShopContent() {
+export function ShopContent({
+  categories,
+}: {
+  categories?: ShopCategoryChip[];
+}) {
+  const chips =
+    categories && categories.length > 0
+      ? categories
+      : siteData.categories.map((c) => ({ id: c.id, label: c.label }));
   return (
     <Suspense
       fallback={
@@ -370,7 +435,7 @@ export function ShopContent() {
         </div>
       }
     >
-      <ShopContentInner />
+      <ShopContentInner categories={chips} />
     </Suspense>
   );
 }

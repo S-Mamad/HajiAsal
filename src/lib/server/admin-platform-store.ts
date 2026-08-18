@@ -780,25 +780,44 @@ export async function getDashboardStats() {
 
   try {
     const orders = await mysqlQuery<RowDataPacket>(
-      `SELECT id, total, status, customer, created_at FROM orders ORDER BY created_at DESC LIMIT 500`,
+      `SELECT id, total, status, customer, payment_method, refunded_at, created_at
+       FROM orders ORDER BY created_at DESC`,
     );
-    const now = Date.now();
-    const day = 86400000;
-    let salesToday = 0;
-    let salesWeek = 0;
-    let salesMonth = 0;
-    let totalRevenue = 0;
+    const { computeTelegramSalesStats, tehranDateKey } = await import(
+      "./telegram-sales-stats"
+    );
+    const sales = computeTelegramSalesStats(
+      orders.map((o) => ({
+        status: String(o.status ?? ""),
+        total: Number(o.total ?? 0),
+        createdAt: toIso(o.created_at),
+        paymentMethod: o.payment_method
+          ? String(o.payment_method)
+          : undefined,
+        refundedAt: o.refunded_at ? toIso(o.refunded_at) : null,
+      })),
+    );
+    const salesToday = sales.salesToday;
+    const salesWeek = sales.salesWeek;
+    const salesMonth = sales.salesMonth;
+    const totalRevenue = sales.totalPaidRevenue;
     const salesChartMap = new Map<string, number>();
     const ordersChartMap = new Map<string, number>();
 
     for (const o of orders) {
-      const created = new Date(toIso(o.created_at)).getTime();
+      const status = String(o.status ?? "");
+      if (
+        status !== "confirmed" &&
+        status !== "processing" &&
+        status !== "shipped" &&
+        status !== "delivered"
+      ) {
+        continue;
+      }
+      if (o.refunded_at) continue;
       const total = Number(o.total ?? 0);
-      totalRevenue += total;
-      if (now - created <= day) salesToday += total;
-      if (now - created <= 7 * day) salesWeek += total;
-      if (now - created <= 30 * day) salesMonth += total;
-      const key = toIso(o.created_at).slice(0, 10);
+      const key = tehranDateKey(toIso(o.created_at));
+      if (!key) continue;
       salesChartMap.set(key, (salesChartMap.get(key) ?? 0) + total);
       ordersChartMap.set(key, (ordersChartMap.get(key) ?? 0) + 1);
     }
@@ -829,7 +848,7 @@ export async function getDashboardStats() {
       customersCount: Number(customersCountRow?.c ?? 0),
       productsCount: Number(productsCountRow?.c ?? 0),
       lowStockCount: Number((lowStockRow as RowDataPacket)?.c ?? 0),
-      avgOrderValue: orders.length ? Math.round(totalRevenue / orders.length) : 0,
+      avgOrderValue: sales.avgOrderValue,
       totalRevenue,
       recentOrders: orders.slice(0, 8).map((o) => ({
         id: String(o.id),

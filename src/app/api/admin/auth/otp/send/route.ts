@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { handlePanelOtpSend } from "@/lib/auth/panel-otp";
-import {
-  ensurePrimaryAdmins,
-  findAdminUserByPhone,
-} from "@/lib/server/admin-auth";
 
-export async function POST(request: Request) {
-  await ensurePrimaryAdmins();
-  return handlePanelOtpSend(request, "admin", async (phone) => {
-    const user = await findAdminUserByPhone(phone);
-    return Boolean(user && user.status === "active");
-  });
+/** Panel OTP login removed — use same-origin /login (shared customer session). */
+export async function POST() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "ورود پنل از صفحه /login همین دامنه است؛ این مسیر دیگر فعال نیست",
+      loginUrl: "/login",
+    },
+    { status: 410 },
+  );
 }

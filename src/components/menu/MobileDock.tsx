@@ -19,13 +19,14 @@ export function MobileDock({ items = defaultDockItems }: MobileDockProps) {
 
   if (!shouldShowFloatingNav(pathname)) return null;
 
-  const activeId = items.find((item) => item.match(pathname))?.id ?? "home";
+  // No fake "home" highlight on routes outside the dock (wishlist, trust pages, …).
+  const activeId = items.find((item) => item.match(pathname))?.id;
 
   return (
     <nav aria-label="ناوبری اصلی موبایل" className="mobile-dock">
       <div className="mx-auto flex h-16 max-w-lg items-stretch px-1.5">
         {items.map((item) => {
-          const active = item.id === activeId;
+          const active = Boolean(activeId && item.id === activeId);
           return (
             <Link
               key={item.id}

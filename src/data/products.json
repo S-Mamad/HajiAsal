@@ -24,6 +24,7 @@
       }
     ],
     "inStock": true,
+    "stockQty": 2,
     "rating": 4.9,
     "reviewCount": 128,
     "isBestseller": true,
@@ -180,7 +181,8 @@
     "reviewCount": 203,
     "isBestseller": true,
     "ingredients": "۱۰۰٪ عسل آویشن طبیعی",
-    "shippingInfo": "بسته‌بندی ویژه با جعبه چوبی"
+    "shippingInfo": "بسته‌بندی ویژه با جعبه چوبی",
+    "viewsLast24h": 86
   },
   {
     "id": "p007",
@@ -294,8 +296,10 @@
       }
     ],
     "inStock": true,
+    "stockQty": 1,
     "rating": 4.7,
     "reviewCount": 156,
+    "viewsLast24h": 112,
     "isBestseller": true,
     "ingredients": "۱۰۰٪ عسل چهل‌گیاه",
     "shippingInfo": "ارسال استاندارد"
@@ -1345,7 +1349,8 @@
     "images": [
       "/images/products/p046.jpg",
       "/images/products/p046-alt.jpg"
-    ]
+    ],
+    "viewsLast24h": 73
   },
   {
     "id": "p047",

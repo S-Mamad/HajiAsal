@@ -8,7 +8,7 @@ import { BrandLogo } from "@/components/ui/BrandLogo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { hajiasalPath } from "@/lib/paths";
 
-const AUTH_HERO_IMAGE = "/images/about/brand-story-honey.webp";
+const AUTH_HERO_IMAGE = "/images/hajiasal/hero-studio.webp";
 
 interface AuthLayoutProps {
   children: React.ReactNode;

@@ -44,6 +44,7 @@
     "percent": 10
   },
   "shippingCost": 45000,
+  "freeShippingThreshold": 500000,
   "milestones": [
     {
       "year": "۱۴۰۰",
@@ -166,7 +167,7 @@
         },
         {
           "heading": "هزینه ارسال",
-          "body": "هزینه ارسال استاندارد به سفارش اضافه می‌شود. زمان تحویل در یزد معمولاً ۱ تا ۲ روز کاری و در سایر شهرها ۳ تا ۷ روز کاری است."
+          "body": "هزینه ارسال در مرحله پرداخت محاسبه می‌شود. سفارش‌های یزد ۲ تا ۷ روز کاری و سایر شهرها ۷ تا ۱۵ روز کاری تحویل داده می‌شوند."
         },
         {
           "heading": "پیگیری",
@@ -241,5 +242,48 @@
       "description": "نگین، سرگل و پوشال",
       "image": "/images/hajiasal/categories/saffron.jpg"
     }
-  ]
+  ],
+  "expressShippingCost": 80000,
+  "pickupShippingCost": 0,
+  "freeShippingIncludesExpress": true,
+  "cartPromo": {
+    "freeShippingBarEnabled": true,
+    "freeShippingRemainingText": "فقط {amount} تا ارسال رایگان",
+    "freeShippingUnlockedText": "ارسال رایگان فعال شد",
+    "impulseEnabled": true,
+    "impulseTitle": "پیشنهادهای لحظه آخری",
+    "impulseMode": "popular",
+    "impulseProductIds": [],
+    "impulseLimit": 8
+  },
+  "searchUi": {
+    "placeholder": "عسل، ژل رویال، هدیه…",
+    "suggestionsTitle": "پیشنهادها",
+    "hint": "نام محصول یا طعم را بنویسید؛ نتایج همان لحظه می‌آید.",
+    "suggestions": [
+      "عسل کوهستان",
+      "آویشن",
+      "ژل رویال",
+      "ست هدیه",
+      "شهد",
+      "عسل گون"
+    ]
+  },
+  "shippingMethods": {
+    "standard": {
+      "label": "پست پیشتاز",
+      "description": "اقتصادی",
+      "eta": "۷ تا ۱۵ روز کاری"
+    },
+    "express": {
+      "label": "پست ویژه",
+      "description": "ارسال سریع",
+      "eta": "۲ تا ۷ روز کاری"
+    },
+    "pickup": {
+      "label": "تحویل حضوری",
+      "description": "",
+      "eta": "هماهنگی تلفنی"
+    }
+  }
 }

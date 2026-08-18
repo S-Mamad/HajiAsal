@@ -126,7 +126,7 @@ export default function AccountTicketDetailPage() {
   const backLink = (
     <Link
       href={hajiasalPath("/account/tickets")}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 text-secondary transition hover:border-gold/30 hover:bg-surface-muted hover:text-primary active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary transition hover:bg-surface-muted hover:text-primary active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
       aria-label="بازگشت به تیکت‌ها"
     >
       <Icon icon={ArrowRight} size={18} />
@@ -134,7 +134,7 @@ export default function AccountTicketDetailPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface md:bg-transparent">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface">
       {ticket ? (
         <>
           <TicketChat
@@ -168,17 +168,17 @@ export default function AccountTicketDetailPage() {
               <button
                 type="button"
                 onClick={() => void toggleClose()}
-                className="h-10 rounded-xl border border-border px-3 text-xs font-medium text-primary transition hover:bg-surface-muted active:scale-[0.98]"
+                className="h-9 rounded-full px-3 text-[12px] font-medium text-secondary transition hover:bg-surface-muted hover:text-primary active:scale-[0.98]"
               >
                 {ticket.status === "closed" || ticket.status === "resolved"
                   ? "بازگشایی"
-                  : "بستن تیکت"}
+                  : "بستن"}
               </button>
             }
           />
           {(ticket.status === "closed" || ticket.status === "resolved") &&
           !ticket.csatScore ? (
-            <div className="relative z-[2] shrink-0 border-t border-border/80 bg-surface/95 p-3 backdrop-blur-md">
+            <div className="relative z-[2] shrink-0 border-t border-border bg-surface/95 px-3 py-2.5 backdrop-blur-md">
               <TicketCsatPrompt onSubmit={sendCsat} />
             </div>
           ) : null}

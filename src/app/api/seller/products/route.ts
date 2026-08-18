@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/products-store";
 import { logSellerActivity } from "@/lib/server/seller-activity";
 import { canSellerPublishStatus } from "@/lib/product-approval";
+import { productImageFitsSchema } from "@/lib/server/product-schemas";
 import type { Product, ProductCategory } from "@/types";
 
 const PRODUCT_CATEGORIES = [
@@ -42,6 +43,7 @@ const createProductSchema = z.object({
   category: categorySchema,
   categoryLabel: z.string().optional().default(""),
   images: z.array(z.string().min(1)).max(8).optional().default([]),
+  imageFits: productImageFitsSchema,
   weightOptions: z.array(weightSchema).min(1),
   inStock: z.boolean().optional().default(true),
   stockQty: z.number().int().min(0).optional(),
@@ -66,6 +68,7 @@ const updateSchema = z.object({
   category: categorySchema.optional(),
   categoryLabel: z.string().optional(),
   images: z.array(z.string().min(1)).max(8).optional(),
+  imageFits: productImageFitsSchema,
   weightOptions: z.array(weightSchema).min(1).optional(),
   inStock: z.boolean().optional(),
   stockQty: z.number().int().min(0).optional(),
@@ -90,6 +93,7 @@ function sellerContentChanged(
     category?: string;
     categoryLabel?: string;
     images?: string[];
+    imageFits?: Product["imageFits"];
     weightOptions?: Product["weightOptions"];
     ingredients?: string;
     shippingInfo?: string;
@@ -118,6 +122,12 @@ function sellerContentChanged(
     return true;
   }
   if (rest.images !== undefined && !sameJson(rest.images, existing.images ?? [])) {
+    return true;
+  }
+  if (
+    rest.imageFits !== undefined &&
+    !sameJson(rest.imageFits, existing.imageFits ?? {})
+  ) {
     return true;
   }
   if (
@@ -166,7 +176,11 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({ product });
   }
-  return NextResponse.json({ products });
+  return NextResponse.json({
+    products,
+    lowStockThreshold:
+      gated.ctx.seller.shopSettings?.lowStockThreshold ?? 10,
+  });
 }
 
 export async function POST(request: Request) {
@@ -246,6 +260,7 @@ export async function POST(request: Request) {
       categoryLabel:
         data.categoryLabel?.trim() || data.category,
       images: data.images ?? [],
+      imageFits: data.imageFits,
       weightOptions: data.weightOptions,
       inStock: stockQty > 0,
       stockQty,

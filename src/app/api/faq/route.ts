@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
-import faqData from "@/data/faq.json";
+import { getFaqItems } from "@/lib/server/site-settings";
 
 export async function GET() {
-  return NextResponse.json({ faq: faqData });
+  return NextResponse.json({ faq: await getFaqItems() });
 }

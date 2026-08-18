@@ -65,7 +65,10 @@ export function Footer() {
   const siteData = useSiteSettings();
 
   return (
-    <footer className="relative z-[1] shrink-0 border-t border-border bg-void">
+    <footer
+      data-site-footer
+      className="relative z-[1] shrink-0 border-t border-border bg-void"
+    >
       {/* Mobile — compact so short pages (cart, wishlist) are not footer-dominated */}
       <div className="mx-auto max-w-7xl px-4 py-7 md:hidden">
         <div className="flex flex-col items-center gap-2 text-center">
@@ -124,7 +127,7 @@ export function Footer() {
 
       {/* Desktop */}
       <div className="mx-auto hidden max-w-7xl px-8 py-14 md:block lg:py-16">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.3fr)]">
           <div className="sm:col-span-2 lg:col-span-1">
             <BrandLogo name={siteData.brand.name} size="lg" className="mb-4" />
             <p className="max-w-md text-sm leading-relaxed text-secondary">

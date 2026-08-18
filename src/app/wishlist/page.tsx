@@ -92,7 +92,16 @@ export default function WishlistPage() {
           onRetry={() => void load()}
         />
       ) : products.length > 0 ? (
-        <ProductGrid products={products} />
+        <ProductGrid products={products} className="pb-8 md:pb-12" />
+      ) : ids.length > 0 ? (
+        <EmptyState
+          className="my-auto"
+          title="محصولات ذخیره‌شده در دسترس نیستند"
+          description="شناسه‌هایی در علاقه‌مندی دارید ولی در کاتالوگ فعلی پیدا نشدند. فروشگاه را تازه کنید یا دوباره ذخیره کنید."
+          action={
+            <Button href={hajiasalPath("/shop")}>رفتن به فروشگاه</Button>
+          }
+        />
       ) : (
         <EmptyState
           className="my-auto"

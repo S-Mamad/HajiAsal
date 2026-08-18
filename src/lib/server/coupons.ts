@@ -51,7 +51,7 @@ function computeDiscount(coupon: Coupon, subtotal: number): number {
 
 async function validateSellerDiscount(
   code: string,
-  subtotal: number,
+  _subtotal: number,
   options?: {
     sellerIdsInCart?: string[];
     sellerLineSubtotals?: Record<string, number>;
@@ -108,9 +108,12 @@ async function validateSellerDiscount(
       label: `تخفیف فروشنده ${String(row.code)}`,
       sellerId,
     };
+    // Fail-closed: seller codes never apply to platform-only carts or other sellers.
+    const cartSellerIds = options?.sellerIdsInCart ?? [];
     if (
-      options?.sellerIdsInCart &&
-      options.sellerIdsInCart.some((id) => id !== sellerId)
+      cartSellerIds.length === 0 ||
+      !cartSellerIds.includes(sellerId) ||
+      cartSellerIds.some((id) => id !== sellerId)
     ) {
       return {
         valid: false,
@@ -119,8 +122,20 @@ async function validateSellerDiscount(
           "این کد تخفیف فقط برای محصولات همان فروشنده قابل استفاده است",
       };
     }
-    const eligibleSubtotal =
-      options?.sellerLineSubtotals?.[sellerId] ?? subtotal;
+    // Never fall back to full cart subtotal — that discounted unrelated lines.
+    const eligibleSubtotal = options?.sellerLineSubtotals?.[sellerId];
+    if (
+      eligibleSubtotal == null ||
+      !Number.isFinite(eligibleSubtotal) ||
+      eligibleSubtotal <= 0
+    ) {
+      return {
+        valid: false,
+        discount: 0,
+        message:
+          "این کد تخفیف فقط برای محصولات همان فروشنده قابل استفاده است",
+      };
+    }
     if (eligibleSubtotal < coupon.minOrder) {
       return {
         valid: false,

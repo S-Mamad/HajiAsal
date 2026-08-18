@@ -15,23 +15,17 @@ import { ProductImage } from "@/components/ui/ProductImage";
 import { formatPrice, cn } from "@/lib/utils";
 import { getMinPrice } from "@/lib/products";
 import { hajiasalPath } from "@/lib/paths";
+import { catalogImageFit, catalogMediaClass, imageFitForSrc } from "@/lib/product-image";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { resolveSearchUi } from "@/lib/search-ui";
 
 interface SearchModalProps {
   open: boolean;
   onClose: () => void;
 }
-
-const SUGGESTIONS = [
-  "عسل کوهستان",
-  "آویشن",
-  "ژل رویال",
-  "ست هدیه",
-  "شهد",
-  "عسل گون",
-] as const;
 
 const RECENT_KEY = "hajiasal.search.recent";
 
@@ -61,6 +55,8 @@ function pushRecent(term: string) {
 }
 
 export function SearchModal({ open, onClose }: SearchModalProps) {
+  const site = useSiteSettings();
+  const searchUi = resolveSearchUi(site);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [resultTotal, setResultTotal] = useState(0);
@@ -95,7 +91,8 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         typeof data.total === "number" ? data.total : data.results?.length ?? 0,
       );
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (signal?.aborted) return;
+      if (err instanceof Error && err.name === "AbortError") return;
       setResults([]);
       setError("جستجو انجام نشد. دوباره تلاش کنید.");
     } finally {
@@ -135,6 +132,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     setQuery("");
     setResults([]);
     setError(null);
+    setLoading(false);
     onClose();
   };
 
@@ -189,7 +187,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                       setRecent(readRecent());
                     }
                   }}
-                  placeholder="عسل، ژل رویال، هدیه…"
+                  placeholder={searchUi.placeholder}
                   className="min-w-0 flex-1 bg-transparent text-[15px] text-primary outline-none placeholder:text-dim"
                   autoComplete="off"
                   enterKeyHint="search"
@@ -244,13 +242,14 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                     </section>
                   ) : null}
 
+                  {searchUi.suggestions.length > 0 ? (
                   <section>
                     <div className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-secondary">
                       <Icon icon={Sparkle} size={14} className="text-gold" />
-                      پیشنهادها
+                      {searchUi.suggestionsTitle}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {SUGGESTIONS.map((s) => (
+                      {searchUi.suggestions.map((s) => (
                         <button
                           key={s}
                           type="button"
@@ -262,10 +261,13 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                       ))}
                     </div>
                   </section>
+                  ) : null}
 
+                  {searchUi.hint ? (
                   <p className="pt-1 text-center text-[12px] leading-relaxed text-dim">
-                    نام محصول یا طعم را بنویسید؛ نتایج همان لحظه می‌آید.
+                    {searchUi.hint}
                   </p>
+                  ) : null}
                 </div>
               ) : loading ? (
                 <ul className="flex flex-col gap-2 py-3" aria-busy>
@@ -299,50 +301,63 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                       : ""}
                   </p>
                   <ul className="flex flex-col gap-0.5 py-2">
-                    {results.map((product) => (
-                      <li key={product.id}>
-                        <Link
-                          href={hajiasalPath(`/product/${product.slug}`)}
-                          onClick={() => {
-                            pushRecent(trimmed);
-                            handleClose();
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 rounded-2xl p-2.5 transition-colors",
-                            "hover:bg-surface-muted active:bg-surface-elevated",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
-                          )}
-                        >
-                          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface-muted ring-1 ring-border/60">
-                            <ProductImage
-                              src={product.images[0]}
-                              alt={product.title}
-                              fill
-                              sizes="56px"
-                              className="object-cover"
+                    {results.map((product) => {
+                      const thumbSrc = product.images[0] ?? "";
+                      const thumbFit = imageFitForSrc(
+                        product.imageFits,
+                        thumbSrc,
+                      );
+                      return (
+                        <li key={product.id}>
+                          <Link
+                            href={hajiasalPath(`/product/${product.slug}`)}
+                            onClick={() => {
+                              pushRecent(trimmed);
+                              handleClose();
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 rounded-2xl p-2.5 transition-colors",
+                              "hover:bg-surface-muted active:bg-surface-elevated",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                catalogMediaClass(thumbSrc, thumbFit),
+                                "relative h-14 w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-border/60",
+                              )}
+                            >
+                              <ProductImage
+                                src={thumbSrc}
+                                alt={product.title}
+                                fill
+                                fit={catalogImageFit(thumbSrc, thumbFit)}
+                                imageFit={thumbFit}
+                                sizes="56px"
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-primary">
+                                {product.title}
+                              </p>
+                              <p className="mt-0.5 text-xs text-secondary">
+                                {product.categoryLabel}
+                                <span className="mx-1.5 text-dim">·</span>
+                                <span className="font-medium text-gold tabular-nums">
+                                  {formatPrice(getMinPrice(product))}
+                                </span>
+                              </p>
+                            </div>
+                            <Icon
+                              icon={ArrowLeft}
+                              size={16}
+                              className="shrink-0 text-dim"
                             />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-primary">
-                              {product.title}
-                            </p>
-                            <p className="mt-0.5 text-xs text-secondary">
-                              {product.categoryLabel}
-                              <span className="mx-1.5 text-dim">·</span>
-                              <span className="font-medium text-gold tabular-nums">
-                                {formatPrice(getMinPrice(product))}
-                              </span>
-                            </p>
-                          </div>
-                          <Icon
-                            icon={ArrowLeft}
-                            size={16}
-                            className="shrink-0 text-dim"
-                          />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                      </ul>
                   <div className="border-t border-border px-3 py-3">
                     <Link
                       href={hajiasalPath(
@@ -362,10 +377,15 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                 <EmptyState
                   className="my-4 border-0 bg-transparent"
                   title="نتیجه‌ای یافت نشد"
-                  description={`برای «${trimmed}» محصولی پیدا نشد. پیشنهادها را امتحان کنید.`}
+                  description={
+                    searchUi.suggestions.length > 0
+                      ? `برای «${trimmed}» محصولی پیدا نشد. پیشنهادها را امتحان کنید.`
+                      : `برای «${trimmed}» محصولی پیدا نشد.`
+                  }
                   action={
+                    searchUi.suggestions.length > 0 ? (
                     <div className="flex flex-wrap justify-center gap-2">
-                      {SUGGESTIONS.slice(0, 3).map((s) => (
+                      {searchUi.suggestions.slice(0, 3).map((s) => (
                         <button
                           key={s}
                           type="button"
@@ -376,6 +396,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                         </button>
                       ))}
                     </div>
+                    ) : undefined
                   }
                 />
               )}

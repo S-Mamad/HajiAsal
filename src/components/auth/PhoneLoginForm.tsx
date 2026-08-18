@@ -27,11 +27,17 @@ export type AuthWelcomeUser = {
 interface PhoneLoginFormProps {
   onNeedsRegister?: (phone: string) => void;
   onWelcome?: (user: AuthWelcomeUser) => void;
+  /** Fires after successful OTP even for brand-new users (checkout inline). */
+  onAuthenticated?: () => void;
+  /** Skip forcing profile-complete flow from parent. */
+  allowIncompleteProfile?: boolean;
 }
 
 export function PhoneLoginForm({
   onNeedsRegister,
   onWelcome,
+  onAuthenticated,
+  allowIncompleteProfile = false,
 }: PhoneLoginFormProps) {
   const { refresh } = useAuth();
 
@@ -126,7 +132,10 @@ export function PhoneLoginForm({
       await refresh();
 
       if (data.isNewUser) {
-        onNeedsRegister?.(normalizedPhone);
+        onAuthenticated?.();
+        if (!allowIncompleteProfile) {
+          onNeedsRegister?.(normalizedPhone);
+        }
         return;
       }
 
@@ -135,6 +144,7 @@ export function PhoneLoginForm({
           ? data.user.fullName.trim()
           : "";
       await syncWishlistBidirectional();
+      onAuthenticated?.();
       onWelcome?.({
         fullName,
         phone:

@@ -15,7 +15,7 @@ import {
 } from "@/lib/auth/phone-mask";
 import { getOrCreateDeviceId } from "@/lib/auth/device-id";
 import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
-import { hajiasalPath } from "@/lib/paths";
+import { hajiasalPath, sellerPublicUrl } from "@/lib/paths";
 import { SELLER_APPLY_TERMS } from "@/lib/seller/apply-terms";
 import {
   isAtLeast18,
@@ -25,6 +25,8 @@ import {
   parseBirthDate,
 } from "@/lib/seller/apply-validation";
 import { cn } from "@/lib/utils";
+import { JalaliBirthDatePicker } from "@/components/seller/JalaliBirthDatePicker";
+import Image from "next/image";
 
 const DEFAULT_OTP_LENGTH = 4;
 
@@ -78,6 +80,9 @@ export function SellerApplyClient() {
   const [backUrl, setBackUrl] = useState("");
   const [commitmentUrl, setCommitmentUrl] = useState("");
   const [uploading, setUploading] = useState<UploadField | null>(null);
+  const [existingSellerLoginUrl, setExistingSellerLoginUrl] = useState<
+    string | null
+  >(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const normalizedPhone = normalizePhoneInput(phone);
@@ -116,6 +121,7 @@ export function SellerApplyClient() {
     setError("");
     setMessage("");
     verifyingRef.current = false;
+    setExistingSellerLoginUrl(null);
     try {
       const res = await fetch("/api/seller/apply/otp/send", {
         method: "POST",
@@ -131,6 +137,15 @@ export function SellerApplyClient() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (data.code === "SELLER_EXISTS") {
+          setExistingSellerLoginUrl(
+            typeof data.sellerLoginUrl === "string"
+              ? data.sellerLoginUrl
+              : `${sellerPublicUrl()}/seller`,
+          );
+          setError(data.message ?? "این شماره از قبل وجود دارد");
+          return;
+        }
         setError(data.message ?? "خطا در ارسال کد");
         return;
       }
@@ -247,6 +262,7 @@ export function SellerApplyClient() {
     if (productsIntro.trim().length < 10)
       nextErrors.productsIntro = "معرفی محصولات را کامل‌تر بنویسید";
     if (!frontUrl) nextErrors.front = "تصویر روی کارت ملی الزامی است";
+    if (!backUrl) nextErrors.back = "تصویر پشت کارت ملی الزامی است";
     if (!commitmentUrl) nextErrors.commitment = "تصویر تعهدنامه الزامی است";
 
     setFieldErrors(nextErrors);
@@ -270,7 +286,7 @@ export function SellerApplyClient() {
           bankCard: normalizeDigits(bankCard),
           productsIntro: productsIntro.trim(),
           nationalIdFrontUrl: frontUrl,
-          nationalIdBackUrl: backUrl || null,
+          nationalIdBackUrl: backUrl,
           commitmentLetterUrl: commitmentUrl,
           termsAccepted: true,
         }),
@@ -385,18 +401,41 @@ export function SellerApplyClient() {
               dir="ltr"
               inputMode="numeric"
               value={phone}
-              onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+              onChange={(e) => {
+                setPhone(formatPhoneInput(e.target.value));
+                setExistingSellerLoginUrl(null);
+                setError("");
+              }}
               placeholder="0912 345 6789"
               autoComplete="tel"
-              error={error || undefined}
+              error={
+                existingSellerLoginUrl
+                  ? undefined
+                  : error || undefined
+              }
             />
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || !isValidIranMobile(phone)}
-            >
-              {loading ? "در حال ارسال..." : "دریافت کد تأیید"}
-            </Button>
+            {existingSellerLoginUrl ? (
+              <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5">
+                <p className="text-sm text-primary">
+                  {error || "این شماره از قبل وجود دارد"}
+                </p>
+                <Button
+                  type="button"
+                  href={existingSellerLoginUrl}
+                  className="w-full"
+                >
+                  ورود به پنل فروشگاه
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !isValidIranMobile(phone)}
+              >
+                {loading ? "در حال ارسال..." : "دریافت کد تأیید"}
+              </Button>
+            )}
             <button
               type="button"
               onClick={() => go("terms")}
@@ -488,14 +527,10 @@ export function SellerApplyClient() {
               }
               error={fieldErrors.nationalId}
             />
-            <Input
-              label="تاریخ تولد"
-              type="date"
+            <JalaliBirthDatePicker
               value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
+              onChange={setBirthDate}
               error={fieldErrors.birthDate}
-              className="appearance-none"
             />
 
             <div className="flex flex-col gap-1.5">
@@ -562,10 +597,31 @@ export function SellerApplyClient() {
               />
               <UploadField
                 label="کارت ملی (پشت)"
+                required
                 url={backUrl}
                 uploading={uploading === "back"}
+                error={fieldErrors.back}
                 onFile={(f) => void uploadFile("back", f)}
               />
+              <div className="space-y-2 rounded-2xl border border-border/70 bg-surface-elevated/40 p-3">
+                <p className="text-sm font-medium text-primary">
+                  نمونه تعهدنامه دست‌نویس
+                </p>
+                <p className="text-[12px] leading-relaxed text-secondary">
+                  دقیقاً همین متن را با دست بنویسید، امضا و تاریخ بزنید و عکس پشت
+                  کارت ملی را کنار برگه قرار دهید؛ سپس از برگه عکس بگیرید و آپلود
+                  کنید.
+                </p>
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-border bg-surface">
+                  <Image
+                    src="/images/seller-commitment-sample.png"
+                    alt="نمونه تعهدنامه فروشنده حاجی عسل"
+                    fill
+                    className="object-contain object-center"
+                    sizes="(max-width: 640px) 100vw, 420px"
+                  />
+                </div>
+              </div>
               <UploadField
                 label="تعهدنامه دست‌نویس"
                 required

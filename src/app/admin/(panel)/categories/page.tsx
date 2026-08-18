@@ -4,7 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
-import { AdminInput } from "@/components/admin/ui/AdminForm";
+import {
+  AdminInput,
+  AdminSelect,
+  AdminTextarea,
+  FormField,
+} from "@/components/admin/ui/AdminForm";
+import { AdminModal } from "@/components/admin/ui/AdminModal";
+import { Can } from "@/components/admin/auth/AdminAuthProvider";
 import { hajiasalPath } from "@/lib/paths";
 
 interface CategoryRow {
@@ -12,7 +19,16 @@ interface CategoryRow {
   slug: string;
   name: string;
   description?: string;
+  image?: string;
   sortOrder: number;
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "");
 }
 
 export default function AdminCategoriesPage() {
@@ -21,8 +37,15 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<CategoryRow | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
+  const [deleting, setDeleting] = useState<CategoryRow | null>(null);
+  const [reassignTo, setReassignTo] = useState("");
+  const [deleteHint, setDeleteHint] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,8 +70,27 @@ export default function AdminCategoriesPage() {
     void load();
   }, [load]);
 
+  const openCreate = () => {
+    setEditing(null);
+    setName("");
+    setSlug("");
+    setDescription("");
+    setImage("");
+    setFormOpen(true);
+  };
+
+  const openEdit = (row: CategoryRow) => {
+    setEditing(row);
+    setName(row.name);
+    setSlug(row.slug);
+    setDescription(row.description ?? "");
+    setImage(row.image ?? "");
+    setFormOpen(true);
+  };
+
   const save = async () => {
-    if (!name.trim() || !slug.trim()) {
+    const nextSlug = slugify(slug) || slugify(name);
+    if (!name.trim() || !nextSlug) {
       setError("نام و slug الزامی است");
       return;
     }
@@ -59,22 +101,22 @@ export default function AdminCategoriesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: slug.trim(),
-          slug: slug.trim(),
+          id: editing?.id ?? nextSlug,
+          slug: nextSlug,
           name: name.trim(),
-          sortOrder: categories.length,
+          description: description.trim() || undefined,
+          image: image.trim() || undefined,
+          sortOrder: editing?.sortOrder ?? categories.length,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(
           data.error ??
-            data.message ??
             "ذخیره نشد. برای مدیریت دسته‌ها اتصال پایگاه‌داده لازم است.",
         );
       }
-      setName("");
-      setSlug("");
+      setFormOpen(false);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا در ذخیره");
@@ -83,30 +125,45 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const remove = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    setError("");
+    setDeleteHint("");
+    try {
+      const qs = new URLSearchParams({ id: deleting.id });
+      if (reassignTo) qs.set("reassignTo", reassignTo);
+      const res = await fetch(`/api/admin/categories?${qs}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        setDeleteHint(data.error ?? "این دسته محصول دارد.");
+        if (!reassignTo && Array.isArray(data.categories) && data.categories[0]) {
+          setReassignTo(String(data.categories[0].id));
+        }
+        return;
+      }
+      if (!res.ok) throw new Error(data.error ?? "حذف نشد");
+      setDeleting(null);
+      setReassignTo("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در حذف");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="panel-card flex flex-wrap gap-2 p-4">
-        <AdminInput
-          placeholder="نام دسته"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="max-w-xs"
-        />
-        <AdminInput
-          placeholder="slug"
-          dir="ltr"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          className="max-w-xs"
-        />
-        <AdminButton
-          type="button"
-          disabled={saving}
-          onClick={() => void save()}
-        >
-          {saving ? "در حال ذخیره..." : "افزودن دسته"}
-        </AdminButton>
-      </div>
+      <Can permission="categories.manage">
+        <div className="flex justify-end">
+          <AdminButton type="button" onClick={openCreate}>
+            افزودن دسته
+          </AdminButton>
+        </div>
+      </Can>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
@@ -136,8 +193,144 @@ export default function AdminCategoriesPage() {
               </span>
             ),
           },
+          {
+            key: "actions",
+            header: "عملیات",
+            render: (r) => (
+              <Can permission="categories.manage">
+                <div className="flex flex-wrap gap-2">
+                  <AdminButton
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEdit(r)}
+                  >
+                    ویرایش
+                  </AdminButton>
+                  <AdminButton
+                    type="button"
+                    size="sm"
+                    variant="danger"
+                    onClick={() => {
+                      setDeleting(r);
+                      setReassignTo("");
+                      setDeleteHint("");
+                    }}
+                  >
+                    حذف
+                  </AdminButton>
+                </div>
+              </Can>
+            ),
+          },
         ]}
       />
+
+      <AdminModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editing ? "ویرایش دسته" : "دسته جدید"}
+        footer={
+          <>
+            <AdminButton
+              type="button"
+              variant="ghost"
+              onClick={() => setFormOpen(false)}
+            >
+              انصراف
+            </AdminButton>
+            <AdminButton
+              type="button"
+              disabled={saving}
+              onClick={() => void save()}
+            >
+              {saving ? "در حال ذخیره..." : "ذخیره"}
+            </AdminButton>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <FormField label="نام" required>
+            <AdminInput
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (!editing) setSlug(slugify(e.target.value));
+              }}
+            />
+          </FormField>
+          <FormField label="Slug" required>
+            <AdminInput
+              dir="ltr"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+            />
+          </FormField>
+          <FormField label="توضیح">
+            <AdminTextarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </FormField>
+          <FormField label="آدرس تصویر" hint="مسیر عمومی مثل /images/hajiasal/categories/mountain.jpg">
+            <AdminInput
+              dir="ltr"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+            />
+          </FormField>
+        </div>
+      </AdminModal>
+
+      <AdminModal
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        title="حذف دسته"
+        footer={
+          <>
+            <AdminButton
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleting(null)}
+            >
+              انصراف
+            </AdminButton>
+            <AdminButton
+              type="button"
+              variant="danger"
+              disabled={saving}
+              onClick={() => void remove()}
+            >
+              {saving ? "در حال حذف..." : "حذف"}
+            </AdminButton>
+          </>
+        }
+      >
+        <p className="text-sm text-zinc-700">
+          دسته «{deleting?.name}» حذف شود؟ اگر محصولی در این دسته باشد باید
+          ابتدا به دسته دیگری منتقل شود.
+        </p>
+        {deleteHint ? (
+          <p className="mt-3 text-sm text-amber-800">{deleteHint}</p>
+        ) : null}
+        {categories.filter((c) => c.id !== deleting?.id).length > 0 ? (
+          <FormField label="انتقال محصولات به" hint="اگر دسته خالی است خالی بگذارید">
+            <AdminSelect
+              value={reassignTo}
+              onChange={(e) => setReassignTo(e.target.value)}
+            >
+              <option value="">بدون انتقال</option>
+              {categories
+                .filter((c) => c.id !== deleting?.id)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </AdminSelect>
+          </FormField>
+        ) : null}
+      </AdminModal>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { hajiasalPath } from "@/lib/paths";
 import { useAuth } from "@/hooks/useAuth";
 import { syncWishlistBidirectional } from "@/lib/client/wishlist-sync";
-import { safeInternalRedirect } from "@/lib/safe-redirect";
+import { safeAuthRedirect } from "@/lib/safe-redirect";
 
 interface RegisterFormProps {
   phone: string;
@@ -18,7 +18,7 @@ export function RegisterForm({ phone, onCompleted }: RegisterFormProps) {
   const router = useRouter();
   const { refresh } = useAuth();
   const searchParams = useSearchParams();
-  const redirect = safeInternalRedirect(
+  const redirect = safeAuthRedirect(
     searchParams.get("redirect"),
     hajiasalPath("/account"),
   );
@@ -57,8 +57,14 @@ export function RegisterForm({ phone, onCompleted }: RegisterFormProps) {
       await syncWishlistBidirectional();
       await refresh();
       await onCompleted?.();
-      router.push(redirect);
-      router.refresh();
+      if (/^https?:\/\//i.test(redirect)) {
+        window.requestAnimationFrame(() => {
+          window.location.replace(redirect);
+        });
+      } else {
+        router.replace(redirect);
+        router.refresh();
+      }
     } catch {
       setError("اتصال برقرار نشد. دوباره تلاش کنید");
     } finally {

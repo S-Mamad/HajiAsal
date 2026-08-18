@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { Can } from "@/components/admin/auth/AdminAuthProvider";
 import type { ProfileWithStats } from "@/lib/server/profiles";
 import { hajiasalPath } from "@/lib/paths";
 
@@ -69,14 +70,16 @@ export default function AdminCustomersPage() {
           >
             بروزرسانی
           </AdminButton>
-          <AdminButton
-            href="/api/admin/customers/export"
-            variant="outline"
-            external
-            download
-          >
-            خروجی CSV
-          </AdminButton>
+          <Can permission="reports.export">
+            <AdminButton
+              href="/api/admin/customers/export"
+              variant="outline"
+              external
+              download
+            >
+              خروجی CSV
+            </AdminButton>
+          </Can>
         </div>
       </div>
 
@@ -132,9 +135,12 @@ export default function AdminCustomersPage() {
             key: "joined",
             header: "عضویت",
             sortable: true,
-            getSortValue: (row) => new Date(row.createdAt).getTime(),
+            getSortValue: (row) =>
+              row.createdAt ? new Date(row.createdAt).getTime() : 0,
             render: (row) =>
-              new Date(row.createdAt).toLocaleDateString("fa-IR"),
+              row.createdAt
+                ? new Date(row.createdAt).toLocaleDateString("fa-IR")
+                : "نامشخص",
           },
           {
             key: "actions",

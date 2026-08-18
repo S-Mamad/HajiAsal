@@ -23,7 +23,7 @@ import { POST, GET, DELETE } from "@/app/api/seller/auth/route";
 import { getSellerFromRequest } from "@/lib/server/sellers";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 
-describe("seller auth behavior (OTP-only)", () => {
+describe("seller auth behavior (storefront session)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -32,13 +32,13 @@ describe("seller auth behavior (OTP-only)", () => {
     vi.clearAllMocks();
   });
 
-  it("POST password login is disabled", async () => {
+  it("POST password/panel login is gone (410)", async () => {
     void sellerRequest;
     const res = await POST();
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(410);
     const json = await readJson(res);
     expect(json.success).toBe(false);
-    expect(String(json.message)).toMatch(/پیامک|OTP|کد/i);
+    expect(String(json.message)).toMatch(/سایت اصلی|ورود/i);
   });
 
   it("GET returns 401 when unauthenticated", async () => {

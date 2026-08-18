@@ -28,7 +28,11 @@ export function AccountWishlistClient() {
           fetch("/api/products"),
           fetch("/api/account/wishlist"),
         ]);
-        const productsData = await productsRes.json();
+        const productsData = await productsRes.json().catch(() => ({}));
+        if (!productsRes.ok) {
+          if (!cancelled) setError(true);
+          return;
+        }
         if (wishRes.ok) {
           const wishData = (await wishRes.json()) as { productIds?: string[] };
           const remote = wishData.productIds ?? [];
@@ -124,6 +128,16 @@ export function AccountWishlistClient() {
         />
       ) : products.length > 0 ? (
         <ProductGrid products={products} />
+      ) : ids.length > 0 ? (
+        <EmptyState
+          title="محصولات ذخیره‌شده در دسترس نیستند"
+          description="شناسه‌هایی در علاقه‌مندی دارید ولی در کاتالوگ فعلی پیدا نشدند."
+          action={
+            <Button href={hajiasalPath("/shop")} size="sm">
+              مشاهده فروشگاه
+            </Button>
+          }
+        />
       ) : (
         <EmptyState
           title="لیست علاقه‌مندی خالی است"

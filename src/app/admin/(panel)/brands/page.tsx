@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminCrudList } from "@/components/admin/ui/AdminCrudList";
 import { AdminModal } from "@/components/admin/ui/AdminModal";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
@@ -32,6 +32,7 @@ export default function AdminBrandsPage() {
       rowKey={(r) => r.id}
       searchKeys={(r) => `${r.name} ${r.slug}`}
       createPermission="brands.manage"
+      editPermission="brands.manage"
       deletePermission="brands.manage"
       createLabel="برند جدید"
       exportFilename="brands"
@@ -53,73 +54,130 @@ export default function AdminBrandsPage() {
         },
       ]}
       renderForm={({ open, editing, onClose, onSaved }) => (
-        <AdminModal
+        <BrandFormModal
           open={open}
+          editing={editing}
           onClose={onClose}
-          title={editing ? "ویرایش برند" : "برند جدید"}
-          footer={
-            <AdminButton
-              disabled={saving || !name || !slug}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  const res = await fetch("/api/admin/brands", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({
-                      id: editing?.id,
-                      name,
-                      slug,
-                      description: description || null,
-                      isActive: true,
-                    }),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(data.error ?? "خطا");
-                  toast.success("ذخیره شد");
-                  onSaved();
-                } catch (err) {
-                  toast.error(err instanceof Error ? err.message : "خطا");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              {saving ? "..." : "ذخیره"}
-            </AdminButton>
-          }
-        >
-          <div className="space-y-3">
-            <FormField label="نام" required>
-              <AdminInput
-                value={name || editing?.name || ""}
-                onChange={(e) => setName(e.target.value)}
-                onFocus={() => {
-                  if (editing && !name) {
-                    setName(editing.name);
-                    setSlug(editing.slug);
-                    setDescription(editing.description ?? "");
-                  }
-                }}
-              />
-            </FormField>
-            <FormField label="اسلاگ" required>
-              <AdminInput
-                dir="ltr"
-                value={slug || editing?.slug || ""}
-                onChange={(e) => setSlug(e.target.value)}
-              />
-            </FormField>
-            <FormField label="توضیح">
-              <AdminTextarea
-                value={description || editing?.description || ""}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </FormField>
-          </div>
-        </AdminModal>
+          onSaved={onSaved}
+          toast={toast}
+          name={name}
+          setName={setName}
+          slug={slug}
+          setSlug={setSlug}
+          description={description}
+          setDescription={setDescription}
+          saving={saving}
+          setSaving={setSaving}
+        />
       )}
     />
+  );
+}
+
+function BrandFormModal({
+  open,
+  editing,
+  onClose,
+  onSaved,
+  toast,
+  name,
+  setName,
+  slug,
+  setSlug,
+  description,
+  setDescription,
+  saving,
+  setSaving,
+}: {
+  open: boolean;
+  editing: Brand | null;
+  onClose: () => void;
+  onSaved: () => void;
+  toast: ReturnType<typeof useAdminToast>;
+  name: string;
+  setName: (v: string) => void;
+  slug: string;
+  setSlug: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  saving: boolean;
+  setSaving: (v: boolean) => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      setName(editing.name);
+      setSlug(editing.slug);
+      setDescription(editing.description ?? "");
+    } else {
+      setName("");
+      setSlug("");
+      setDescription("");
+    }
+  }, [open, editing, setName, setSlug, setDescription]);
+
+  return (
+    <AdminModal
+      open={open}
+      onClose={onClose}
+      title={editing ? "ویرایش برند" : "برند جدید"}
+      footer={
+        <>
+          <AdminButton type="button" variant="outline" onClick={onClose}>
+            انصراف
+          </AdminButton>
+          <AdminButton
+            type="button"
+            disabled={saving || !name.trim() || !slug.trim()}
+            onClick={async () => {
+            setSaving(true);
+            try {
+              const res = await fetch("/api/admin/brands", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                  id: editing?.id,
+                  name: name.trim(),
+                  slug: slug.trim(),
+                  description: description.trim() || null,
+                  isActive: editing?.isActive ?? true,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error ?? "خطا");
+              toast.success("ذخیره شد");
+              onSaved();
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "خطا");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+            {saving ? "در حال ذخیره..." : "ذخیره"}
+          </AdminButton>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <FormField label="نام" required>
+          <AdminInput value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
+        <FormField label="اسلاگ" required>
+          <AdminInput
+            dir="ltr"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
+        </FormField>
+        <FormField label="توضیح">
+          <AdminTextarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </FormField>
+      </div>
+    </AdminModal>
   );
 }

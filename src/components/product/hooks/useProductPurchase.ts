@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Product, WeightOption } from "@/types";
 import { getEffectiveWeightPrice } from "@/lib/products";
+import { imageFitForSrc } from "@/lib/product-image";
 import {
   isProductPurchasable,
   maxPurchasableQty,
@@ -25,6 +26,7 @@ export function useProductPurchase({
   );
   const [quantity, setQuantity] = useState(1);
   const [addedFlash, setAddedFlash] = useState(false);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const addingLock = useRef(false);
 
@@ -117,6 +119,7 @@ export function useProductPurchase({
           slug: product.slug,
           title: product.title,
           image: product.images[0],
+          imageFit: imageFitForSrc(product.imageFits, product.images[0]),
           weight: {
             ...selectedWeight,
             price: salePrice,
@@ -126,11 +129,14 @@ export function useProductPurchase({
             typeof data.stockQty === "number"
               ? data.stockQty
               : product.stockQty,
+          priceAtAdd: salePrice,
+          sellerId: product.sellerId,
         },
         quantity,
       );
       if (!ok) return;
       setAddedFlash(true);
+      setAddSheetOpen(true);
       window.setTimeout(() => setAddedFlash(false), 1200);
     } catch {
       setAnnouncement("خطا در بررسی موجودی محصول");
@@ -160,6 +166,8 @@ export function useProductPurchase({
     maxQty,
     adding,
     addedFlash,
+    addSheetOpen,
+    setAddSheetOpen,
     handleAddToCart,
   };
 }

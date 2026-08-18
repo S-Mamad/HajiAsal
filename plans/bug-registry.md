@@ -110,6 +110,23 @@
 
 ---
 
+## Deep sweep (آگوست ۲۰۲۶ — پول/کوپن)
+
+| ID | سطح | بخش | symptom | وضعیت | تست |
+|----|------|------|---------|--------|------|
+| SWEEP-01 | Crit | coupons | کد فروشنده روی سبد بدون `sellerId` → تخفیف روی کل مبلغ (`?? subtotal`) | **fixed** | `coupons-seller-scope.test.ts` |
+| SWEEP-02 | High | checkout UI | ارسال `couponCode` خالی با `discount > 0` | **fixed** | fallback به `appliedCouponCode` |
+| SWEEP-03 | Low | tests | payment-refs / SupportFab drift | **fixed** | suite سبز |
+| SWEEP-04 | Crit | snappay | verify بدون amount = fail-open | **fixed** | `snappay.test.ts` |
+| SWEEP-05 | Crit | otp | مصرف غیراتمی MySQL (TOCTOU multi-instance) | **fixed** | `otp-store.test.ts` |
+| SWEEP-06 | Crit | refund | auto-refund زیبال no-op بدون آلرت | **fixed** | alert `api.error_critical` |
+| SWEEP-07 | High | success | session منقضی → UI unpaid با سفارش confirmed | **fixed** | orderId+tracking |
+| SWEEP-08 | High | checkout | حذف خاموش اقلام OOS | **fixed** | block + پیام |
+
+Vitest هدف: سبز کامل پس از sweep.
+
+---
+
 ## Frontend commerce UI (آگوست ۲۰۲۶ — UI-C)
 
 | ID | سطح | بخش | symptom | وضعیت |

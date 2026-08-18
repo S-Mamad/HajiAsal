@@ -1,14 +1,16 @@
 import { timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
 import {
   createAdminSession,
   revokeAdminSession,
   validateAdminSessionToken,
 } from "./admin-sessions";
 import {
+  getAdminAuthFromCustomerSession,
   getAdminAuthFromToken,
   type AdminAuthContext,
 } from "./admin-auth";
+import { getSessionFromCookies, getSessionFromRequest } from "@/lib/auth/session";
+import { readCookieValue } from "@/lib/auth/cookie-value";
 
 export const ADMIN_COOKIE = "hajiasal_admin_session";
 
@@ -26,34 +28,31 @@ export function verifyAdminPassword(input: string): boolean {
 }
 
 function getTokenFromCookieHeader(cookieHeader: string): string | null {
-  const match = cookieHeader.match(new RegExp(`${ADMIN_COOKIE}=([^;]+)`));
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  return readCookieValue(cookieHeader, ADMIN_COOKIE);
 }
 
 export async function getAdminTokenFromCookies(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(ADMIN_COOKIE)?.value ?? null;
+  // Legacy helper — panels now use customer session.
+  return null;
 }
 
 export async function isAdminAuthenticated(): Promise<boolean> {
-  const token = await getAdminTokenFromCookies();
-  if (!token) return false;
-  const ctx = await getAdminAuthFromToken(token);
+  const session = await getSessionFromCookies();
+  const ctx = await getAdminAuthFromCustomerSession(session);
   return ctx.authenticated;
 }
 
 export async function getAdminAuthContext(): Promise<AdminAuthContext> {
-  const token = await getAdminTokenFromCookies();
-  return getAdminAuthFromToken(token);
+  const session = await getSessionFromCookies();
+  return getAdminAuthFromCustomerSession(session);
 }
 
 export async function isAdminRequestAuthenticatedAsync(
   request: Request,
 ): Promise<boolean> {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const token = getTokenFromCookieHeader(cookieHeader);
-  if (!token) return false;
-  return validateAdminSessionToken(token);
+  const session = getSessionFromRequest(request);
+  const ctx = await getAdminAuthFromCustomerSession(session);
+  return ctx.authenticated;
 }
 
 export async function loginAdmin(meta?: {
@@ -69,8 +68,6 @@ export async function logoutAdmin(request?: Request): Promise<void> {
   let token: string | null = null;
   if (request) {
     token = getTokenFromCookieHeader(request.headers.get("cookie") ?? "");
-  } else {
-    token = await getAdminTokenFromCookies();
   }
   if (token) await revokeAdminSession(token);
 }
@@ -86,3 +83,6 @@ export function adminCookieOptions(token: string) {
     maxAge: 60 * 60 * 24 * 30,
   };
 }
+
+/** @deprecated Prefer getAdminAuthFromCustomerSession — kept for migration tests */
+export { getAdminAuthFromToken, validateAdminSessionToken };

@@ -57,8 +57,9 @@ describe("resolveAppRolePath", () => {
     });
     expect(resolveAppRolePath("admin", "/shop").type).toBe("not_found");
     expect(resolveAppRolePath("admin", "/api/auth/otp/send").type).toBe(
-      "not_found",
+      "next",
     );
+    expect(resolveAppRolePath("admin", "/login").type).toBe("next");
     expect(resolveAppRolePath("admin", "/admin/dashboard").type).toBe("next");
     expect(resolveAppRolePath("admin", "/api/telegram/webhook").type).toBe(
       "next",
@@ -66,7 +67,23 @@ describe("resolveAppRolePath", () => {
     expect(resolveAppRolePath("admin", "/api/cron/telegram-digest").type).toBe(
       "next",
     );
+    expect(resolveAppRolePath("admin", "/api/cron/telegram-outbox").type).toBe(
+      "next",
+    );
     expect(resolveAppRolePath("admin", "/robots.txt").type).toBe("not_found");
+  });
+
+  it("seller: allows same-origin login and auth APIs", () => {
+    expect(resolveAppRolePath("seller", "/")).toEqual({
+      type: "rewrite",
+      pathname: "/seller",
+    });
+    expect(resolveAppRolePath("seller", "/login").type).toBe("next");
+    expect(resolveAppRolePath("seller", "/api/auth/otp/send").type).toBe(
+      "next",
+    );
+    expect(resolveAppRolePath("seller", "/seller/dashboard").type).toBe("next");
+    expect(resolveAppRolePath("seller", "/shop").type).toBe("not_found");
   });
 
   it("storefront: redirects panels and blocks panel APIs", () => {
@@ -112,10 +129,10 @@ describe("panel cookies", () => {
 });
 
 describe("primary admin phones", () => {
-  it("defaults to the two primary numbers", () => {
+  it("defaults to empty when ADMIN_PRIMARY_PHONES is unset", () => {
     const prev = process.env.ADMIN_PRIMARY_PHONES;
     delete process.env.ADMIN_PRIMARY_PHONES;
-    expect(getPrimaryAdminPhones()).toEqual(["09351925900", "09135201973"]);
+    expect(getPrimaryAdminPhones()).toEqual([]);
     process.env.ADMIN_PRIMARY_PHONES = prev;
   });
 });

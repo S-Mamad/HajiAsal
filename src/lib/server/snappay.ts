@@ -170,33 +170,30 @@ export async function verifyAndSettleSnappay(
         ? verifyData.response.transactionAmount
         : undefined;
 
-  if (
-    typeof options?.expectedAmountRial === "number" &&
-    typeof reportedAmount === "number" &&
-    Math.round(reportedAmount) !== Math.round(options.expectedAmountRial)
-  ) {
-    console.error(
-      "[snappay] amount mismatch",
-      {
+  // Fail-closed: never settle/confirm when expected amount cannot be proven.
+  if (typeof options?.expectedAmountRial === "number") {
+    if (reportedAmount == null || !Number.isFinite(reportedAmount)) {
+      console.error("[snappay] verify response missing amount", {
+        expected: options.expectedAmountRial,
+      });
+      return {
+        ok: false,
+        message: "مبلغ پرداخت از درگاه دریافت نشد",
+      };
+    }
+    if (
+      Math.round(reportedAmount) !== Math.round(options.expectedAmountRial)
+    ) {
+      console.error("[snappay] amount mismatch", {
         expected: options.expectedAmountRial,
         reported: reportedAmount,
-      },
-    );
-    return {
-      ok: false,
-      message: "مبلغ پرداخت با سفارش هم‌خوانی ندارد",
-      amountRial: reportedAmount,
-    };
-  }
-
-  if (
-    typeof options?.expectedAmountRial === "number" &&
-    reportedAmount == null
-  ) {
-    console.warn(
-      "[snappay] verify response had no amount; relying on payment-ref bind",
-      { expected: options.expectedAmountRial },
-    );
+      });
+      return {
+        ok: false,
+        message: "مبلغ پرداخت با سفارش هم‌خوانی ندارد",
+        amountRial: reportedAmount,
+      };
+    }
   }
 
   const settleRes = await fetch(

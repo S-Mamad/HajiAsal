@@ -33,8 +33,11 @@ export const useWishlistStore = create<WishlistStore>()(
     {
       name: "haji-asal-wishlist",
       partialize: (state) => ({ ids: state.ids }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => (_state, error) => {
+        useWishlistStore.setState({ _hasHydrated: true });
+        if (error) {
+          console.warn("[wishlist] persist rehydrate failed", error);
+        }
       },
     },
   ),

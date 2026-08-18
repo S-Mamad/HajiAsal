@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Star, SealCheck } from "@phosphor-icons/react";
+import { RatingStars } from "@/components/ui/RatingStars";
 import type { Review } from "@/lib/server/reviews";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -175,18 +176,11 @@ export function ReviewsSection({
               className="border-b border-border py-6 last:border-0"
             >
               <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <div className="flex items-center gap-0.5" aria-hidden>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      size={12}
-                      weight={i < review.rating ? "fill" : "regular"}
-                      className={
-                        i < review.rating ? "text-gold" : "text-star-empty"
-                      }
-                    />
-                  ))}
-                </div>
+                <RatingStars
+                  rating={review.rating}
+                  size="sm"
+                  showValue={false}
+                />
                 <time
                   className="text-[11px] text-dim tabular-nums"
                   dateTime={review.date}

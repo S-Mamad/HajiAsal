@@ -1,4 +1,4 @@
-import { createHash, randomInt, timingSafeEqual } from "crypto";
+import { createHmac, randomInt, timingSafeEqual } from "crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   isMysqlConfigured,
@@ -60,8 +60,22 @@ function getMemory(): GlobalOtpMemory {
   return g.__hajiasalOtpMemory;
 }
 
-function hashCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+function getOtpPepper(): string {
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SESSION_SECRET is required in production");
+    }
+    return "dev-only-insecure-otp-pepper";
+  }
+  return secret;
+}
+
+/** HMAC so a leaked otp_challenges table is not a 4-digit rainbow table. */
+function hashCode(phone: string, code: string): string {
+  return createHmac("sha256", getOtpPepper())
+    .update(`${phone}:${code}`)
+    .digest("hex");
 }
 
 function safeEqualHex(a: string, b: string): boolean {
@@ -75,7 +89,7 @@ function safeEqualHex(a: string, b: string): boolean {
   }
 }
 
-function generateCode(): string {
+export function generateOtpCode(): string {
   // 4 digits: 1000–9999 (9000 possibilities). Leading zeros not used.
   return String(randomInt(1000, 10000));
 }
@@ -178,7 +192,7 @@ export async function createOtpChallenge(
     throw new Error("MySQL is required for OTP in production");
   }
 
-  const code = normalizeOtpDigits(fixedCode ?? generateCode());
+  const code = normalizeOtpDigits(fixedCode ?? generateOtpCode());
   if (!isValidOtpCode(code)) {
     throw new Error(
       `OTP must be ${MIN_OTP_LENGTH}-${MAX_OTP_LENGTH} digits`,
@@ -187,8 +201,10 @@ export async function createOtpChallenge(
 
   await clearPreviousChallenges(phone);
 
-  const codeHash = hashCode(code);
+  const codeHash = hashCode(phone, code);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  // Memory first so same-process verify never waits on MySQL.
+  storeMemoryChallenge(phone, codeHash);
 
   // Skip MySQL when circuit is open — avoids multi-second connect stalls.
   if (isMysqlUsable()) {
@@ -198,19 +214,26 @@ export async function createOtpChallenge(
          VALUES (?, ?, ?, ?, 0)`,
         [newId(), phone, codeHash, expiresAt],
       );
-      storeMemoryChallenge(phone, codeHash);
       return code;
     } catch (error) {
       console.error(
-        "[otp] mysql store failed, using memory fallback:",
+        "[otp] mysql store failed:",
         error instanceof Error ? error.message : error,
       );
-      storeMemoryChallenge(phone, codeHash);
+      // Production is multi-instance: memory-only challenges are not safe.
+      if (process.env.NODE_ENV === "production") {
+        getMemory().challenges.delete(phone);
+        throw new Error("خطا در ذخیره کد تأیید");
+      }
       return code;
     }
   }
 
-  storeMemoryChallenge(phone, codeHash);
+  if (process.env.NODE_ENV === "production" && isMysqlConfigured()) {
+    getMemory().challenges.delete(phone);
+    throw new Error("سرویس تأیید موقتاً در دسترس نیست");
+  }
+
   return code;
 }
 
@@ -227,28 +250,28 @@ export async function verifyOtpChallenge(
     return { valid: false, message: "کد تأیید نادرست است" };
   }
 
-  const codeHash = hashCode(normalized);
+  const codeHash = hashCode(phone, normalized);
+  // Allow verify until expires_at + grace (same as memory path).
+  const graceCutoffIso = new Date(
+    Date.now() - OTP_VERIFY_GRACE_MS,
+  ).toISOString();
 
-  // Fast path: memory mirror (same Node process) — also covers MySQL circuit open.
-  const mem = getMemory().challenges.get(phone);
-  if (mem && safeEqualHex(mem.codeHash, codeHash)) {
-    if (mem.expiresAt + OTP_VERIFY_GRACE_MS >= Date.now()) {
-      getMemory().challenges.delete(phone);
-      if (isMysqlUsable()) {
-        try {
-          await mysqlExecute("DELETE FROM otp_challenges WHERE phone = ?", [
-            phone,
-          ]);
-        } catch {
-          /* ignore */
-        }
-      }
-      return { valid: true, message: "تأیید شد" };
-    }
-  }
-
+  // Atomic MySQL consume first — closes multi-instance replay (TOCTOU).
   if (isMysqlUsable()) {
     try {
+      const consumed = await mysqlExecute(
+        `DELETE FROM otp_challenges
+         WHERE phone = ?
+           AND code_hash = ?
+           AND expires_at >= ?
+           AND attempts < ?`,
+        [phone, codeHash, graceCutoffIso, MAX_VERIFY_ATTEMPTS],
+      );
+      if (consumed.affectedRows > 0) {
+        getMemory().challenges.delete(phone);
+        return { valid: true, message: "تأیید شد" };
+      }
+
       const data = await mysqlQueryOne<RowDataPacket>(
         "SELECT * FROM otp_challenges WHERE phone = ? ORDER BY created_at DESC LIMIT 1",
         [phone],
@@ -275,27 +298,19 @@ export async function verifyOtpChallenge(
           };
         }
 
-        if (!safeEqualHex(String(data.code_hash), codeHash)) {
-          try {
-            await mysqlExecute(
-              "UPDATE otp_challenges SET attempts = ? WHERE id = ?",
-              [(data.attempts as number) + 1, data.id],
-            );
-          } catch {
-            /* ignore — still reject */
-          }
-          return { valid: false, message: "کد تأیید نادرست است" };
-        }
-
         try {
-          await mysqlExecute("DELETE FROM otp_challenges WHERE id = ?", [
-            data.id,
-          ]);
+          await mysqlExecute(
+            `UPDATE otp_challenges
+             SET attempts = attempts + 1
+             WHERE id = ? AND attempts < ?`,
+            [data.id, MAX_VERIFY_ATTEMPTS],
+          );
         } catch {
-          /* ignore */
+          /* ignore — still reject */
         }
-        getMemory().challenges.delete(phone);
-        return { valid: true, message: "تأیید شد" };
+        const mem = getMemory().challenges.get(phone);
+        if (mem) mem.attempts += 1;
+        return { valid: false, message: "کد تأیید نادرست است" };
       }
     } catch (error) {
       console.error(

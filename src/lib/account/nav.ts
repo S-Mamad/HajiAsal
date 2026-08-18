@@ -20,8 +20,8 @@ export type AccountNavLink = {
 
 /** Link back to the storefront — shown prominently in account chrome */
 export const ACCOUNT_STORE_LINK = {
-  href: hajiasalPath("/"),
-  label: "بازگشت به فروشگاه",
+  href: hajiasalPath("/shop"),
+  label: "فروشگاه",
   shortLabel: "فروشگاه",
   icon: Storefront,
 } as const;
@@ -65,14 +65,6 @@ export const ACCOUNT_NAV_LINKS: readonly AccountNavLink[] = [
     icon: User,
   },
 ] as const;
-
-/** Primary tabs for mobile bottom bar (keeps bar readable) */
-export const ACCOUNT_MOBILE_NAV_LINKS: readonly AccountNavLink[] =
-  ACCOUNT_NAV_LINKS.filter(
-    (link) =>
-      link.href !== hajiasalPath("/account/addresses") &&
-      link.href !== hajiasalPath("/account/wishlist"),
-  );
 
 export function isAccountNavActive(
   pathname: string,

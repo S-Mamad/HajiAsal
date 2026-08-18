@@ -23,6 +23,9 @@ vi.mock("@/lib/server/site-settings", () => ({
     hero: { title: "H" },
     ...patch,
   })),
+  resolveFaq: (settings: { faq?: unknown }) =>
+    Array.isArray(settings.faq) ? settings.faq : [],
+  getFaqItems: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/server/mysql", () => ({
@@ -63,6 +66,23 @@ describe("content vs settings allowlist", () => {
     expect(updateSiteSettings).not.toHaveBeenCalled();
   });
 
+  it("content PATCH accepts footer address", async () => {
+    authMock.asRole("content");
+    const res = await patchContent(
+      authedAdminRequest("http://localhost/api/admin/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          footer: { address: "یزد، انبار مرکزی" },
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updateSiteSettings).toHaveBeenCalledWith({
+      footer: { address: "یزد، انبار مرکزی" },
+    });
+  });
+
   it("content PATCH accepts hero fields", async () => {
     authMock.asRole("content");
     const res = await patchContent(
@@ -78,17 +98,41 @@ describe("content vs settings allowlist", () => {
     });
   });
 
-  it("settings PATCH accepts shippingCost for super_admin", async () => {
+  it("content PATCH rejects javascript social URLs", async () => {
+    authMock.asRole("content");
+    const res = await patchContent(
+      authedAdminRequest("http://localhost/api/admin/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          social: { telegram: "javascript:alert(1)" },
+        }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(updateSiteSettings).not.toHaveBeenCalled();
+  });
+
+  it("settings PATCH accepts express and pickup shipping fields", async () => {
     authMock.asRole("super_admin");
+    const payload = {
+      shippingCost: 40000,
+      expressShippingCost: 75000,
+      pickupShippingCost: 0,
+      freeShippingIncludesExpress: false,
+      shippingMethods: {
+        express: { label: "پیک ویژه", eta: "همان روز" },
+      },
+    };
     const res = await patchSettings(
       authedAdminRequest("http://localhost/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shippingCost: 12000 }),
+        body: JSON.stringify(payload),
       }),
     );
     expect(res.status).toBe(200);
-    expect(updateSiteSettings).toHaveBeenCalledWith({ shippingCost: 12000 });
+    expect(updateSiteSettings).toHaveBeenCalledWith(payload);
   });
 
   it("content role cannot PATCH settings", async () => {

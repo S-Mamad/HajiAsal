@@ -2,19 +2,29 @@ import { NextResponse } from "next/server";
 import { normalizePhone } from "@/lib/auth/phone";
 import { otpVerifySchema } from "@/lib/auth/validations/auth";
 import { verifyOtpChallenge } from "@/lib/auth/otp-store";
+import { withOtpLock } from "@/lib/auth/otp-lock";
+import { isTrustedMutationOrigin } from "@/lib/auth/request-origin";
 import {
   findOrCreateProfileByPhone,
   findProfileByPhone,
 } from "@/lib/server/profiles";
 import {
   createSessionToken,
-  sessionCookieOptions,
+  applySessionCookieToResponse,
 } from "@/lib/auth/session";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
+import { enqueueTelegramAlert } from "@/lib/server/telegram-alert-queue";
 
 export async function POST(request: Request) {
   try {
+    if (!isTrustedMutationOrigin(request)) {
+      return NextResponse.json(
+        { success: false, message: "درخواست نامعتبر است" },
+        { status: 403 },
+      );
+    }
+
     const ip = getClientIp(request);
     const limited = await checkRateLimitAsync(
       `otp-verify:ip:${ip}`,
@@ -63,7 +73,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const verify = await verifyOtpChallenge(phone, parsed.data.code);
+    const verify = await withOtpLock(`otp-verify:${phone}`, () =>
+      verifyOtpChallenge(phone, parsed.data.code),
+    );
 
     if (!verify.valid) {
       return NextResponse.json(
@@ -82,6 +94,13 @@ export async function POST(request: Request) {
       fullName: profile.fullName,
     });
 
+    void enqueueTelegramAlert(isNewUser ? "auth.register" : "auth.login", {
+      userId: profile.id,
+      phone: profile.phone,
+      fullName: profile.fullName ?? undefined,
+      isNewUser,
+    });
+
     const response = NextResponse.json({
       success: true,
       isNewUser,
@@ -94,18 +113,16 @@ export async function POST(request: Request) {
       message: isNewUser ? "لطفاً اطلاعات خود را تکمیل کنید" : "ورود موفق",
     });
 
-    const cookie = sessionCookieOptions(token);
     await clearAllAuthSessions(request, response);
-    response.cookies.set(cookie.name, cookie.value, {
-      httpOnly: cookie.httpOnly,
-      secure: cookie.secure,
-      sameSite: cookie.sameSite,
-      path: cookie.path,
-      maxAge: cookie.maxAge,
-    });
+    applySessionCookieToResponse(response, token);
 
     return response;
-  } catch {
+  } catch (error) {
+    void enqueueTelegramAlert("api.error_critical", {
+      route: "auth/otp/verify",
+      message: error instanceof Error ? error.message : "خطا در تأیید کد",
+      ip: getClientIp(request),
+    });
     return NextResponse.json(
       { success: false, message: "خطا در تأیید کد" },
       { status: 500 },

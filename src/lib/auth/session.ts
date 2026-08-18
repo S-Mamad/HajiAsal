@@ -1,14 +1,20 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import type { SessionPayload } from "@/types/auth";
+import { authCookieBaseOptions } from "@/lib/auth/cookie-domain";
+import { readCookieValue } from "@/lib/auth/cookie-value";
 
 export const CUSTOMER_COOKIE = "hajiasal_customer_session";
 const SESSION_DAYS = 30;
 
 function getSecret(): string {
   const secret = process.env.AUTH_SESSION_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SESSION_SECRET is required in production");
+  if (process.env.NODE_ENV === "production") {
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        "AUTH_SESSION_SECRET must be at least 32 characters in production",
+      );
+    }
   }
   return secret ?? "dev-only-insecure-secret-change-me";
 }
@@ -71,39 +77,75 @@ export async function getSessionFromCookies(): Promise<SessionPayload | null> {
 }
 
 export function getSessionFromRequest(request: Request): SessionPayload | null {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(
-    new RegExp(`${CUSTOMER_COOKIE}=([^;]+)`),
+  const token = readCookieValue(
+    request.headers.get("cookie") ?? "",
+    CUSTOMER_COOKIE,
   );
-  const token = match?.[1];
   if (!token) return null;
-  return parseSessionToken(decodeURIComponent(token));
+  return parseSessionToken(token);
 }
 
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(CUSTOMER_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    ...authCookieBaseOptions({ maxAge: SESSION_DAYS * 24 * 60 * 60 }),
   });
 }
 
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(CUSTOMER_COOKIE);
+  cookieStore.set(CUSTOMER_COOKIE, "", {
+    ...authCookieBaseOptions({ maxAge: 0 }),
+  });
 }
 
 export function sessionCookieOptions(token: string) {
   return {
     name: CUSTOMER_COOKIE,
     value: token,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    ...authCookieBaseOptions({ maxAge: SESSION_DAYS * 24 * 60 * 60 }),
   };
+}
+
+/** Options to expire the customer cookie (logout / migration). */
+export function clearCustomerCookieOptions() {
+  return {
+    name: CUSTOMER_COOKIE,
+    value: "",
+    ...authCookieBaseOptions({ maxAge: 0 }),
+  };
+}
+
+type CookieWritable = {
+  cookies: {
+    set: (
+      name: string,
+      value: string,
+      options: {
+        httpOnly?: boolean;
+        secure?: boolean;
+        sameSite?: "lax" | "strict" | "none";
+        path?: string;
+        maxAge?: number;
+        domain?: string;
+      },
+    ) => void;
+  };
+};
+
+/** Set customer session cookie including AUTH_COOKIE_DOMAIN when configured. */
+export function applySessionCookieToResponse(
+  response: CookieWritable,
+  token: string,
+): void {
+  const cookie = sessionCookieOptions(token);
+  const { name, value, ...options } = cookie;
+  response.cookies.set(name, value, options);
+}
+
+/** Clear customer session cookie (same Domain as when it was set). */
+export function clearSessionCookieOnResponse(response: CookieWritable): void {
+  const clear = clearCustomerCookieOptions();
+  const { name, value, ...options } = clear;
+  response.cookies.set(name, value, options);
 }

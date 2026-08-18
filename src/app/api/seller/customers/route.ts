@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { gateSeller } from "@/lib/server/seller-gate";
 import { getSellerOrders } from "@/lib/server/sellers";
 import { hajiasalPath } from "@/lib/paths";
+import { PAID_OR_FULFILLING } from "@/lib/server/orders";
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "customers.view");
@@ -26,18 +27,19 @@ export async function GET(request: Request) {
   for (const o of orders) {
     const key = o.customer.phone || o.customer.fullName;
     const prev = map.get(key);
+    const spent = PAID_OR_FULFILLING.has(o.status) ? o.sellerSubtotal : 0;
     if (!prev) {
       map.set(key, {
         phone: o.customer.phone,
         fullName: o.customer.fullName,
         city: o.customer.city,
         orderCount: 1,
-        totalSpent: o.sellerSubtotal,
+        totalSpent: spent,
         lastOrderAt: o.createdAt,
       });
     } else {
       prev.orderCount += 1;
-      prev.totalSpent += o.sellerSubtotal;
+      prev.totalSpent += spent;
       if (o.createdAt > prev.lastOrderAt) prev.lastOrderAt = o.createdAt;
     }
   }

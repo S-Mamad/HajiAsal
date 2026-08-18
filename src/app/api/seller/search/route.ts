@@ -11,6 +11,7 @@ import {
   searchTokensMatch,
 } from "@/lib/search/text";
 import { checkRateLimitAsync } from "@/lib/server/rate-limit";
+import { canSeller } from "@/lib/seller/capabilities";
 import type { RowDataPacket } from "mysql2/promise";
 
 const MAX_QUERY_LEN = 80;
@@ -63,42 +64,47 @@ export async function GET(request: Request) {
   }
 
   const sellerId = gated.ctx.seller.id;
+  const caps = gated.ctx.seller.capabilities;
   const results: SearchHit[] = [];
 
-  const products = await getSellerProducts(sellerId);
-  for (const p of products) {
-    const haystack = `${p.title} ${p.slug} ${p.approvalStatus ?? ""}`;
-    if (!searchTokensMatch(haystack, q)) continue;
-    const score = scoreTitle(p.title, q) + (p.slug.includes(q) ? 20 : 0);
-    results.push({
-      type: "product",
-      id: p.id,
-      title: p.title,
-      subtitle: p.approvalStatus ?? "product",
-      href: hajiasalPath(`/seller/products/${p.id}`),
-      score,
-    });
+  if (canSeller(caps, "products.manage") || canSeller(caps, "inventory.manage")) {
+    const products = await getSellerProducts(sellerId);
+    for (const p of products) {
+      const haystack = `${p.title} ${p.slug} ${p.approvalStatus ?? ""}`;
+      if (!searchTokensMatch(haystack, q)) continue;
+      const score = scoreTitle(p.title, q) + (p.slug.includes(q) ? 20 : 0);
+      results.push({
+        type: "product",
+        id: p.id,
+        title: p.title,
+        subtitle: p.approvalStatus ?? "product",
+        href: hajiasalPath(`/seller/products/${p.id}`),
+        score,
+      });
+    }
   }
 
-  const orders = await getSellerOrders(sellerId);
-  for (const o of orders) {
-    const haystack = `${o.id} ${o.customer.fullName} ${o.customer.phone} ${o.status}`;
-    if (!searchTokensMatch(haystack, q)) continue;
-    const score =
-      scoreTitle(o.customer.fullName, q) +
-      (o.id.toLowerCase().includes(q) ? 40 : 0) +
-      (o.customer.phone.includes(q.replace(/\s/g, "")) ? 50 : 0);
-    results.push({
-      type: "order",
-      id: o.id,
-      title: `سفارش ${o.id}`,
-      subtitle: `${o.status} · ${o.sellerSubtotal.toLocaleString("fa-IR")} تومان`,
-      href: hajiasalPath(`/seller/orders/${o.id}`),
-      score,
-    });
+  if (canSeller(caps, "orders.manage")) {
+    const orders = await getSellerOrders(sellerId);
+    for (const o of orders) {
+      const haystack = `${o.id} ${o.customer.fullName} ${o.customer.phone} ${o.status}`;
+      if (!searchTokensMatch(haystack, q)) continue;
+      const score =
+        scoreTitle(o.customer.fullName, q) +
+        (o.id.toLowerCase().includes(q) ? 40 : 0) +
+        (o.customer.phone.includes(q.replace(/\s/g, "")) ? 50 : 0);
+      results.push({
+        type: "order",
+        id: o.id,
+        title: `سفارش ${o.id}`,
+        subtitle: `${o.status} · ${o.sellerSubtotal.toLocaleString("fa-IR")} تومان`,
+        href: hajiasalPath(`/seller/orders/${o.id}`),
+        score,
+      });
+    }
   }
 
-  if (isMysqlConfigured()) {
+  if (canSeller(caps, "tickets.manage") && isMysqlConfigured()) {
     try {
       const tickets = await mysqlQuery<RowDataPacket>(
         `SELECT id, subject, status FROM seller_tickets

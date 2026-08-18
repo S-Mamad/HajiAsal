@@ -88,6 +88,12 @@ describe("seller nav × capabilities", () => {
     ).toBe(false);
   });
 
+  it("picks the longest matching nav href for nested paths", () => {
+    expect(
+      findSellerNavItemForPath(hajiasalPath("/seller/orders/abc"))?.href,
+    ).toBe(hajiasalPath("/seller/orders"));
+  });
+
   it("unknown seller path is allowed (API gate owns it)", () => {
     expect(
       canAccessSellerPath(null, "/seller/unknown-xyz"),

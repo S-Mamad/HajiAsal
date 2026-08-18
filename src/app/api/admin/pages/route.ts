@@ -7,6 +7,7 @@ import {
   upsertCmsPage,
 } from "@/lib/server/admin-platform-store";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { sanitizeMultiline, sanitizePlainText } from "@/lib/server/safe-copy";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -30,7 +31,15 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "اطلاعات نامعتبر است" }, { status: 400 });
   }
-  const item = await upsertCmsPage(parsed.data);
+  const item = await upsertCmsPage({
+    ...parsed.data,
+    title: sanitizePlainText(parsed.data.title, 160),
+    slug: sanitizePlainText(parsed.data.slug, 80).replace(/\s+/g, "-"),
+    body:
+      parsed.data.body == null
+        ? parsed.data.body
+        : sanitizeMultiline(parsed.data.body, 20000),
+  });
   await logAdminAction({
     action: parsed.data.id ? "page.update" : "page.create",
     entityType: "cms_page",

@@ -1,22 +1,23 @@
 import type { Metadata } from "next";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
 import { TrustPageLayout } from "@/components/layout/TrustPageLayout";
 import { LabCertificateDownload } from "@/components/trust/LabCertificateDownload";
 import { hajiasalPath } from "@/lib/paths";
+import { getSiteSettings } from "@/lib/server/site-settings";
 
-const siteData = site as SiteConfig;
-const content = siteData.trustPages!.authenticity;
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSiteSettings();
+  const content = site.trustPages!.authenticity;
+  return {
+    title: content.title,
+    description: content.intro,
+    alternates: { canonical: hajiasalPath("/authenticity") },
+  };
+}
 
-export const metadata: Metadata = {
-  title: content.title,
-  description: content.intro,
-  alternates: { canonical: hajiasalPath("/authenticity") },
-};
-
-export default function AuthenticityPage() {
+export default async function AuthenticityPage() {
+  const site = await getSiteSettings();
   return (
-    <TrustPageLayout content={content}>
+    <TrustPageLayout kind="authenticity" content={site.trustPages!.authenticity}>
       <LabCertificateDownload />
     </TrustPageLayout>
   );

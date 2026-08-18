@@ -1,11 +1,12 @@
 "use client";
 
-import faqData from "@/data/faq.json";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProductAccordion } from "@/components/product";
 
 export function FaqContent() {
-  const items = faqData.map((f) => ({
+  const siteData = useSiteSettings();
+  const items = (siteData.faq ?? []).map((f) => ({
     title: f.question,
     content: f.answer,
   }));

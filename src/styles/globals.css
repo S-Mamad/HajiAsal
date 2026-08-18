@@ -45,11 +45,11 @@
   --surface-muted: #242424;
   --text-primary: #f5f5f4;
   --text-secondary: #a8a29e;
-  --text-dim: #78716c;
+  --text-dim: #a1a1aa;
   --gold: #d4a056;
   --gold-bright: #e8b86a;
-  --gold-dim: rgba(212, 160, 86, 0.12);
-  --gold-glow: rgba(212, 160, 86, 0.35);
+  --gold-dim: rgba(212, 160, 86, 0.18);
+  --gold-glow: rgba(212, 160, 86, 0.4);
   --success: #4ade80;
   --border: rgba(255, 255, 255, 0.06);
   --border-bright: rgba(255, 255, 255, 0.12);
@@ -99,22 +99,37 @@
 
 html {
   scroll-behavior: smooth;
+  /* Fixed mobile dock must not steal the last lines of content from scroll/anchors.
+     --scroll-pad-bottom-chrome is set by StoreChrome when dock is hidden (account/checkout). */
+  scroll-padding-bottom: calc(
+    var(
+        --scroll-pad-bottom-chrome,
+        var(--mobile-dock-clearance, 4rem)
+      ) + var(--sticky-bottom-bar-h, 0px) + 0.75rem
+  );
 }
 
 .hajiasal-root {
-  /* Mobile dock clearance — keep in sync with FloatingBottomNav h-16 */
+  /* Keep in sync with Header h-16 / sm:h-[4.75rem] and MobileDock h-16 */
+  --site-header-h: 4rem;
+  --toast-top: calc(
+    var(--site-header-h) + 0.5rem + env(safe-area-inset-top, 0px)
+  );
   --mobile-dock-h: 4rem;
   --mobile-dock-clearance: calc(
     var(--mobile-dock-h) + env(safe-area-inset-bottom, 0px)
-  );
-  --mobile-dock-toast-clearance: calc(
-    var(--mobile-dock-h) + 1rem + env(safe-area-inset-bottom, 0px)
   );
   overflow-x: clip;
   background: var(--void);
   color: var(--text-primary);
   font-family: var(--font-vazirmatn), system-ui, sans-serif;
   transition: background-color 0.35s var(--ease-out), color 0.35s var(--ease-out);
+}
+
+@media (min-width: 640px) {
+  .hajiasal-root {
+    --site-header-h: 4.75rem;
+  }
 }
 
 .hajiasal-root::before {
@@ -136,6 +151,12 @@ html {
   pointer-events: none;
   opacity: var(--grain-opacity);
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 767px) {
+  .hajiasal-root::after {
+    display: none;
+  }
 }
 
 .hajiasal-root main {
@@ -185,6 +206,61 @@ html {
   border: 1px solid var(--border);
   background: var(--surface-muted);
   box-shadow: 0 24px 48px -24px var(--gold-glow);
+}
+
+/*
+ * Next/Image `fill` sets physical `left: 0`, which in RTL pins the photo
+ * to the visual left. Force a full box + true center crop/contain.
+ */
+.product-media {
+  position: relative;
+  overflow: hidden;
+}
+
+.product-media img {
+  position: absolute !important;
+  inset: 0 !important;
+  inset-inline: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  object-position: 50% 50% !important;
+}
+
+.product-media--cover img {
+  object-fit: cover !important;
+}
+
+.product-media--contain img {
+  object-fit: contain !important;
+}
+
+/* Uploaded photos: whole product, centered, even inset on a square stage. */
+.product-media--studio {
+  background:
+    radial-gradient(
+      ellipse 85% 70% at 50% 42%,
+      var(--gold-dim),
+      transparent 68%
+    ),
+    var(--surface-muted);
+}
+
+.product-media--studio img {
+  object-fit: contain !important;
+  object-position: 50% 50% !important;
+  box-sizing: border-box !important;
+  padding: 12% !important;
+}
+
+/* Custom pan/zoom: fill the square; studio padding would fight translate. */
+.product-media--fitted img {
+  object-fit: cover !important;
+  object-position: 50% 50% !important;
+  padding: 0 !important;
+  transform-origin: center center;
 }
 
 .site-header {
@@ -296,11 +372,14 @@ html {
   );
 }
 
-/* Account panel shell */
+/* Account panel shell — shares store dock; ticket chat keeps its own bottom clearance */
 .account-shell {
   min-height: min(100%, 100dvh);
   --site-header-h: 4rem;
-  --account-bottom-chrome: 6.75rem;
+  --account-bottom-chrome: var(--mobile-dock-clearance);
+  --account-ticket-chat-bottom: calc(
+    env(safe-area-inset-bottom, 0px) + 0.75rem
+  );
 }
 
 @media (min-width: 640px) {
@@ -312,7 +391,23 @@ html {
 @media (min-width: 1024px) {
   .account-shell {
     --account-bottom-chrome: 0rem;
+    --account-ticket-chat-bottom: 0rem;
   }
+}
+
+html.account-ticket-chat-active,
+html.account-ticket-chat-active body {
+  overscroll-behavior: none;
+}
+
+/* Cart / checkout: page scroll lives in the main column so the pay bar
+   stays in flow and content cannot slide under it. */
+html.commerce-focus-lock,
+html.commerce-focus-lock body {
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Ticket chat: soft ambient canvas (mobile-first messaging) */
@@ -332,9 +427,34 @@ html {
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a16207' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
+.hajiasal-root[data-theme="dark"] .ticket-chat-canvas {
+  background-color: #121212;
+}
+
 .hajiasal-root[data-theme="dark"] .ticket-chat-canvas::before {
   opacity: 0.22;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4a056' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+@keyframes ticket-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ticket-msg-enter {
+  animation: ticket-msg-in 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-msg-enter {
+    animation: none;
+  }
 }
 
 .account-surface {
@@ -361,8 +481,11 @@ html {
     0 6px 18px -12px rgb(0 0 0 / 0.35);
 }
 
-/* Account mobile nav (solid pill) */
-.account-mobile-nav,
+.account-dashboard {
+  padding-bottom: 0.25rem;
+}
+
+/* Legacy floating pill styles (kept for any remaining solid-nav surfaces) */
 .floating-solid-nav,
 .floating-glass-nav {
   isolation: isolate;
@@ -375,7 +498,6 @@ html {
     0 0 0 1px rgb(161 98 7 / 0.04);
 }
 
-.account-mobile-nav::before,
 .floating-solid-nav::before,
 .floating-glass-nav::before {
   content: "";
@@ -391,7 +513,6 @@ html {
   pointer-events: none;
 }
 
-.hajiasal-root[data-theme="dark"] .account-mobile-nav,
 .hajiasal-root[data-theme="dark"] .floating-solid-nav,
 .hajiasal-root[data-theme="dark"] .floating-glass-nav {
   border-color: var(--border-bright);
@@ -402,7 +523,6 @@ html {
     0 0 0 1px rgb(212 160 86 / 0.08);
 }
 
-.hajiasal-root[data-theme="dark"] .account-mobile-nav::before,
 .hajiasal-root[data-theme="dark"] .floating-solid-nav::before,
 .hajiasal-root[data-theme="dark"] .floating-glass-nav::before {
   background: linear-gradient(
@@ -419,34 +539,6 @@ html {
     var(--hero-wash-mid) 42%,
     var(--hero-wash-bottom) 100%
   );
-}
-
-@keyframes hero-ken {
-  from {
-    transform: scale(1.05) translate3d(0, 0, 0);
-  }
-  to {
-    transform: scale(1.12) translate3d(-1.2%, 0.6%, 0);
-  }
-}
-
-.hero-ken {
-  transform-origin: center 32%;
-  will-change: transform;
-  animation: hero-ken 28s var(--ease-out) infinite alternate;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-ken {
-    animation: none;
-    transform: scale(1.05);
-  }
-}
-
-@media (min-width: 768px) {
-  .hero-ken {
-    transform-origin: 32% 42%;
-  }
 }
 
 .hero-wash-mobile {
@@ -539,6 +631,27 @@ html {
   font-family: var(--font-vazirmatn), system-ui, sans-serif;
 }
 
+@keyframes panel-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-toast-in {
+  animation: panel-toast-in 0.28s var(--panel-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-toast-in {
+    animation: none;
+  }
+}
+
 .hajiasal-root:has(.panel-shell)::before,
 .hajiasal-root:has(.panel-shell)::after {
   opacity: 0;
@@ -596,6 +709,128 @@ html {
   background: var(--panel-accent-soft);
   color: var(--panel-accent-text);
   font-weight: 500;
+}
+
+/* Leaflet map pin in checkout address sheet */
+.hajiasal-map-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  font: inherit;
+  background: #ece8e0;
+  z-index: 0;
+}
+
+.leaflet-control-zoom,
+.leaflet-control-attribution {
+  display: none;
+}
+
+.hajiasal-map-center-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-18px);
+}
+
+.hajiasal-map-center-pin__head {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--gold);
+  border: 3px solid #fff;
+  box-shadow: 0 8px 18px -8px rgb(28 25 23 / 0.55);
+}
+
+.hajiasal-map-center-pin__dot {
+  position: absolute;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.hajiasal-map-center-pin__tip {
+  width: 0;
+  height: 0;
+  margin-top: -3px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid var(--gold);
+}
+
+.hajiasal-map-center-pin__shadow {
+  width: 14px;
+  height: 5px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgb(28 25 23 / 0.22);
+  filter: blur(1.5px);
+}
+
+.support-fab-btn {
+  background: var(--surface);
+  color: var(--gold);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 10px 28px rgba(28, 25, 23, 0.1),
+    0 2px 6px rgba(28, 25, 23, 0.06);
+}
+.hajiasal-root[data-theme="dark"] .support-fab-btn {
+  background: color-mix(in srgb, var(--surface-elevated) 92%, var(--gold) 8%);
+  color: var(--gold-bright);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: none;
+}
+.support-fab-btn--offline {
+  color: var(--text-dim);
+  background: var(--surface-muted);
+}
+.support-fab-btn--moon {
+  color: var(--gold);
+  background: var(--surface-elevated);
+}
+.hajiasal-root[data-theme="dark"] .support-fab-btn--offline {
+  background: var(--surface-muted);
+  color: var(--text-dim);
+}
+.hajiasal-root[data-theme="dark"] .support-fab-btn--moon {
+  background: var(--surface-elevated);
+  color: var(--gold-bright);
+}
+.support-fab-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background-color: var(--surface);
+  box-shadow:
+    0 24px 60px -24px rgba(28, 25, 23, 0.28),
+    0 8px 24px -12px rgba(28, 25, 23, 0.12);
+}
+.hajiasal-root[data-theme="dark"] .support-fab-panel {
+  box-shadow: none;
+  border-color: rgb(255 255 255 / 0.1);
+}
+.support-fab-badge {
+  animation: support-fab-pulse 1.8s ease-out infinite;
+}
+@keyframes support-fab-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(244, 63, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
 }
 
 .panel-shell .panel-scrollbar::-webkit-scrollbar {

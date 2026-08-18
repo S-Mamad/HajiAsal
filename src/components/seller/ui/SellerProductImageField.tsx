@@ -3,6 +3,12 @@
 import { useRef, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { ProductFrameEditor } from "@/components/product/frame/ProductFrameEditor";
+import {
+  pruneImageFits,
+  writeImageFit,
+  type ProductImageFit,
+} from "@/lib/product-image";
 
 async function uploadSellerImage(file: File): Promise<string> {
   const form = new FormData();
@@ -25,10 +31,15 @@ async function uploadSellerImage(file: File): Promise<string> {
 
 export function SellerProductImageField({
   images,
+  imageFits,
   onChange,
 }: {
   images: string[];
-  onChange: (next: string[]) => void;
+  imageFits?: Record<string, ProductImageFit>;
+  onChange: (
+    images: string[],
+    imageFits: Record<string, ProductImageFit>,
+  ) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [urlDraft, setUrlDraft] = useState("");
@@ -36,6 +47,16 @@ export function SellerProductImageField({
   const [error, setError] = useState("");
 
   const primary = images[0] ?? "";
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
+  const fitsRef = useRef(imageFits);
+  fitsRef.current = imageFits;
+
+  const setImages = (next: string[]) => {
+    const pruned = pruneImageFits(fitsRef.current, next) ?? {};
+    fitsRef.current = pruned;
+    onChange(next, pruned);
+  };
 
   const onPickFile = async (file: File | null) => {
     if (!file) return;
@@ -47,7 +68,7 @@ export function SellerProductImageField({
     setError("");
     try {
       const url = await uploadSellerImage(file);
-      onChange([url, ...images.slice(1)]);
+      setImages([url, ...imagesRef.current.slice(1)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا در آپلود");
     } finally {
@@ -63,7 +84,7 @@ export function SellerProductImageField({
       setError("آدرس موقت مرورگر قابل ذخیره نیست. فایل را آپلود کنید.");
       return;
     }
-    onChange([url, ...images.slice(1)]);
+    setImages([url, ...imagesRef.current.slice(1)]);
     setUrlDraft("");
     setError("");
   };
@@ -78,11 +99,14 @@ export function SellerProductImageField({
         onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
       />
       {primary ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ProductFrameEditor
           src={primary}
-          alt=""
-          className="h-28 w-28 rounded-lg border border-stone-200 object-cover"
+          value={imageFits?.[primary]}
+          onChange={(next) => {
+            const updated = writeImageFit(fitsRef.current, primary, next);
+            fitsRef.current = updated;
+            onChange(imagesRef.current, updated);
+          }}
         />
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -98,7 +122,7 @@ export function SellerProductImageField({
           <AdminButton
             type="button"
             variant="ghost"
-            onClick={() => onChange([])}
+            onClick={() => setImages([])}
           >
             حذف تصویر
           </AdminButton>

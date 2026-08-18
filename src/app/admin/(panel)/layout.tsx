@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { isAdminAuthenticated } from "@/lib/server/admin";
+import { loadAdminPanelSession } from "@/lib/auth/admin-panel-session";
 import { AdminLayout } from "@/components/admin/layout/AdminLayout";
+import { PanelAccessDenied } from "@/components/auth/PanelAccessDenied";
 import { hajiasalPath } from "@/lib/paths";
 
 export const metadata: Metadata = {
@@ -14,10 +15,12 @@ export default async function AdminPanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const authenticated = await isAdminAuthenticated();
-
-  if (!authenticated) {
-    redirect(hajiasalPath("/admin"));
+  const state = await loadAdminPanelSession(hajiasalPath("/admin/dashboard"));
+  if (state.kind === "login") {
+    redirect(state.loginUrl);
+  }
+  if (state.kind === "denied") {
+    return <PanelAccessDenied panelLabel="پنل مدیریت" />;
   }
 
   return <AdminLayout>{children}</AdminLayout>;

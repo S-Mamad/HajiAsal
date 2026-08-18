@@ -32,6 +32,7 @@ export type {
 
 export { ProductCard } from "./catalog/ProductCard";
 export { ProductGrid } from "./catalog/ProductGrid";
+export { ProductCardSkeleton } from "./catalog/ProductCardSkeleton";
 export { ProductGallery } from "./gallery/ProductGallery";
 export { WeightSelector } from "./purchase/WeightSelector";
 export { StickyAddToCart } from "./purchase/StickyAddToCart";

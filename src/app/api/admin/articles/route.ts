@@ -7,6 +7,7 @@ import {
   upsertArticle,
 } from "@/lib/server/admin-platform-store";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { sanitizeMultiline, sanitizePlainText } from "@/lib/server/safe-copy";
 
 const schema = z.object({
   id: z.string().optional(),
@@ -37,6 +38,16 @@ export async function POST(request: Request) {
   }
   const item = await upsertArticle({
     ...parsed.data,
+    title: sanitizePlainText(parsed.data.title, 160),
+    slug: sanitizePlainText(parsed.data.slug, 80).replace(/\s+/g, "-"),
+    excerpt:
+      parsed.data.excerpt == null
+        ? parsed.data.excerpt
+        : sanitizeMultiline(parsed.data.excerpt, 800),
+    body:
+      parsed.data.body == null
+        ? parsed.data.body
+        : sanitizeMultiline(parsed.data.body, 20000),
     authorId: gate.ctx.user?.id,
   });
   await logAdminAction({

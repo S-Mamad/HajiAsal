@@ -10,16 +10,16 @@ import { Reveal } from "@/components/ui/Reveal";
  */
 export function LabCertificateDownload() {
   return (
-    <Reveal delay={0.18}>
-      <aside className="mt-10 border-t border-border pt-8 md:mt-12 md:pt-10">
-        <p className="mb-1 text-xs font-medium tracking-wide text-gold/90">
+    <Reveal delay={0.12}>
+      <aside className="account-surface mt-3 overflow-hidden rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <p className="text-[11px] font-medium tracking-[0.14em] text-gold">
           گزارش آزمایشگاه
         </p>
-        <h2 className="mb-2 text-base font-semibold text-primary md:text-lg">
+        <h2 className="mt-1.5 text-base font-semibold text-primary">
           گواهی اصالت شیمیایی عسل
         </h2>
-        <p className="mb-5 max-w-xl text-sm leading-relaxed text-secondary md:text-base">
-          {LAB_CERTIFICATE.note} برای مشاهده یا ذخیره گزارش کامل، روی دکمه بزنید؛
+        <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-secondary">
+          {LAB_CERTIFICATE.note} برای مشاهده یا ذخیره گزارش کامل، روی کارت بزنید؛
           فایل تا آن لحظه دانلود نمی‌شود.
         </p>
 
@@ -28,7 +28,7 @@ export function LabCertificateDownload() {
           target="_blank"
           rel="noopener noreferrer"
           download={LAB_CERTIFICATE.downloadName}
-          className="group flex max-w-md items-stretch gap-4 rounded-xl border border-border bg-surface-elevated/40 p-3 transition-colors hover:border-gold/40 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-void"
+          className="group mt-4 flex max-w-md items-stretch gap-4 rounded-xl border border-border bg-surface-elevated/60 p-3 transition-colors hover:border-gold/40 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-void"
         >
           <span className="relative h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-void">
             <Image

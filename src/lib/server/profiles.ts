@@ -11,6 +11,7 @@ import {
   toIso,
   withMysqlTransaction,
 } from "./mysql";
+import { decodeAddressLabel, encodeAddressLabel } from "@/lib/address-meta";
 
 const PROFILES_FILE = "profiles.json";
 const ADDRESSES_FILE = "user-addresses.json";
@@ -29,16 +30,24 @@ function mapProfileRow(row: Record<string, unknown>): CustomerUser {
 }
 
 function mapAddressRow(row: Record<string, unknown>): UserAddress {
+  const rawLabel = (row.label as string) ?? null;
+  const meta = decodeAddressLabel(rawLabel);
   return {
     id: row.id as string,
     userId: row.user_id as string,
-    label: (row.label as string) ?? null,
+    label: meta.displayLabel,
     province: row.province as string,
     city: row.city as string,
     address: row.address as string,
     postalCode: row.postal_code as string,
     isDefault: toBool(row.is_default),
     createdAt: toIso(row.created_at),
+    lat: meta.lat ?? null,
+    lng: meta.lng ?? null,
+    plaque: meta.plaque ?? null,
+    unit: meta.unit ?? null,
+    receiverName: meta.receiverName ?? null,
+    receiverPhone: meta.receiverPhone ?? null,
   };
 }
 
@@ -226,17 +235,42 @@ export async function getAddressesByUserId(
   }
 
   const all = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
-  return all.filter((a) => a.userId === userId);
+  return all
+    .filter((a) => a.userId === userId)
+    .map((a) => {
+      const meta = decodeAddressLabel(a.label);
+      return {
+        ...a,
+        label: meta.displayLabel,
+        lat: a.lat ?? meta.lat ?? null,
+        lng: a.lng ?? meta.lng ?? null,
+        plaque: a.plaque ?? meta.plaque ?? null,
+        unit: a.unit ?? meta.unit ?? null,
+        receiverName: a.receiverName ?? meta.receiverName ?? null,
+        receiverPhone: a.receiverPhone ?? meta.receiverPhone ?? null,
+      };
+    });
 }
 
 export async function createAddress(
   userId: string,
   input: Omit<UserAddress, "id" | "userId" | "createdAt">,
 ): Promise<UserAddress> {
+  const storedLabel = encodeAddressLabel({
+    displayLabel: input.label,
+    lat: input.lat,
+    lng: input.lng,
+    plaque: input.plaque,
+    unit: input.unit,
+    receiverName: input.receiverName,
+    receiverPhone: input.receiverPhone,
+  });
+
   const address: UserAddress = {
     id: randomUUID(),
     userId,
     ...input,
+    label: input.label ?? null,
     createdAt: new Date().toISOString(),
   };
 
@@ -254,7 +288,7 @@ export async function createAddress(
       [
         address.id,
         userId,
-        input.label ?? null,
+        storedLabel,
         input.province,
         input.city,
         input.address,
@@ -266,14 +300,14 @@ export async function createAddress(
     return address;
   }
 
-  const all = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
+  const allJson = await readJsonFile<UserAddress[]>(ADDRESSES_FILE, []);
   if (input.isDefault) {
-    for (const a of all) {
+    for (const a of allJson) {
       if (a.userId === userId) a.isDefault = false;
     }
   }
-  all.push(address);
-  await writeJsonFile(ADDRESSES_FILE, all);
+  allJson.push({ ...address, label: storedLabel });
+  await writeJsonFile(ADDRESSES_FILE, allJson);
   return address;
 }
 
@@ -504,6 +538,7 @@ export async function getAllProfilesWithStats(): Promise<ProfileWithStats[]> {
   }
 
   return result.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    (a, b) =>
+      new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
   );
 }

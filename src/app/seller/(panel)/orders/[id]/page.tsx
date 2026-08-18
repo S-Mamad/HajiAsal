@@ -157,11 +157,19 @@ export default function SellerOrderDetailPage() {
         ) : null}
         <AdminButton
           variant="outline"
-          href={`/api/orders/${order.id}/invoice?print=1`}
+          href={`/api/orders/${order.id}/invoice`}
           external
           target="_blank"
         >
-          چاپ فاکتور
+          فاکتور
+        </AdminButton>
+        <AdminButton
+          variant="outline"
+          href={`/api/orders/${order.id}/invoice?download=1`}
+          external
+          download={`invoice-${order.id}.pdf`}
+        >
+          دانلود PDF
         </AdminButton>
       </div>
 

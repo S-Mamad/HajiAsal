@@ -1,10 +1,10 @@
 import type { OtpProvider, OtpSendResult } from "./otp-provider";
-import { randomInt } from "crypto";
 import { MIN_OTP_LENGTH, MAX_OTP_LENGTH } from "./otp-store";
 
 type SmsProvider = "melipayamak" | "kavenegar" | "ghasedak";
 
-const FETCH_MS = 8_000;
+/** Tight timeout: pattern OTP APIs reply in well under a second. */
+const FETCH_MS = 3_000;
 
 function getProvider(): SmsProvider {
   const p = process.env.SMS_PROVIDER?.toLowerCase().trim();
@@ -301,26 +301,32 @@ function hasSharedChannel(): boolean {
 }
 
 /**
- * Fastest Melipayamak path first:
- * 1) shared/pattern (our code) — instant operator lane
- * 2) console OTP gateway — dedicated OTP lane
- * 3) simple free-text — last resort (often delayed)
+ * Fastest Melipayamak path only — never chain slow fallbacks:
+ * 1) console shared/pattern with OUR code (instant operator lane)
+ * 2) REST BaseServiceNumber (same pattern, same code) if console shared fails
+ * 3) console OTP gateway when no bodyId is configured
+ * Free-text simple is opt-in only (MELIPAYAMAK_PREFER_SIMPLE) — operators delay it.
  */
 async function sendViaMelipayamak(
   phone: string,
   code: string,
 ): Promise<OtpSendResult> {
   if (hasSharedChannel() && code) {
+    if (getMelipayamakSharedUrl()) {
+      const shared = await sendViaMelipayamakShared(phone, code);
+      if (shared.success) return shared;
+    }
     const username = process.env.MELIPAYAMAK_USERNAME?.trim();
     const password = process.env.MELIPAYAMAK_PASSWORD?.trim();
     if (username && password) {
       const base = await sendViaMelipayamakBaseService(phone, code);
       if (base.success) return base;
     }
-    if (getMelipayamakSharedUrl()) {
-      const shared = await sendViaMelipayamakShared(phone, code);
-      if (shared.success) return shared;
-    }
+    // Pattern was configured: do not send a second slow/different-code SMS.
+    return {
+      success: false,
+      message: "خطا در ارسال پیامک. لطفاً دوباره تلاش کنید",
+    };
   }
 
   const otpUrl = getMelipayamakOtpUrl();
@@ -336,26 +342,16 @@ async function sendViaMelipayamak(
     return simple;
   }
 
-  // Default: OTP gateway before free-text (delivery is much faster).
   if (otpUrl) {
     const gateway = await sendViaMelipayamakGateway(phone);
     if (gateway.success) return gateway;
+    return gateway;
   }
-  if (simpleUrl) {
-    const fallbackCode =
-      code && code.length >= MIN_OTP_LENGTH
-        ? code
-        : String(randomInt(1000, 10000));
-    const simple = await sendViaMelipayamakSimple(phone, fallbackCode);
-    if (simple.success) {
-      return { ...simple, code: fallbackCode };
-    }
-    return simple;
+
+  if (simpleUrl && code) {
+    return sendViaMelipayamakSimple(phone, code);
   }
-  if (otpUrl) {
-    // Gateway already failed above; surface that failure.
-    return sendViaMelipayamakGateway(phone);
-  }
+
   return {
     success: false,
     message: "سرویس پیامک پیکربندی نشده است",

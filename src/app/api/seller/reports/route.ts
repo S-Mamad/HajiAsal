@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gateSeller } from "@/lib/server/seller-gate";
 import { getSellerOrders, getSellerProducts } from "@/lib/server/sellers";
+import { PAID_OR_FULFILLING } from "@/lib/server/orders";
 
 export async function GET(request: Request) {
   const gated = await gateSeller(request, "reports.view");
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
   };
 
   const filtered = orders.filter((o) => inRange(o.createdAt));
+  const paidFiltered = filtered.filter((o) => PAID_OR_FULFILLING.has(o.status));
 
   if (type === "products") {
     return NextResponse.json({
@@ -49,8 +51,11 @@ export async function GET(request: Request) {
   }
 
   if (type === "customers") {
-    const map = new Map<string, { name: string; phone: string; orders: number; spent: number }>();
-    for (const o of filtered) {
+    const map = new Map<
+      string,
+      { name: string; phone: string; orders: number; spent: number }
+    >();
+    for (const o of paidFiltered) {
       const key = o.customer.phone;
       const prev = map.get(key);
       if (!prev) {
@@ -68,18 +73,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ type, rows: Array.from(map.values()) });
   }
 
-  // sales default
+  // sales default — only paid/fulfilling
   const byDay = new Map<string, number>();
-  for (const o of filtered) {
-    if (o.status === "cancelled") continue;
+  for (const o of paidFiltered) {
     const day = o.createdAt.slice(0, 10);
     byDay.set(day, (byDay.get(day) ?? 0) + o.sellerSubtotal);
   }
   return NextResponse.json({
     type: "sales",
-    total: filtered
-      .filter((o) => o.status !== "cancelled")
-      .reduce((s, o) => s + o.sellerSubtotal, 0),
+    total: paidFiltered.reduce((s, o) => s + o.sellerSubtotal, 0),
     rows: Array.from(byDay.entries())
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => a.date.localeCompare(b.date)),

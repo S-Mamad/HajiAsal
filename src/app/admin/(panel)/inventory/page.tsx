@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { Can } from "@/components/admin/auth/AdminAuthProvider";
 import type { Product } from "@/types";
 import { hajiasalPath } from "@/lib/paths";
 
@@ -90,15 +91,17 @@ export default function AdminInventoryPage() {
             sortable: true,
             getSortValue: (r) => (r.inStock ? 1 : 0),
             render: (r) => (
-              <AdminButton
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busyId === r.id}
-                onClick={() => void toggleStock(r)}
-              >
-                {busyId === r.id ? "..." : r.inStock ? "موجود" : "ناموجود"}
-              </AdminButton>
+              <Can permission="inventory.edit">
+                <AdminButton
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busyId === r.id}
+                  onClick={() => void toggleStock(r)}
+                >
+                  {busyId === r.id ? "..." : r.inStock ? "موجود" : "ناموجود"}
+                </AdminButton>
+              </Can>
             ),
           },
         ]}

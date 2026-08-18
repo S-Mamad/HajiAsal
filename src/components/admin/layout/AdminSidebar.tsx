@@ -2,20 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { SignOut } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { useAdminAuth } from "@/components/admin/auth/AdminAuthProvider";
 import { filterNavForRole } from "@/lib/admin/nav";
 import { ADMIN_ROLE_LABELS, type AdminRole } from "@/lib/admin/permissions";
-import { hajiasalPath } from "@/lib/paths";
+import { hajiasalPath, sitePublicUrl } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
 type BadgeMap = Partial<Record<"tickets" | "messages" | "qa", number>>;
 
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { role, user, loading, legacy } = useAdminAuth();
   const effectiveRole = legacy ? "super_admin" : role;
   const groups = loading || !effectiveRole ? [] : filterNavForRole(effectiveRole);
@@ -49,9 +48,11 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/admin/auth", { method: "DELETE" });
-    router.push(hajiasalPath("/admin"));
-    router.refresh();
+    await fetch("/api/admin/auth", { method: "DELETE", credentials: "include" });
+    // Hard navigation so cleared customer cookie is honored immediately.
+    const host = window.location.hostname;
+    const local = host === "localhost" || host === "127.0.0.1";
+    window.location.assign(local ? "/login" : `${sitePublicUrl()}/login`);
   };
 
   const roleLabel = role
@@ -105,9 +106,10 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <ul className="flex flex-col gap-0.5">
                 {group.items.map((item) => {
                   const active =
-                    pathname === item.href ||
-                    (item.href !== hajiasalPath("/") &&
-                      pathname.startsWith(`${item.href}/`));
+                    !item.external &&
+                    (pathname === item.href ||
+                      (item.href !== hajiasalPath("/") &&
+                        pathname.startsWith(`${item.href}/`)));
                   const badge =
                     item.badgeKey && badges[item.badgeKey]
                       ? badges[item.badgeKey]
@@ -119,6 +121,9 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
                         onClick={onNavigate}
                         data-active={active}
                         className="panel-nav-item"
+                        {...(item.external
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
                       >
                         <Icon icon={item.icon} size={17} className="shrink-0 opacity-90" />
                         <span className="min-w-0 flex-1 truncate">{item.label}</span>

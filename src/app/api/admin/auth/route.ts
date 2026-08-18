@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
-import { ensurePrimaryAdmins } from "@/lib/server/admin-auth";
+import { clearSessionCookieOnResponse } from "@/lib/auth/session";
+import { getSessionFromRequest } from "@/lib/auth/session";
+import {
+  ensurePrimaryAdmins,
+  getAdminAuthFromCustomerSession,
+} from "@/lib/server/admin-auth";
 
-/** Password login disabled — use OTP endpoints. */
+/** Password login disabled — use same-origin /login OTP. */
 export async function POST() {
   return NextResponse.json(
     {
       success: false,
-      message: "ورود فقط با کد پیامکی امکان‌پذیر است",
+      message: "ورود پنل از صفحه /login همین دامنه است؛ این مسیر دیگر فعال نیست",
     },
-    { status: 401 },
+    { status: 410 },
   );
 }
 
@@ -23,11 +28,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const { getAdminAuthFromToken } = await import("@/lib/server/admin-auth");
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(/hajiasal_admin_session=([^;]+)/);
-  const token = match?.[1] ? decodeURIComponent(match[1]) : null;
-  const ctx = await getAdminAuthFromToken(token);
+  const session = getSessionFromRequest(request);
+  const ctx = await getAdminAuthFromCustomerSession(session);
   if (!ctx.authenticated) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
@@ -50,5 +52,6 @@ export async function GET(request: Request) {
 export async function DELETE(request: Request) {
   const response = NextResponse.json({ success: true });
   await clearAllAuthSessions(request, response);
+  clearSessionCookieOnResponse(response);
   return response;
 }

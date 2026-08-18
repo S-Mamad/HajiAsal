@@ -1,49 +1,47 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, TEST_OTP } from "./helpers/auth";
+import { loginAsAdmin, loginAsTestUser } from "./helpers/auth";
 
-const adminPhone =
-  process.env.ADMIN_TEST_PHONE?.trim() ||
-  process.env.AUTH_TEST_PHONE?.trim() ||
-  "09123456789";
-
-test.describe("Haji Asal admin auth", () => {
-  test("admin login page loads OTP form", async ({ page }) => {
+test.describe("Haji Asal admin auth (storefront session)", () => {
+  test("unauthenticated /admin redirects to storefront login", async ({
+    page,
+  }) => {
     await page.goto("/admin");
-    await expect(
-      page.getByRole("button", { name: /دریافت کد/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByPlaceholder(/0912|موبایل/i).or(page.locator('input[autocomplete="tel"]')),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
   });
 
-  test("rejects wrong OTP after send", async ({ page }) => {
+  test("logged-in non-admin sees access denied", async ({ page }) => {
     test.skip(
-      process.env.NODE_ENV === "production" && !process.env.AUTH_TEST_OTP,
-      "needs test OTP in non-prod",
+      !process.env.AUTH_TEST_OTP,
+      "AUTH_TEST_OTP not set",
     );
-    await page.goto("/admin");
-    const phoneInput = page
-      .locator('input[autocomplete="tel"], input[inputmode="numeric"]')
-      .first();
-    await phoneInput.fill(adminPhone);
-    await page.getByRole("button", { name: /دریافت کد/i }).click();
-    await expect(page.getByLabel("رقم 1")).toBeVisible({ timeout: 15_000 });
-    const wrong = "0000";
-    for (let i = 0; i < wrong.length; i++) {
-      await page.getByLabel(`رقم ${i + 1}`).fill(wrong[i]!);
-    }
-    await expect(page.getByText(/نادرست|نامعتبر|خطا/i)).toBeVisible({
-      timeout: 10_000,
+    // Use a phone that is unlikely to be in admin_users unless seeded as primary.
+    // If AUTH_TEST_PHONE is a primary admin, this may land on dashboard — skip then.
+    const phone = process.env.AUTH_TEST_PHONE ?? "09123456789";
+    const primaries = (process.env.ADMIN_PRIMARY_PHONES ?? "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    test.skip(
+      primaries.includes(phone) ||
+        phone === "09351925900" ||
+        phone === "09135201973",
+      "test phone is a primary admin",
+    );
+
+    await loginAsTestUser(page, "/admin");
+    await expect(page.getByText(/اجازه دسترسی ندارید/i)).toBeVisible({
+      timeout: 20_000,
     });
+    await expect(page.getByRole("link", { name: /پشتیبانی/i })).toBeVisible();
   });
 
-  test("login succeeds with panel OTP", async ({ page }) => {
+  test("eligible admin reaches dashboard via storefront OTP", async ({
+    page,
+  }) => {
     test.skip(
       !process.env.AUTH_TEST_OTP && !process.env.ADMIN_TEST_PHONE,
       "AUTH_TEST_OTP / ADMIN_TEST_PHONE not set",
     );
-    void TEST_OTP;
     const ok = await loginAsAdmin(page);
     expect(ok).toBe(true);
     await expect(page.getByText(/داشبورد|سفارش/i).first()).toBeVisible();

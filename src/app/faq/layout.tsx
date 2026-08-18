@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { serializeJsonLd } from "@/lib/json-ld";
 import { buildFaqJsonLd } from "@/lib/seo";
 import { hajiasalCanonical } from "@/lib/paths";
-import faqData from "@/data/faq.json";
+import { getFaqItems } from "@/lib/server/site-settings";
 
 export const metadata: Metadata = {
   title: "سوالات متداول",
@@ -11,13 +11,14 @@ export const metadata: Metadata = {
   alternates: { canonical: hajiasalCanonical("/faq") },
 };
 
-export default function FaqLayout({
+export default async function FaqLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const faq = await getFaqItems();
   const faqJsonLd = buildFaqJsonLd(
-    faqData.map((f) => ({ question: f.question, answer: f.answer })),
+    faq.map((f) => ({ question: f.question, answer: f.answer })),
   );
 
   return (

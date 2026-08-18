@@ -95,11 +95,21 @@ export default async function RootLayout({
   const forceBare = appRole === "admin" || appRole === "seller";
 
   return (
-    <html lang="fa" dir="rtl" className={`${vazirmatn.variable} ${lalezar.variable} hajiasal-root h-full antialiased`} data-theme="light">
-      <body className="flex min-h-full flex-col overflow-x-hidden bg-void text-primary">
+    <html
+      lang="fa"
+      dir="rtl"
+      className={`${vazirmatn.variable} ${lalezar.variable} hajiasal-root h-full antialiased`}
+      data-theme="light"
+      suppressHydrationWarning
+    >
+      <body
+        className="flex min-h-full flex-col overflow-x-hidden bg-void text-primary"
+        suppressHydrationWarning
+      >
       <script
         dangerouslySetInnerHTML={{
-          __html: `(function(){try{var k='hajiasal-theme';var t=localStorage.getItem(k);if(t!=='light'&&t!=='dark')t='light';var r=document.currentScript&&document.currentScript.parentElement;if(r)r.setAttribute('data-theme',t);document.documentElement.setAttribute('data-hajiasal-theme',t);}catch(e){}})();`,
+          // Only touch <html> — never mutate <body> before hydrate (causes mismatch).
+          __html: `(function(){try{var k='hajiasal-theme';var t=localStorage.getItem(k);if(t!=='light'&&t!=='dark')t='light';var root=document.documentElement;root.setAttribute('data-theme',t);root.setAttribute('data-hajiasal-theme',t);}catch(e){}})();`,
         }}
       />
       <script

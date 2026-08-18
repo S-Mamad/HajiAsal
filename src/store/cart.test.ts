@@ -140,4 +140,80 @@ describe("cart store", () => {
     expect(useCartStore.getState().items).toHaveLength(1);
     expect(useCartStore.getState().items[0]?.quantity).toBe(2);
   });
+
+  it("cart total excludes shipping until checkout", () => {
+    useCartStore.setState({
+      shippingConfig: {
+        shippingCost: 55_000,
+        freeShippingThreshold: 0,
+      },
+    });
+    useCartStore.getState().addItem(
+      {
+        productId: "p-ship",
+        slug: "honey-ship",
+        title: "عسل",
+        image: "/x.webp",
+        weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+      },
+      1,
+    );
+    expect(useCartStore.getState().getPayableSubtotal()).toBe(100_000);
+    expect(useCartStore.getState().getTotal()).toBe(100_000);
+    expect(useCartStore.getState().getShippingCost()).toBe(55_000);
+  });
+
+  it("clamps quantity when revalidate reports lower stock", () => {
+    useCartStore.getState().addItem(
+      {
+        productId: "p-clamp",
+        slug: "honey-clamp",
+        title: "عسل",
+        image: "/x.webp",
+        weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+        inStock: true,
+        stockQty: 5,
+      },
+      5,
+    );
+    useCartStore.getState().applyRevalidate([
+      {
+        productId: "p-clamp",
+        weightGrams: 500,
+        availability: "ok",
+        inStock: true,
+        stockQty: 2,
+        livePrice: 100_000,
+      },
+    ]);
+    expect(useCartStore.getState().items[0]?.quantity).toBe(2);
+  });
+
+  it("clears a stored crop when revalidate reports null imageFit", () => {
+    useCartStore.getState().addItem(
+      {
+        productId: "p-fit",
+        slug: "honey-fit",
+        title: "عسل",
+        image: "/x.webp",
+        imageFit: { scale: 1.8, x: 10, y: -6 },
+        weight: { label: "۵۰۰ گرم", grams: 500, price: 100_000 },
+        inStock: true,
+        stockQty: 5,
+      },
+      1,
+    );
+    useCartStore.getState().applyRevalidate([
+      {
+        productId: "p-fit",
+        weightGrams: 500,
+        availability: "ok",
+        inStock: true,
+        stockQty: 5,
+        livePrice: 100_000,
+        imageFit: null,
+      },
+    ]);
+    expect(useCartStore.getState().items[0]?.imageFit).toBeUndefined();
+  });
 });

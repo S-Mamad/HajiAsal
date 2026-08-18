@@ -27,7 +27,7 @@ const submitSchema = z.object({
   bankCard: z.string().min(16).max(32),
   productsIntro: z.string().min(10).max(4000),
   nationalIdFrontUrl: z.string().min(8).max(512),
-  nationalIdBackUrl: z.string().max(512).optional().nullable(),
+  nationalIdBackUrl: z.string().min(8).max(512),
   commitmentLetterUrl: z.string().min(8).max(512),
   termsAccepted: z.literal(true),
 });
@@ -112,10 +112,10 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const backUrl = data.nationalIdBackUrl?.trim() || null;
-    if (backUrl && !looksLikeUploadUrl(backUrl)) {
+    const backUrl = data.nationalIdBackUrl.trim();
+    if (!looksLikeUploadUrl(backUrl)) {
       return NextResponse.json(
-        { success: false, error: "تصویر کارت ملی (پشت) نامعتبر است" },
+        { success: false, error: "تصویر کارت ملی (پشت) الزامی است" },
         { status: 400 },
       );
     }

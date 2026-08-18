@@ -17,6 +17,8 @@ import {
 } from "./production";
 import type { TicketMessage, TicketPriority } from "@/lib/tickets/types";
 import { isTicketClosed, statusAfterSenderReply } from "@/lib/tickets/types";
+import { countUnreadStaffMessages } from "@/lib/tickets/read-receipts";
+import { sanitizeTicketAttachmentUrl } from "@/lib/tickets/attachment-url";
 
 export interface SupportTicketRecord {
   id: string;
@@ -32,6 +34,10 @@ export interface SupportTicketRecord {
   department?: string | null;
   csatScore?: number | null;
   csatAt?: string | null;
+  /** Watermark: customer has seen staff messages up to this time. */
+  lastReadByCustomerAt?: string | null;
+  /** Watermark: admin has seen customer messages up to this time. */
+  lastReadByAdminAt?: string | null;
   meta?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -70,6 +76,12 @@ function mapTicketRow(r: RowDataPacket): SupportTicketRecord {
     department: r.department ? String(r.department) : "general",
     csatScore: r.csat_score != null ? Number(r.csat_score) : null,
     csatAt: r.csat_at ? toIso(r.csat_at) : null,
+    lastReadByCustomerAt: r.last_read_by_customer_at
+      ? toIso(r.last_read_by_customer_at)
+      : null,
+    lastReadByAdminAt: r.last_read_by_admin_at
+      ? toIso(r.last_read_by_admin_at)
+      : null,
     meta: parseJsonField<Record<string, unknown> | null>(r.meta, null),
     createdAt: toIso(r.created_at),
     updatedAt: toIso(r.updated_at),
@@ -210,6 +222,14 @@ export async function upsertSupportTicket(
           ? now
           : null
         : (existing?.csatAt ?? null),
+    lastReadByCustomerAt:
+      input.lastReadByCustomerAt !== undefined
+        ? input.lastReadByCustomerAt
+        : (existing?.lastReadByCustomerAt ?? null),
+    lastReadByAdminAt:
+      input.lastReadByAdminAt !== undefined
+        ? input.lastReadByAdminAt
+        : (existing?.lastReadByAdminAt ?? null),
     meta: input.meta !== undefined ? input.meta : (existing?.meta ?? null),
     createdAt: existing?.createdAt ?? input.createdAt ?? now,
     updatedAt: now,
@@ -317,6 +337,121 @@ export async function listSupportTicketMessages(
   return memoryTickets.find((t) => t.id === ticketId)?.messages ?? [];
 }
 
+/**
+ * Stamp a read watermark without bumping updated_at (keeps ticket order stable).
+ */
+export async function markSupportTicketRead(
+  ticketId: string,
+  viewer: "customer" | "admin",
+): Promise<SupportTicketRecord | null> {
+  const ticket = await getSupportTicket(ticketId);
+  if (!ticket) return null;
+
+  const now = new Date().toISOString();
+  const next: SupportTicketRecord =
+    viewer === "customer"
+      ? { ...ticket, lastReadByCustomerAt: now }
+      : { ...ticket, lastReadByAdminAt: now };
+
+  if (isMysqlConfigured()) {
+    try {
+      const column =
+        viewer === "customer"
+          ? "last_read_by_customer_at"
+          : "last_read_by_admin_at";
+      await mysqlExecute(
+        `UPDATE support_tickets SET ${column} = ? WHERE id = ?`,
+        [now, ticketId],
+      );
+      return next;
+    } catch (error) {
+      console.error(
+        "[support-tickets] markSupportTicketRead mysql failed:",
+        error instanceof Error ? error.message : error,
+      );
+      if (!allowTicketMysqlFallthrough()) {
+        throw new Error("MYSQL_UNAVAILABLE");
+      }
+    }
+  }
+
+  if (canUseFilesystemPersistence()) {
+    const list = await fsListTickets();
+    const idx = list.findIndex((t) => t.id === ticketId);
+    if (idx < 0) return null;
+    list[idx] = { ...list[idx], ...next };
+    await fsSaveTickets(list);
+    return next;
+  }
+
+  const idx = memoryTickets.findIndex((t) => t.id === ticketId);
+  if (idx < 0) return null;
+  memoryTickets[idx] = { ...memoryTickets[idx], ...next };
+  return next;
+}
+
+export async function countCustomerUnreadStaffMessages(
+  customerId: string,
+): Promise<number> {
+  if (isMysqlConfigured()) {
+    try {
+      const row = await mysqlQueryOne<RowDataPacket>(
+        `SELECT COUNT(*) AS c
+         FROM ticket_messages m
+         INNER JOIN support_tickets t ON t.id = m.ticket_id
+         WHERE t.customer_id = ?
+           AND COALESCE(m.is_internal, 0) = 0
+           AND m.deleted_at IS NULL
+           AND m.sender_type = 'admin'
+           AND m.created_at > COALESCE(t.last_read_by_customer_at, '1970-01-01 00:00:00.000')
+           AND (
+             t.last_read_by_customer_at IS NOT NULL
+             OR t.status IN ('pending', 'answered')
+           )`,
+        [customerId],
+      );
+      return Number(row?.c ?? 0);
+    } catch (error) {
+      if (!allowTicketMysqlFallthrough()) {
+        throw new Error("MYSQL_UNAVAILABLE");
+      }
+      console.error(
+        "[support-tickets] countCustomerUnreadStaffMessages mysql failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const tickets = await listSupportTicketsByCustomer(customerId);
+  let total = 0;
+  for (const ticket of tickets) {
+    const messages = await listSupportTicketMessages(ticket.id);
+    total += countUnreadStaffMessages({
+      status: ticket.status,
+      lastReadByCustomerAt: ticket.lastReadByCustomerAt,
+      messages,
+    });
+  }
+  return total;
+}
+
+async function finalizePersistedMessage(
+  input: {
+    ticketId: string;
+    senderType: "customer" | "admin" | "system";
+    isInternal?: boolean;
+  },
+  message: SupportTicketMessageRecord,
+): Promise<SupportTicketMessageRecord> {
+  if (input.senderType === "admin" && !input.isInternal) {
+    await markSupportTicketRead(input.ticketId, "admin").catch(() => null);
+  }
+  return {
+    ...message,
+    delivery: message.delivery === "failed" ? "failed" : "sent",
+  };
+}
+
 export async function addSupportTicketMessage(input: {
   ticketId: string;
   senderType: "customer" | "admin" | "system";
@@ -360,7 +495,7 @@ export async function addSupportTicketMessage(input: {
     senderType: input.senderType,
     senderId: input.senderId ?? null,
     body: prepared.body,
-    attachmentUrl: input.attachmentUrl ?? null,
+    attachmentUrl: sanitizeTicketAttachmentUrl(input.attachmentUrl),
     attachmentName: input.attachmentName ?? null,
     attachmentMime: input.attachmentMime ?? null,
     clientMessageId: input.clientMessageId ?? null,
@@ -403,14 +538,14 @@ export async function addSupportTicketMessage(input: {
         `UPDATE support_tickets SET status = ?, department = COALESCE(?, department), updated_at = ? WHERE id = ?`,
         [nextStatus, prepared.departmentHint, now, input.ticketId],
       );
-      return message;
+      return finalizePersistedMessage(input, message);
     } catch (error) {
       if (isMysqlDuplicateKey(error) && input.clientMessageId) {
         const again = await listSupportTicketMessages(input.ticketId);
         const dup = again.find(
           (m) => m.clientMessageId === input.clientMessageId,
         );
-        if (dup) return dup;
+        if (dup) return finalizePersistedMessage(input, dup);
       }
       console.error(
         "[support-tickets] addSupportTicketMessage mysql failed, falling back:",
@@ -439,7 +574,7 @@ export async function addSupportTicketMessage(input: {
       updatedAt: now,
     };
     await fsSaveTickets(list);
-    return message;
+    return finalizePersistedMessage(input, message);
   }
 
   let memIdx = memoryTickets.findIndex((t) => t.id === input.ticketId);
@@ -456,7 +591,7 @@ export async function addSupportTicketMessage(input: {
     department: prepared.departmentHint,
     updatedAt: now,
   };
-  return message;
+  return finalizePersistedMessage(input, message);
 }
 
 export async function mutateSupportMessage(input: {
@@ -579,11 +714,27 @@ export async function createCustomerTicket(input: {
   body: string;
   priority?: TicketPriority;
   meta?: Record<string, unknown> | null;
-}): Promise<{ ticket: SupportTicketRecord; message: SupportTicketMessageRecord }> {
-  const { prepareOutboundBody, isAnyOperatorOnline, buildSystemMessage } =
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
+  attachmentMime?: string | null;
+  clientMessageId?: string | null;
+}): Promise<{
+  ticket: SupportTicketRecord;
+  message: SupportTicketMessageRecord;
+  greeting: SupportTicketMessageRecord;
+}> {
+  const { prepareOutboundBody, isAnyOperatorOnline } =
     await import("./ticket-runtime");
+  const { isWithinSupportHours, supportGreeting } = await import(
+    "@/lib/support-fab/hours"
+  );
   const prepared = prepareOutboundBody(input.body);
+  const attachmentUrl = sanitizeTicketAttachmentUrl(input.attachmentUrl);
+  if (!prepared.body && !attachmentUrl) {
+    throw new Error("EMPTY_BODY");
+  }
   const online = isAnyOperatorOnline();
+  const withinHours = isWithinSupportHours();
 
   const ticket = await upsertSupportTicket({
     subject: input.subject,
@@ -598,30 +749,28 @@ export async function createCustomerTicket(input: {
 
   const message = await addSupportTicketMessage({
     ticketId: ticket.id,
+    senderType: "system",
+    body: supportGreeting({ withinHours, operatorOnline: online }),
+    nextStatus: "open",
+  });
+
+  const customerMessage = await addSupportTicketMessage({
+    ticketId: ticket.id,
     senderType: "customer",
     senderId: input.customerId,
-    body: prepared.body,
+    body: prepared.body || "پیوست",
+    attachmentUrl,
+    attachmentName: input.attachmentName ?? null,
+    attachmentMime: input.attachmentMime ?? null,
+    clientMessageId: input.clientMessageId ?? null,
     nextStatus: "waiting",
   });
 
-  if (!online) {
-    await addSupportTicketMessage({
-      ticketId: ticket.id,
-      senderType: "system",
-      body: "اپراتور آنلاین نیست. پیام شما به‌صورت تیکت ثبت شد و پاسخ در پنل حساب کاربری شما نمایش داده می‌شود.",
-      nextStatus: "waiting",
-    });
-  } else {
-    await addSupportTicketMessage({
-      ticketId: ticket.id,
-      senderType: "system",
-      body: "به پشتیبانی زنده متصل شدید. لطفاً منتظر پاسخ اپراتور بمانید.",
-      nextStatus: "waiting",
-    });
-  }
-
-  void buildSystemMessage;
-  return { ticket: { ...ticket, status: "waiting", department: prepared.departmentHint }, message };
+  return {
+    ticket: { ...ticket, status: "waiting", department: prepared.departmentHint },
+    message: customerMessage,
+    greeting: message,
+  };
 }
 
 /** Test helper — clears in-memory tickets. */

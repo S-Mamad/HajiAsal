@@ -51,6 +51,7 @@ export default function AdminCustomerDetailPage() {
   const [balanceDelta, setBalanceDelta] = useState("0");
   const [pointsDelta, setPointsDelta] = useState("0");
   const [saving, setSaving] = useState(false);
+  const isGuest = Boolean(customer?.id.startsWith("guest-"));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,75 +162,83 @@ export default function AdminCustomerDetailPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Can permission="customers.edit">
-          <section className="rounded-xl border border-stone-200 bg-white p-5">
-            <h3 className="mb-3 text-sm font-semibold">تنظیم کیف پول / امتیاز</h3>
-            <div className="space-y-3">
-              <FormField label="تغییر موجودی (مثبت/منفی)">
-                <AdminInput
-                  dir="ltr"
-                  value={balanceDelta}
-                  onChange={(e) => setBalanceDelta(e.target.value)}
-                />
-              </FormField>
-              <FormField label="تغییر امتیاز">
-                <AdminInput
-                  dir="ltr"
-                  value={pointsDelta}
-                  onChange={(e) => setPointsDelta(e.target.value)}
+        {!isGuest ? (
+          <Can permission="customers.edit">
+            <section className="rounded-xl border border-stone-200 bg-white p-5">
+              <h3 className="mb-3 text-sm font-semibold">تنظیم کیف پول / امتیاز</h3>
+              <div className="space-y-3">
+                <FormField label="تغییر موجودی (مثبت/منفی)">
+                  <AdminInput
+                    dir="ltr"
+                    value={balanceDelta}
+                    onChange={(e) => setBalanceDelta(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="تغییر امتیاز">
+                  <AdminInput
+                    dir="ltr"
+                    value={pointsDelta}
+                    onChange={(e) => setPointsDelta(e.target.value)}
+                  />
+                </FormField>
+                <AdminButton
+                  disabled={saving}
+                  onClick={() =>
+                    void postAction({
+                      action: "wallet",
+                      balanceDelta: Number(balanceDelta) || 0,
+                      pointsDelta: Number(pointsDelta) || 0,
+                    })
+                  }
+                >
+                  اعمال
+                </AdminButton>
+              </div>
+            </section>
+          </Can>
+        ) : null}
+
+        {!isGuest ? (
+          <Can permission="customers.edit">
+            <section className="rounded-xl border border-stone-200 bg-white p-5">
+              <h3 className="mb-3 text-sm font-semibold">یادداشت مدیر</h3>
+              <FormField label="متن یادداشت">
+                <AdminTextarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
                 />
               </FormField>
               <AdminButton
-                disabled={saving}
+                className="mt-3"
+                disabled={saving || !noteText.trim()}
                 onClick={() =>
-                  void postAction({
-                    action: "wallet",
-                    balanceDelta: Number(balanceDelta) || 0,
-                    pointsDelta: Number(pointsDelta) || 0,
-                  })
+                  void postAction({ action: "note", note: noteText.trim() }).then(
+                    () => setNoteText(""),
+                  )
                 }
               >
-                اعمال
+                ذخیره یادداشت
               </AdminButton>
-            </div>
+              <ul className="mt-4 space-y-2 text-sm">
+                {notes.map((n) => (
+                  <li key={n.id} className="rounded-lg bg-stone-50 px-3 py-2">
+                    <p>{n.note}</p>
+                    <p className="mt-1 text-xs text-stone-400">
+                      {new Date(n.createdAt).toLocaleString("fa-IR")}
+                    </p>
+                  </li>
+                ))}
+                {notes.length === 0 ? (
+                  <li className="text-stone-400">یادداشتی نیست</li>
+                ) : null}
+              </ul>
+            </section>
+          </Can>
+        ) : (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 lg:col-span-2">
+            مشتری مهمان است؛ کیف پول و یادداشت فقط برای حساب‌های ثبت‌نام‌شده در دسترس است.
           </section>
-        </Can>
-
-        <Can permission="customers.edit">
-          <section className="rounded-xl border border-stone-200 bg-white p-5">
-            <h3 className="mb-3 text-sm font-semibold">یادداشت مدیر</h3>
-            <FormField label="متن یادداشت">
-              <AdminTextarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-              />
-            </FormField>
-            <AdminButton
-              className="mt-3"
-              disabled={saving || !noteText.trim()}
-              onClick={() =>
-                void postAction({ action: "note", note: noteText.trim() }).then(
-                  () => setNoteText(""),
-                )
-              }
-            >
-              ذخیره یادداشت
-            </AdminButton>
-            <ul className="mt-4 space-y-2 text-sm">
-              {notes.map((n) => (
-                <li key={n.id} className="rounded-lg bg-stone-50 px-3 py-2">
-                  <p>{n.note}</p>
-                  <p className="mt-1 text-xs text-stone-400">
-                    {new Date(n.createdAt).toLocaleString("fa-IR")}
-                  </p>
-                </li>
-              ))}
-              {notes.length === 0 ? (
-                <li className="text-stone-400">یادداشتی نیست</li>
-              ) : null}
-            </ul>
-          </section>
-        </Can>
+        )}
       </div>
 
       <section className="rounded-xl border border-stone-200 bg-white p-5">

@@ -71,7 +71,9 @@ export function AdminDashboard() {
         credentials: "include",
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "خطا در بارگذاری");
+      if (!res.ok || json.success === false) {
+        throw new Error(json.error ?? "خطا در بارگذاری");
+      }
       setData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
@@ -97,7 +99,7 @@ export function AdminDashboard() {
     );
   }
 
-  if (error || !data) {
+  if (error || !data?.kpis) {
     return (
       <div className="rounded-[var(--panel-radius,10px)] border border-red-200 bg-red-50 p-6 text-sm text-red-700">
         {error || "داده‌ای نیست"}
@@ -113,7 +115,11 @@ export function AdminDashboard() {
   }
 
   const { kpis } = data;
-  const maxSale = Math.max(1, ...data.salesChart.map((x) => x.total));
+  const salesChart = data.salesChart ?? [];
+  const recentOrders = data.recentOrders ?? [];
+  const recentMessages = data.recentMessages ?? [];
+  const recentCustomers = data.recentCustomers ?? [];
+  const maxSale = Math.max(1, ...salesChart.map((x) => x.total));
 
   return (
     <div className="space-y-6">
@@ -184,10 +190,10 @@ export function AdminDashboard() {
             </button>
           </div>
           <div className="flex h-44 items-end gap-1.5">
-            {data.salesChart.length === 0 ? (
+            {salesChart.length === 0 ? (
               <p className="text-sm text-zinc-400">داده‌ای نیست</p>
             ) : (
-              data.salesChart.map((p) => (
+              salesChart.map((p) => (
                 <div
                   key={p.date}
                   className="group flex flex-1 flex-col items-center gap-1.5"
@@ -222,12 +228,12 @@ export function AdminDashboard() {
             </Link>
           </div>
           <ul className="divide-y divide-zinc-100">
-            {data.recentOrders.length === 0 ? (
+            {recentOrders.length === 0 ? (
               <li className="py-8 text-center text-sm text-zinc-400">
                 سفارشی نیست
               </li>
             ) : (
-              data.recentOrders.map((o) => (
+              recentOrders.map((o) => (
                 <li
                   key={o.id}
                   className="flex items-center justify-between gap-3 py-2.5 text-sm"
@@ -263,7 +269,7 @@ export function AdminDashboard() {
             </Link>
           </div>
           <ul className="space-y-1.5 text-sm">
-            {data.recentMessages.map((m) => (
+            {recentMessages.map((m) => (
               <li
                 key={m.id}
                 className="rounded-lg bg-zinc-50 px-3 py-2.5 transition hover:bg-zinc-100/80"
@@ -274,7 +280,7 @@ export function AdminDashboard() {
                 </p>
               </li>
             ))}
-            {data.recentMessages.length === 0 ? (
+            {recentMessages.length === 0 ? (
               <li className="py-6 text-center text-zinc-400">پیامی نیست</li>
             ) : null}
           </ul>
@@ -293,7 +299,7 @@ export function AdminDashboard() {
             </Link>
           </div>
           <ul className="space-y-1.5 text-sm">
-            {(data.recentCustomers ?? []).map((c) => (
+            {recentCustomers.map((c) => (
               <li
                 key={c.id}
                 className="flex justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-2.5"
@@ -306,7 +312,7 @@ export function AdminDashboard() {
                 </span>
               </li>
             ))}
-            {(data.recentCustomers ?? []).length === 0 ? (
+            {recentCustomers.length === 0 ? (
               <li className="py-6 text-center text-zinc-400">مشتری‌ای نیست</li>
             ) : null}
           </ul>

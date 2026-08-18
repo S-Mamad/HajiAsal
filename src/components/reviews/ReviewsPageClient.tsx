@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { SealCheck, Star } from "@phosphor-icons/react";
+import { SealCheck } from "@phosphor-icons/react";
 import { Reveal } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { RatingStars } from "@/components/ui/RatingStars";
 import { ReviewForm } from "@/components/sections/ReviewForm";
 import { hajiasalPath } from "@/lib/paths";
 import { GENERAL_REVIEW_PRODUCT_ID } from "@/lib/review-constants";
@@ -78,6 +79,13 @@ export function ReviewsPageClient({
                   maximumFractionDigits: 1,
                 })}
               </p>
+              <div className="mt-2">
+                <RatingStars
+                  rating={averageRating}
+                  size="md"
+                  showValue={false}
+                />
+              </div>
               <p className="mt-1 text-xs text-dim">میانگین از ۵</p>
             </div>
             <div className="rounded-2xl border border-border bg-surface px-5 py-5">
@@ -160,18 +168,11 @@ export function ReviewsPageClient({
             <Reveal key={review.id} delay={Math.min(i * 0.04, 0.2)}>
               <li className="flex h-full flex-col rounded-2xl border border-border bg-surface p-5 md:p-6">
                 <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <div className="flex items-center gap-0.5" aria-hidden>
-                    {Array.from({ length: 5 }).map((_, star) => (
-                      <Star
-                        key={star}
-                        size={13}
-                        weight={star < review.rating ? "fill" : "regular"}
-                        className={
-                          star < review.rating ? "text-gold" : "text-star-empty"
-                        }
-                      />
-                    ))}
-                  </div>
+                  <RatingStars
+                    rating={review.rating}
+                    size="sm"
+                    showValue={false}
+                  />
                   <time
                     dateTime={review.date}
                     className="text-[11px] text-dim tabular-nums"

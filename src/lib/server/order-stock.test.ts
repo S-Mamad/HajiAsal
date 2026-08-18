@@ -24,6 +24,7 @@ describe("decrementStockForPaidOrder memory/fs path", () => {
     isMysqlConfigured.mockReturnValue(false);
     updateProductAsync.mockReset();
     getProductByIdAsync.mockReset();
+    mysqlExecute.mockReset();
     updateProductAsync.mockResolvedValue({});
   });
 
@@ -112,7 +113,54 @@ describe("decrementStockForPaidOrder memory/fs path", () => {
     );
   });
 
+  it("skips unlimited (unset) stock without mutating", async () => {
+    getProductByIdAsync.mockResolvedValue({
+      id: "p1",
+      title: "عسل",
+      inStock: true,
+    });
+    const items: CartItem[] = [
+      {
+        productId: "p1",
+        slug: "p1",
+        title: "عسل",
+        image: "",
+        weight: { label: "1kg", grams: 1000, price: 100_000 },
+        quantity: 2,
+      },
+    ];
+    const shortages = await decrementStockForPaidOrder(items);
+    expect(shortages).toEqual([]);
+    expect(updateProductAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not soft-zero NULL stock_qty on mysql path", async () => {
+    isMysqlConfigured.mockReturnValue(true);
+    mysqlExecute.mockResolvedValue({ affectedRows: 0 });
+    const items: CartItem[] = [
+      {
+        productId: "p1",
+        slug: "p1",
+        title: "عسل",
+        image: "",
+        weight: { label: "1kg", grams: 1000, price: 100_000 },
+        quantity: 1,
+      },
+    ];
+    const shortages = await decrementStockForPaidOrder(items);
+    expect(shortages).toEqual([]);
+    expect(mysqlExecute).toHaveBeenCalled();
+    const softCall = mysqlExecute.mock.calls.find((c) =>
+      String(c[0]).includes("stock_qty IS NOT NULL"),
+    );
+    expect(softCall).toBeTruthy();
+    expect(String(mysqlExecute.mock.calls[0]?.[0] ?? "")).not.toContain(
+      "COALESCE(stock_qty, 0)",
+    );
+  });
+
   it("restores stock after paid order", async () => {
+    isMysqlConfigured.mockReturnValue(false);
     getProductByIdAsync.mockResolvedValue({
       id: "p1",
       title: "عسل",
@@ -135,5 +183,24 @@ describe("decrementStockForPaidOrder memory/fs path", () => {
       { stockQty: 3, inStock: true },
       expect.objectContaining({ createRevision: false }),
     );
+  });
+
+  it("mysql restore does not COALESCE NULL unlimited stock", async () => {
+    isMysqlConfigured.mockReturnValue(true);
+    mysqlExecute.mockResolvedValue({ affectedRows: 0 });
+    const items: CartItem[] = [
+      {
+        productId: "p1",
+        slug: "p1",
+        title: "عسل",
+        image: "",
+        weight: { label: "1kg", grams: 1000, price: 100_000 },
+        quantity: 1,
+      },
+    ];
+    await restoreStockForPaidOrder(items);
+    const sql = String(mysqlExecute.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("stock_qty IS NOT NULL");
+    expect(sql).not.toContain("COALESCE(stock_qty, 0)");
   });
 });

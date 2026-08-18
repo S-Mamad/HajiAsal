@@ -12,6 +12,7 @@ import {
   mysqlQuery,
   toIso,
 } from "@/lib/server/mysql";
+import { resolvePublicUploadPath } from "@/lib/server/safe-public-path";
 
 const memoryMedia: Array<{
   id: string;
@@ -199,8 +200,12 @@ export async function POST(request: Request) {
       );
     }
     if (
-      !parsed.data.url.startsWith("/") &&
-      !parsed.data.url.startsWith("https://")
+      parsed.data.url.includes("..") ||
+      parsed.data.url.includes("\\") ||
+      (
+        !parsed.data.url.startsWith("/uploads/seller/") &&
+        !parsed.data.url.startsWith("https://")
+      )
     ) {
       return NextResponse.json(
         { error: "آدرس فایل نامعتبر است" },
@@ -280,9 +285,12 @@ export async function DELETE(request: Request) {
     memoryMedia.splice(idx, 1);
   }
 
-  if (url?.startsWith("/uploads/seller/")) {
+  const diskPath = url
+    ? resolvePublicUploadPath(url, "/uploads/seller/")
+    : null;
+  if (diskPath) {
     try {
-      await unlink(path.join(process.cwd(), "public", url.replace(/^\//, "")));
+      await unlink(diskPath);
     } catch {
       /* ignore missing file */
     }

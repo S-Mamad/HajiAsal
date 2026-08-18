@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import { getAllProfilesWithStats } from "@/lib/server/profiles";
 
-function escapeCsv(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
+function escapeCsv(value: string | undefined | null): string {
+  const text = value ?? "";
+  if (text.includes(",") || text.includes('"') || text.includes("\n")) {
+    return `"${text.replace(/"/g, '""')}"`;
   }
-  return value;
+  return text;
 }
 
 export async function GET(request: Request) {

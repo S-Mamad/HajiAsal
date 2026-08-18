@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
 import { TrustPageLayout } from "@/components/layout/TrustPageLayout";
 import { hajiasalPath } from "@/lib/paths";
+import { getSiteSettings } from "@/lib/server/site-settings";
 
-const siteData = site as SiteConfig;
-const content = siteData.trustPages!.shipping;
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSiteSettings();
+  const content = site.trustPages!.shipping;
+  return {
+    title: content.title,
+    description: content.intro,
+    alternates: { canonical: hajiasalPath("/shipping") },
+  };
+}
 
-export const metadata: Metadata = {
-  title: content.title,
-  description: content.intro,
-  alternates: { canonical: hajiasalPath("/shipping") },
-};
-
-export default function ShippingPage() {
-  return <TrustPageLayout content={content} />;
+export default async function ShippingPage() {
+  const site = await getSiteSettings();
+  return <TrustPageLayout kind="shipping" content={site.trustPages!.shipping} />;
 }

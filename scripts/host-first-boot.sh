@@ -36,6 +36,9 @@ fi
 
 if [ ! -f .env ] && [ -f .env.example ]; then
   echo "[host-boot] WARNING: no .env file. Create it from .env.example OR set vars in Setup Node.js App → Environment variables."
+  echo "[host-boot] WARNING: for checkout map, also set NESHAN_API_KEY (server-only)."
+elif [ -f .env ] && ! grep -q '^NESHAN_API_KEY=.\+' .env 2>/dev/null; then
+  echo "[host-boot] WARNING: NESHAN_API_KEY missing/empty — checkout address map reverse/search will return 503."
 fi
 
 export NODE_ENV=production

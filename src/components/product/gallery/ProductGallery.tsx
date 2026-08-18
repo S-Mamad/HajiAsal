@@ -3,37 +3,54 @@
 import { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
+import {
+  catalogImageFit,
+  catalogMediaClass,
+  imageFitForSrc,
+} from "@/lib/product-image";
 import { ProductImage } from "@/components/ui/ProductImage";
 import type { ProductGalleryProps } from "../types";
 
-export function ProductGallery({ images, title }: ProductGalleryProps) {
+export function ProductGallery({
+  images,
+  title,
+  imageFits,
+}: ProductGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const reducedMotion = useReducedMotion();
 
-  const thumbnailBtn = (img: string, i: number, vertical: boolean) => (
-    <button
-      key={`${img}-${i}`}
-      type="button"
-      onClick={() => setActiveIndex(i)}
-      aria-label={`تصویر ${i + 1}`}
-      aria-current={i === activeIndex ? "true" : undefined}
-      className={cn(
-        "relative shrink-0 overflow-hidden rounded-xl border-2 transition-colors",
-        vertical ? "h-16 w-16 md:h-[72px] md:w-[72px]" : "h-16 w-16",
-        i === activeIndex
-          ? "border-gold ring-2 ring-gold/30"
-          : "border-border hover:border-border-bright",
-      )}
-    >
-      <ProductImage
-        src={img}
-        alt={`${title} - ${i + 1}`}
-        fill
-        sizes="72px"
-        className="object-cover"
-      />
-    </button>
-  );
+  const thumbnailBtn = (img: string, i: number, vertical: boolean) => {
+    const fit = imageFitForSrc(imageFits, img);
+    return (
+      <button
+        key={`${img}-${i}`}
+        type="button"
+        onClick={() => setActiveIndex(i)}
+        aria-label={`تصویر ${i + 1}`}
+        aria-current={i === activeIndex ? "true" : undefined}
+        className={cn(
+          catalogMediaClass(img, fit),
+          "relative shrink-0 overflow-hidden rounded-xl border-2 transition-colors",
+          vertical ? "h-16 w-16 md:h-[72px] md:w-[72px]" : "h-16 w-16",
+          i === activeIndex
+            ? "border-gold ring-2 ring-gold/30"
+            : "border-border hover:border-border-bright",
+        )}
+      >
+        <ProductImage
+          src={img}
+          alt={`${title} - ${i + 1}`}
+          fill
+          fit={catalogImageFit(img, fit)}
+          imageFit={fit}
+          sizes="72px"
+        />
+      </button>
+    );
+  };
+
+  const activeSrc = images[activeIndex] ?? "";
+  const activeFit = imageFitForSrc(imageFits, activeSrc);
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,11 +61,12 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
           </div>
         ) : null}
 
-        <div className="gallery-frame relative aspect-[4/5] w-full flex-1 overflow-hidden bg-surface-muted lg:aspect-[4/5]">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,160,86,0.12),transparent_70%)]"
-            aria-hidden
-          />
+        <div
+          className={cn(
+            "gallery-frame relative aspect-square w-full flex-1 overflow-hidden",
+            catalogMediaClass(activeSrc, activeFit),
+          )}
+        >
           <AnimatePresence mode="wait">
             <motion.div
               key={activeIndex}
@@ -56,15 +74,19 @@ export function ProductGallery({ images, title }: ProductGalleryProps) {
               animate={{ opacity: 1 }}
               exit={reducedMotion ? undefined : { opacity: 0 }}
               transition={{ duration: reducedMotion ? 0 : 0.3 }}
-              className="absolute inset-0"
+              className={cn(
+                "absolute inset-0",
+                catalogMediaClass(activeSrc, activeFit),
+              )}
             >
               <ProductImage
-                src={images[activeIndex]}
+                src={activeSrc}
                 alt={title}
                 fill
+                fit={catalogImageFit(activeSrc, activeFit)}
+                imageFit={activeFit}
                 sizes="(max-width: 768px) 100vw, 40vw"
                 priority
-                className="object-cover"
               />
             </motion.div>
           </AnimatePresence>

@@ -14,26 +14,19 @@ test.describe("Haji Asal checkout coupon transfer", () => {
     }
   });
 
-  test("checkout accepts coupon from query", async ({ page }) => {
+  test("checkout accepts coupon from query via coupon trap", async ({
+    page,
+  }) => {
     await loginAsTestUser(page, "/account");
     await addFirstShopProductToCart(page);
     await page.goto("/checkout?coupon=HAJI10");
-    await expect(page.getByRole("heading", { name: /تکمیل خرید/i })).toBeVisible({
+    await expect(page.getByPlaceholder(/کد تخفیف/i)).toBeVisible({
       timeout: 15_000,
     });
     await expect(page).toHaveURL(/coupon=HAJI10/i);
 
-    // Coupon field lives on the payment step.
-    await page.getByRole("button", { name: "بعدی" }).click();
-    await page.getByLabel("نام و نام خانوادگی").fill("علی تستی");
-    await page.getByLabel("استان").fill("تهران");
-    await page.getByLabel("شهر").fill("تهران");
-    await page.getByLabel("آدرس کامل").fill("خیابان ولیعصر، پلاک ۱");
-    await page.getByLabel("کد پستی").fill("1234567890");
-    await page.getByRole("button", { name: "بعدی" }).click();
-    await page.getByRole("button", { name: "بعدی" }).click();
-
     const couponInput = page.getByPlaceholder(/کد تخفیف/i);
+    await expect(couponInput).toBeVisible();
     await expect(couponInput).toHaveValue("HAJI10");
   });
 });

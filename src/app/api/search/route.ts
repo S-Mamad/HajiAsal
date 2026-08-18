@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { searchPublicProductsAsync } from "@/lib/server/product-search";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
-
-const SEARCH_SUGGESTIONS = [
-  "عسل کوهستان",
-  "آویشن",
-  "ژل رویال",
-  "ست هدیه",
-  "شهد",
-] as const;
+import { getSiteSettings } from "@/lib/server/site-settings";
+import { resolveSearchUi } from "@/lib/search-ui";
 
 function parseLimit(raw: string | null): number {
   const n = Number(raw ?? 12);
@@ -39,12 +33,13 @@ export async function GET(request: Request) {
   const limit = parseLimit(searchParams.get("limit"));
 
   if (!raw.trim()) {
+    const searchUi = resolveSearchUi(await getSiteSettings());
     return NextResponse.json(
       {
         results: [],
         query: "",
         total: 0,
-        suggestions: SEARCH_SUGGESTIONS,
+        suggestions: searchUi.suggestions,
       },
       {
         headers: {

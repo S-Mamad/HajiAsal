@@ -5,8 +5,14 @@ import { DotsSixVertical, Trash, Plus } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { ProductFrameEditor } from "@/components/product/frame/ProductFrameEditor";
 import { cn } from "@/lib/utils";
 import { useAdminAuth } from "@/components/admin/auth/AdminAuthProvider";
+import {
+  pruneImageFits,
+  writeImageFit,
+  type ProductImageFit,
+} from "@/lib/product-image";
 
 async function uploadImageFile(file: File): Promise<string> {
   const form = new FormData();
@@ -31,20 +37,37 @@ async function uploadImageFile(file: File): Promise<string> {
 export function MediaDropzone({
   images,
   onChange,
+  imageFits,
+  onFitsChange,
 }: {
   images: string[];
   onChange: (next: string[]) => void;
+  imageFits?: Record<string, ProductImageFit>;
+  onFitsChange: (next: Record<string, ProductImageFit>) => void;
 }) {
   const { can } = useAdminAuth();
   const canUpload = can("media.manage") || can("products.edit");
   const imagesRef = useRef(images);
   imagesRef.current = images;
+  const fitsRef = useRef(imageFits);
+  fitsRef.current = imageFits;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const onFitsChangeRef = useRef(onFitsChange);
+  onFitsChangeRef.current = onFitsChange;
 
   const [draftUrl, setDraftUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  const setImages = (next: string[]) => {
+    const pruned = pruneImageFits(fitsRef.current, next) ?? {};
+    fitsRef.current = pruned;
+    onChangeRef.current(next);
+    onFitsChangeRef.current(pruned);
+  };
 
   const addUrl = () => {
     const url = draftUrl.trim();
@@ -55,7 +78,7 @@ export function MediaDropzone({
       );
       return;
     }
-    onChange([...imagesRef.current, url]);
+    setImages([...imagesRef.current, url]);
     setDraftUrl("");
     setUploadError("");
   };
@@ -75,7 +98,9 @@ export function MediaDropzone({
           if (!file.type.startsWith("image/")) continue;
           uploaded.push(await uploadImageFile(file));
         }
-        if (uploaded.length) onChange([...imagesRef.current, ...uploaded]);
+        if (uploaded.length) {
+          setImages([...imagesRef.current, ...uploaded]);
+        }
         if (!uploaded.length) {
           setUploadError("فایل تصویری معتبری انتخاب نشد");
         }
@@ -85,7 +110,7 @@ export function MediaDropzone({
         setUploading(false);
       }
     },
-    [canUpload, onChange],
+    [canUpload],
   );
 
   const move = (from: number, to: number) => {
@@ -93,7 +118,7 @@ export function MediaDropzone({
     const next = [...imagesRef.current];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item!);
-    onChange(next);
+    setImages(next);
   };
 
   return (
@@ -170,40 +195,52 @@ export function MediaDropzone({
         </AdminButton>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {images.map((src, index) => (
           <li
             key={`${src.slice(0, 48)}-${index}`}
-            draggable
-            onDragStart={() => setDragIndex(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => {
               if (dragIndex == null) return;
               move(dragIndex, index);
               setDragIndex(null);
             }}
-            className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-2"
+            className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3 sm:flex-row sm:items-start"
           >
-            <Icon icon={DotsSixVertical} size={18} className="text-zinc-400" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={src}
-              alt=""
-              className="h-14 w-14 rounded-lg object-cover"
-            />
-            <p className="min-w-0 flex-1 truncate text-xs text-zinc-600">
-              {src.startsWith("data:") ? "تصویر آپلودشده" : src}
-            </p>
-            <AdminButton
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                onChange(imagesRef.current.filter((_, i) => i !== index))
-              }
+              draggable
+              onDragStart={() => setDragIndex(index)}
+              aria-label="جابه‌جایی ترتیب"
+              className="mt-1 hidden cursor-grab text-zinc-400 sm:block"
             >
-              <Icon icon={Trash} size={16} />
-            </AdminButton>
+              <Icon icon={DotsSixVertical} size={18} />
+            </button>
+            <ProductFrameEditor
+              src={src}
+              value={imageFits?.[src]}
+              onChange={(next) => {
+                const updated = writeImageFit(fitsRef.current, src, next);
+                fitsRef.current = updated;
+                onFitsChangeRef.current(updated);
+              }}
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="truncate text-xs text-zinc-600" dir="ltr">
+                {src.startsWith("data:") ? "تصویر آپلودشده" : src}
+              </p>
+              <AdminButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setImages(imagesRef.current.filter((_, i) => i !== index))
+                }
+              >
+                <Icon icon={Trash} size={16} />
+                حذف
+              </AdminButton>
+            </div>
           </li>
         ))}
       </ul>

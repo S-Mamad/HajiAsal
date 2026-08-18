@@ -137,7 +137,7 @@ export function TicketCreateForm({
         className={cn(
           "inline-flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium transition disabled:opacity-40 sm:sticky sm:bottom-4",
           variant === "storefront"
-            ? "bg-gold text-primary hover:brightness-95"
+            ? "bg-gold text-ink-on-gold hover:brightness-95"
             : "bg-zinc-900 text-white hover:bg-zinc-800",
         )}
       >

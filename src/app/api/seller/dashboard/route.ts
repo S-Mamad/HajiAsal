@@ -11,10 +11,22 @@ export async function GET(request: Request) {
   if (!gated.ok) return gated.response;
 
   const seller = gated.ctx.seller;
-  const includeWallet = canSeller(seller.capabilities, "wallet.view");
+  const caps = seller.capabilities;
+  const includeWallet = canSeller(caps, "wallet.view");
+  const includeOrders = canSeller(caps, "orders.manage");
+  const includeProducts =
+    canSeller(caps, "products.manage") || canSeller(caps, "inventory.manage");
+  const includeTickets = canSeller(caps, "tickets.manage");
+  const includeRevenue =
+    canSeller(caps, "reports.view") || canSeller(caps, "orders.manage");
+
   const data = await buildSellerDashboard(seller.id, {
     lowStockThreshold: seller.shopSettings?.lowStockThreshold ?? 10,
     includeWallet,
+    includeOrders,
+    includeProducts,
+    includeTickets,
+    includeRevenue,
   });
 
   return NextResponse.json({

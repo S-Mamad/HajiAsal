@@ -205,14 +205,17 @@ export function getSellerNavGroups(
 export function findSellerNavItemForPath(
   pathname: string,
 ): SellerNavItem | null {
+  let best: SellerNavItem | null = null;
   for (const group of GROUPS) {
     for (const item of group.items) {
       if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
-        return item;
+        if (!best || item.href.length > best.href.length) {
+          best = item;
+        }
       }
     }
   }
-  return null;
+  return best;
 }
 
 export function canAccessSellerPath(

@@ -47,7 +47,7 @@ export function SellerLayout({
         className="panel-shell seller-shell flex min-h-[100dvh] text-[var(--panel-text)]"
         dir="rtl"
       >
-        <div className="sticky top-0 hidden h-[100dvh] shrink-0 lg:flex">
+        <div className="sticky top-0 z-30 hidden h-[100dvh] shrink-0 lg:flex">
           <SellerSidebar shopName={shopName} capabilities={capabilities} />
         </div>
 

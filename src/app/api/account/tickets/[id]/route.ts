@@ -5,14 +5,18 @@ import {
   addSupportTicketMessage,
   getSupportTicket,
   listSupportTicketMessages,
+  markSupportTicketRead,
   upsertSupportTicket,
 } from "@/lib/server/support-tickets";
+import { resolveSupportActor } from "@/lib/server/support-guest";
+import { applyDeliveryReceipts } from "@/lib/tickets/read-receipts";
 import {
   assertMessageRateLimitAsync,
   getTypingActors,
   isBlocked,
   setTyping,
 } from "@/lib/server/ticket-runtime";
+import { enqueueTelegramAlert } from "@/lib/server/telegram-alert-queue";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,22 +27,27 @@ async function ownedTicket(userId: string, id: string) {
 }
 
 export async function GET(request: Request, { params }: Params) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
+  const actor = resolveSupportActor(getSessionFromRequest(request), request);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const ticket = await ownedTicket(session.userId, id);
+  const ticket = await ownedTicket(actor.customerId, id);
   if (!ticket) {
     return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
   }
-  const messages = (await listSupportTicketMessages(id)).filter(
-    (m) => !m.isInternal,
+
+  const seen =
+    (await markSupportTicketRead(id, "customer").catch(() => null)) ?? ticket;
+
+  const messages = applyDeliveryReceipts(
+    (await listSupportTicketMessages(id)).filter((m) => !m.isInternal),
+    seen,
   );
-  const typing = getTypingActors("customer", id, session.userId);
+  const typing = getTypingActors("customer", id, actor.customerId);
   const adminTyping = typing.some((t) => t.actorType === "admin");
   return NextResponse.json({
-    ticket,
+    ticket: seen,
     messages,
     typing: { adminTyping },
   });
@@ -65,17 +74,17 @@ const patchSchema = z.object({
 });
 
 export async function POST(request: Request, { params }: Params) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
+  const actor = resolveSupportActor(getSessionFromRequest(request), request);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  const ticket = await ownedTicket(session.userId, id);
+  const ticket = await ownedTicket(actor.customerId, id);
   if (!ticket) {
     return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
   }
 
-  if (isBlocked(`user:${session.userId}`)) {
+  if (isBlocked(`user:${actor.customerId}`)) {
     return NextResponse.json({ error: "حساب مسدود است" }, { status: 403 });
   }
 
@@ -88,7 +97,7 @@ export async function POST(request: Request, { params }: Params) {
     setTyping({
       channel: "customer",
       ticketId: id,
-      actorId: session.userId,
+      actorId: actor.customerId,
       actorType: "customer",
     });
     return NextResponse.json({ success: true });
@@ -98,7 +107,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "متن نامعتبر است" }, { status: 400 });
   }
 
-  const rl = await assertMessageRateLimitAsync(`customer:${session.userId}`);
+  const rl = await assertMessageRateLimitAsync(`customer:${actor.customerId}`);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "ارسال بیش از حد مجاز است", retryAfterSec: rl.retryAfterSec },
@@ -110,7 +119,7 @@ export async function POST(request: Request, { params }: Params) {
     const message = await addSupportTicketMessage({
       ticketId: id,
       senderType: "customer",
-      senderId: session.userId,
+      senderId: actor.customerId,
       body: parsed.data.body.trim(),
       attachmentUrl: parsed.data.attachmentUrl ?? null,
       attachmentName: parsed.data.attachmentName ?? null,
@@ -118,6 +127,26 @@ export async function POST(request: Request, { params }: Params) {
       clientMessageId: parsed.data.clientMessageId,
       replyToId: parsed.data.replyToId,
     });
+    // Keep contact fields fresh if guest updated cookie earlier.
+    if (
+      ticket.customerName !== (actor.fullName?.trim() || actor.phone) ||
+      ticket.customerPhone !== actor.phone
+    ) {
+      await upsertSupportTicket({
+        ...ticket,
+        customerName: actor.fullName?.trim() || actor.phone,
+        customerPhone: actor.phone,
+      }).catch(() => undefined);
+    }
+
+    void enqueueTelegramAlert("ticket.reply", {
+      id,
+      subject: ticket.subject,
+      excerpt: parsed.data.body.trim(),
+      customerName: actor.fullName ?? ticket.customerName ?? undefined,
+      customerPhone: actor.phone ?? ticket.customerPhone,
+    });
+
     return NextResponse.json({ success: true, message });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
@@ -135,13 +164,13 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
+  const actor = resolveSupportActor(getSessionFromRequest(request), request);
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
   try {
-    const ticket = await ownedTicket(session.userId, id);
+    const ticket = await ownedTicket(actor.customerId, id);
     if (!ticket) {
       return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
     }

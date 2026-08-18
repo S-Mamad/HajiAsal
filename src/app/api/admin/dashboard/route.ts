@@ -110,7 +110,7 @@ export async function GET(request: Request) {
         salesChart: [],
         ordersChart: [],
       },
-      { status: 200 },
+      { status: 503 },
     );
   }
 }

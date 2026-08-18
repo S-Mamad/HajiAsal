@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import { isProduction } from "@/lib/server/production";
-import { getDashboardStats } from "@/lib/server/admin-platform-store";
-import { getAllOrders } from "@/lib/server/orders";
-import { countOpenUnifiedTickets } from "@/lib/server/unified-tickets";
-import { getContactMessagesBySource } from "@/lib/server/newsletter";
-import { notifyTelegram } from "@/lib/server/telegram-notify";
+import { tehranDateKey } from "@/lib/server/telegram-sales-stats";
+import {
+  claimTelegramDigestDay,
+  clearTelegramDigestClaim,
+  markTelegramDigestSent,
+  wasDigestSentForDate,
+} from "@/lib/server/telegram-digest-state";
+import { sendTelegramDigest } from "@/lib/server/telegram-digest";
 
 /**
- * cPanel cron (daily):
- * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://admin.hajiasal.ir/api/cron/telegram-digest
+ * cPanel cron (daily, ideally ~23:55 Asia/Tehran):
+ * curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
+ *   https://admin.hajiasal.ir/api/cron/telegram-digest
+ *
+ * Force resend same day: add ?force=1
  */
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -21,49 +27,58 @@ export async function POST(request: Request) {
 
   const auth = request.headers.get("authorization") ?? "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  const urlSecret = new URL(request.url).searchParams.get("secret") ?? "";
+  const url = new URL(request.url);
+  const urlSecret = url.searchParams.get("secret") ?? "";
   if (bearer !== secret && urlSecret !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const stats = await getDashboardStats().catch(() => ({
-      salesToday: 0,
-      salesWeek: 0,
-      salesMonth: 0,
-      customersCount: 0,
-      lowStockCount: 0,
-      avgOrderValue: 0,
-    }));
-    const orders = await getAllOrders().catch(() => []);
-    const pendingOrders = orders.filter(
-      (o) => o.status === "pending_payment" || o.status === "confirmed",
-    ).length;
-    const openTickets = await countOpenUnifiedTickets().catch(() => 0);
-    const messages = await getContactMessagesBySource("hajiasal").catch(
-      () => [],
-    );
-    const unreadMessages = messages.filter((m) => !m.readAt).length;
+  const force =
+    url.searchParams.get("force") === "1" ||
+    url.searchParams.get("force") === "true";
+  const todayKey = tehranDateKey();
 
-    const result = await notifyTelegram("digest", {
-      salesToday: stats.salesToday,
-      salesWeek: stats.salesWeek,
-      salesMonth: stats.salesMonth,
-      pendingOrders,
-      openTickets,
-      unreadMessages,
-      lowStockCount: stats.lowStockCount,
-      customersCount: stats.customersCount,
-      avgOrderValue: stats.avgOrderValue,
-    });
+  try {
+    if (!force) {
+      if (await wasDigestSentForDate(todayKey)) {
+        return NextResponse.json({
+          success: true,
+          skipped: "already_sent_today",
+          dateKey: todayKey,
+        });
+      }
+      const claimed = await claimTelegramDigestDay(todayKey);
+      if (!claimed) {
+        return NextResponse.json({
+          success: true,
+          skipped: "already_sent_today",
+          dateKey: todayKey,
+        });
+      }
+    } else {
+      // Force: refresh claim so subsequent non-force runs skip.
+      await markTelegramDigestSent(todayKey);
+    }
+
+    const result = await sendTelegramDigest();
+
+    if (!result.sent) {
+      await clearTelegramDigestClaim(todayKey);
+    }
 
     return NextResponse.json({
       success: true,
       sent: result.sent,
       skipped: result.skipped,
       error: result.error,
+      dateKey: todayKey,
+      salesToday: result.sales.salesToday,
+      ordersToday: result.sales.ordersToday,
+      pendingFresh: result.sales.pendingOrdersFresh,
+      pendingStale: result.sales.pendingOrdersStale,
     });
   } catch (error) {
+    await clearTelegramDigestClaim(todayKey).catch(() => undefined);
     console.error(
       "[cron/telegram-digest]",
       error instanceof Error ? error.message : error,

@@ -12,6 +12,8 @@ vi.mock("./mysql", () => ({
   mysqlQuery: (...args: unknown[]) => mysqlQuery(...args),
   mysqlQueryOne: (...args: unknown[]) => mysqlQueryOne(...args),
   withMysqlTransaction: (...args: unknown[]) => withMysqlTransaction(...args),
+  withMysqlConnection: vi.fn(),
+  isMysqlUsable: () => false,
   asJson: (v: unknown) => JSON.stringify(v),
   parseJsonField: <T>(v: unknown, fallback: T) => {
     if (v == null) return fallback;
@@ -138,7 +140,7 @@ describe("expireStalePendingOrders", () => {
     memoryPushOrder(baseOrder({ id: "OLD", createdAt: old, updatedAt: old }));
     memoryPushOrder(baseOrder({ id: "NEW" }));
 
-    const n = await expireStalePendingOrders(24 * 60 * 60 * 1000);
+    const n = await expireStalePendingOrders();
     expect(n).toBe(1);
     const orders = memoryGetOrders() as StoredOrder[];
     expect(orders.find((o) => o.id === "OLD")?.status).toBe("cancelled");

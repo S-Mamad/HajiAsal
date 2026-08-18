@@ -13,9 +13,8 @@ import { ADMIN_NAV_PATHS } from "./module-catalog";
 const ROLES: AdminRole[] = ["super_admin", "support", "warehouse", "content"];
 
 function allNavHrefs(): string[] {
-  const storefront = hajiasalPath("/");
   return ADMIN_NAV_GROUPS.flatMap((g) =>
-    g.items.map((i) => i.href).filter((href) => href !== storefront),
+    g.items.filter((item) => !item.external).map((item) => item.href),
   );
 }
 

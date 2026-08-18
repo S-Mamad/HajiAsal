@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -29,6 +30,8 @@ import {
 
 const MAX_CHARS = 5000;
 
+type CannedItem = { shortcut: string; title: string; body: string };
+
 type Props = {
   variant: TicketChatVariant;
   ticketId?: string;
@@ -37,11 +40,18 @@ type Props = {
   sending?: boolean;
   closed?: boolean;
   placeholder?: string;
+  /** Prefill draft once on mount (FAB quick prompts). */
+  initialText?: string;
   allowInternal?: boolean;
   replyTo?: ChatMessage | null;
   onClearReply?: () => void;
-  canned?: Array<{ shortcut: string; title: string; body: string }>;
+  canned?: CannedItem[];
   onTyping?: () => void;
+  keyboardOffset?: number;
+  /** Tight chrome for FAB / mobile sheet composers. */
+  compact?: boolean;
+  /** Account ticket shell already clears safe-area; skip double inset. */
+  omitBottomSafeArea?: boolean;
   onSend: (input: {
     body: string;
     attachmentUrl?: string | null;
@@ -66,15 +76,19 @@ export function TicketComposer({
   sending,
   closed,
   placeholder = "پیام خود را بنویسید…",
+  initialText,
   allowInternal,
   replyTo,
   onClearReply,
   canned = [],
   onTyping,
+  keyboardOffset = 0,
+  compact = false,
+  omitBottomSafeArea = false,
   onSend,
   onUpload,
 }: Props) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const [attachmentMime, setAttachmentMime] = useState<string | null>(null);
@@ -83,24 +97,42 @@ export function TicketComposer({
   const [shake, setShake] = useState(false);
   const [internal, setInternal] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isStore = variant === "storefront";
+  const bottomPad = omitBottomSafeArea
+    ? compact
+      ? "px-3 pb-2.5 pt-2"
+      : "px-3 pb-3 pt-2 sm:px-4"
+    : compact
+      ? "px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2"
+      : "px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pt-2 sm:px-4";
+
+  const fieldChrome = isStore
+    ? "rounded-[1.375rem] border border-border bg-surface-elevated"
+    : "rounded-[1.375rem] border border-stone-200 bg-white";
 
   const draftKey =
     ticketId && roleKey ? draftStorageKey(ticketId, roleKey) : null;
 
   useEffect(() => {
     if (!draftKey) return;
+    if (initialText) return;
     try {
       const raw = localStorage.getItem(draftKey);
       if (raw) setText(raw);
     } catch {
       /* ignore */
     }
-  }, [draftKey]);
+  }, [draftKey, initialText]);
+
+  useEffect(() => {
+    if (!initialText) return;
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [initialText]);
 
   useEffect(() => {
     if (!draftKey) return;
@@ -118,8 +150,8 @@ export function TicketComposer({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
-  }, []);
+    el.style.height = `${Math.min(el.scrollHeight, compact ? 96 : 140)}px`;
+  }, [compact]);
 
   useEffect(() => {
     resize();
@@ -129,6 +161,28 @@ export function TicketComposer({
     !locked &&
     (text.trim().length > 0 || !!attachmentUrl) &&
     text.length <= MAX_CHARS;
+
+  const slashQuery = useMemo(() => {
+    if (!canned.length) return null;
+    if (!text.startsWith("/")) return null;
+    const token = text.split(/\s+/)[0] ?? "";
+    return token.slice(1).toLowerCase();
+  }, [canned.length, text]);
+
+  const slashMatches = useMemo(() => {
+    if (slashQuery === null) return [];
+    return canned
+      .filter(
+        (c) =>
+          c.shortcut.replace(/^\//, "").toLowerCase().includes(slashQuery) ||
+          c.title.toLowerCase().includes(slashQuery),
+      )
+      .slice(0, 6);
+  }, [canned, slashQuery]);
+
+  useEffect(() => {
+    setSlashOpen(slashQuery !== null && slashMatches.length > 0);
+  }, [slashMatches.length, slashQuery]);
 
   const processFile = async (file: File) => {
     if (!onUpload) return;
@@ -153,12 +207,20 @@ export function TicketComposer({
     }
   };
 
+  const applyCanned = (item: CannedItem) => {
+    setText(item.body);
+    setSlashOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
   const submit = async () => {
     if (!canSend) return;
     let body = text.trim();
     if (body.startsWith("/") && canned.length) {
       const shortcut = body.split(/\s+/)[0];
-      const found = canned.find((c) => c.shortcut === shortcut);
+      const found = canned.find(
+        (c) => c.shortcut === shortcut || c.shortcut === `/${shortcut?.slice(1)}`,
+      );
       if (found) body = found.body;
     }
     const payload = {
@@ -173,27 +235,46 @@ export function TicketComposer({
       replyToId: replyTo?.id ?? null,
       isInternal: internal,
     };
+    const prevText = text;
+    const prevUrl = attachmentUrl;
+    const prevName = attachmentName;
+    const prevMime = attachmentMime;
     setText("");
     setAttachmentUrl(null);
     setAttachmentName(null);
     setAttachmentMime(null);
     setUploadError("");
+    setSlashOpen(false);
     onClearReply?.();
-    if (draftKey) {
-      try {
-        localStorage.removeItem(draftKey);
-      } catch {
-        /* ignore */
-      }
-    }
     try {
       await onSend(payload);
+      if (draftKey) {
+        try {
+          localStorage.removeItem(draftKey);
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      setText(prevText);
+      setAttachmentUrl(prevUrl);
+      setAttachmentName(prevName);
+      setAttachmentMime(prevMime);
     } finally {
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashOpen && slashMatches.length && e.key === "ArrowDown") {
+      e.preventDefault();
+      applyCanned(slashMatches[0]!);
+      return;
+    }
+    if (e.key === "Escape" && slashOpen) {
+      setSlashOpen(false);
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void submit();
@@ -229,11 +310,15 @@ export function TicketComposer({
     return (
       <div
         className={cn(
-          "relative z-[1] border-t px-4 py-4 text-center text-sm",
-          isStore
-            ? "border-border/70 bg-surface/90 text-secondary backdrop-blur-md"
-            : "border-stone-200 bg-white text-stone-500",
+          "relative z-[1] text-center text-sm",
+          compact ? "px-3 py-3" : "px-4 py-4",
+          isStore ? "border-t border-border bg-surface text-secondary" : "bg-white text-stone-500",
         )}
+        style={
+          keyboardOffset > 0
+            ? { paddingBottom: `calc(1rem + ${keyboardOffset}px)` }
+            : undefined
+        }
       >
         این تیکت بسته شده است. برای ادامه گفتگو آن را دوباره باز کنید.
       </div>
@@ -243,12 +328,22 @@ export function TicketComposer({
   return (
     <div
       className={cn(
-        "relative z-[1] border-t p-2.5 sm:p-3",
+        "relative z-[1] border-t",
+        bottomPad,
         isStore
-          ? "border-border/70 bg-surface/92 backdrop-blur-md supports-[backdrop-filter]:bg-surface/85"
-          : "border-stone-200 bg-white/95 backdrop-blur-md",
+          ? "border-border bg-surface"
+          : "border-stone-200 bg-white",
         dragOver && "ring-2 ring-inset ring-gold/50",
       )}
+      style={
+        keyboardOffset > 0
+          ? {
+              paddingBottom: omitBottomSafeArea
+                ? `calc(${compact ? "0.5rem" : "0.75rem"} + ${keyboardOffset}px)`
+                : `calc(max(${compact ? "0.5rem" : "0.65rem"}, env(safe-area-inset-bottom, 0px)) + ${keyboardOffset}px)`,
+            }
+          : undefined
+      }
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -256,11 +351,40 @@ export function TicketComposer({
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
+      {slashOpen && slashMatches.length > 0 ? (
+        <div
+          className={cn(
+            "absolute inset-x-2.5 bottom-full z-20 mb-1 overflow-hidden rounded-2xl py-1 shadow-[0_16px_40px_-18px_rgb(28_25_23/0.4)]",
+            isStore ? "bg-surface" : "bg-white",
+          )}
+          role="listbox"
+          aria-label="پاسخ‌های آماده"
+        >
+          {slashMatches.map((item) => (
+            <button
+              key={item.shortcut}
+              type="button"
+              role="option"
+              className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-right hover:bg-stone-50"
+              onClick={() => applyCanned(item)}
+            >
+              <span className="text-xs font-medium text-zinc-900">
+                {item.shortcut} · {item.title}
+              </span>
+              <span className="truncate text-[11px] font-light text-stone-500">
+                {item.body.slice(0, 80)}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {replyTo ? (
         <div
           className={cn(
-            "mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs",
-            isStore ? "bg-gold-dim text-primary" : "bg-stone-100 text-stone-700",
+            "mb-2 flex h-9 items-center gap-2 px-3 text-[12px]",
+            "rounded-xl",
+            isStore ? "bg-surface-muted text-primary" : "bg-stone-100 text-stone-700",
           )}
         >
           <span className="min-w-0 flex-1 truncate">
@@ -268,7 +392,7 @@ export function TicketComposer({
           </span>
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-xl hover:bg-black/5"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-muted"
             onClick={onClearReply}
             aria-label="لغو پاسخ"
           >
@@ -280,17 +404,20 @@ export function TicketComposer({
       {attachmentUrl ? (
         <div
           className={cn(
-            "mb-2 flex items-center gap-2 rounded-2xl px-3 py-2 text-xs",
-            isStore ? "bg-surface-muted text-primary" : "bg-stone-100 text-stone-700",
+            "mb-2 flex h-9 items-center gap-2 px-3 text-[12px]",
+            "rounded-xl",
+            isStore
+              ? "bg-surface-muted text-primary"
+              : "bg-stone-100 text-stone-700",
           )}
         >
-          <Icon icon={Paperclip} size={14} />
+          <Icon icon={Paperclip} size={14} className="shrink-0 opacity-70" />
           <span className="min-w-0 flex-1 truncate">
             {attachmentName ?? "پیوست"}
           </span>
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-xl hover:bg-black/5"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-muted"
             onClick={() => {
               setAttachmentUrl(null);
               setAttachmentName(null);
@@ -306,7 +433,8 @@ export function TicketComposer({
         <p className="mb-2 px-1 text-xs text-rose-600">{uploadError}</p>
       ) : null}
 
-      <div className="flex items-end gap-1.5 sm:gap-2">
+      {/* Native RTL: attach at start, send at end, all h-11. */}
+      <div className="flex items-end gap-1.5">
         {onUpload ? (
           <>
             <input
@@ -321,18 +449,20 @@ export function TicketComposer({
               disabled={locked}
               onClick={() => fileRef.current?.click()}
               className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.97]",
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition",
+                "active:scale-[0.96]",
                 isStore
                   ? "text-secondary hover:bg-surface-muted hover:text-primary"
-                  : "text-stone-600 hover:bg-stone-50",
-                locked && "opacity-50",
-                shake && "motion-safe:animate-pulse ring-2 ring-rose-400",
+                  : "text-stone-500 hover:bg-stone-100 hover:text-stone-800",
+                locked && "pointer-events-none opacity-40",
+                shake && "motion-safe:animate-pulse ring-1 ring-rose-400",
               )}
               aria-label="پیوست فایل"
             >
               <Icon
                 icon={uploading ? SpinnerGap : Paperclip}
                 size={20}
+                weight="regular"
                 className={uploading ? "animate-spin" : undefined}
               />
             </button>
@@ -345,59 +475,67 @@ export function TicketComposer({
             title="یادداشت داخلی"
             onClick={() => setInternal((v) => !v)}
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.97]",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-[0.96]",
               internal
-                ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200"
-                : "text-stone-500 hover:bg-stone-50",
+                ? "bg-amber-100 text-amber-900"
+                : "text-stone-500 hover:bg-stone-100",
             )}
           >
             <Icon icon={NoteBlank} size={18} />
           </button>
         ) : null}
 
-        <div className="relative min-w-0 flex-1">
-          <label htmlFor={labelId} className="sr-only">
-            متن پیام
-          </label>
-          <textarea
-            id={labelId}
-            ref={textareaRef}
-            rows={1}
-            value={text}
-            disabled={locked}
-            onChange={(e) => {
-              setText(e.target.value.slice(0, MAX_CHARS));
-              if (onTyping) {
-                if (typingTimer.current) clearTimeout(typingTimer.current);
-                typingTimer.current = setTimeout(() => onTyping(), 250);
+        <div
+          className={cn(
+            "flex min-h-11 min-w-0 flex-1 items-end px-3.5",
+            fieldChrome,
+            "focus-within:border-gold/45",
+          )}
+        >
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor={labelId} className="sr-only">
+              متن پیام
+            </label>
+            <textarea
+              id={labelId}
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              disabled={locked}
+              onChange={(e) => {
+                setText(e.target.value.slice(0, MAX_CHARS));
+                if (onTyping) {
+                  if (typingTimer.current) clearTimeout(typingTimer.current);
+                  typingTimer.current = setTimeout(() => onTyping(), 250);
+                }
+              }}
+              onKeyDown={onKeyDown}
+              onPaste={onPaste}
+              placeholder={
+                internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
               }
-            }}
-            onKeyDown={onKeyDown}
-            onPaste={onPaste}
-            placeholder={
-              internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
-            }
-            className={cn(
-              "max-h-36 min-h-11 w-full resize-none rounded-[1.35rem] px-4 py-2.5 text-sm leading-relaxed outline-none transition",
-              "focus-visible:ring-2 focus-visible:ring-gold/30",
-              isStore
-                ? "border border-border/80 bg-surface-elevated text-primary placeholder:text-secondary/65"
-                : "border border-stone-200 bg-stone-50 text-zinc-900 placeholder:text-stone-400",
-              locked && "opacity-60",
-            )}
-          />
-          {text.length > MAX_CHARS - 200 ? (
-            <span
               className={cn(
-                "pointer-events-none absolute bottom-1.5 left-3 text-[10px] tabular-nums",
-                text.length > MAX_CHARS - 100
-                  ? "text-rose-500"
-                  : "text-stone-400",
+                "max-h-24 w-full resize-none bg-transparent py-2.5 text-start outline-none",
+                "min-h-11 text-[15px] leading-6",
+                isStore
+                  ? "text-primary placeholder:text-secondary/45"
+                  : "text-zinc-900 placeholder:text-stone-400",
+                locked && "opacity-60",
               )}
-            >
-              {text.length}/{MAX_CHARS}
-            </span>
-          ) : null}
+            />
+            {text.length > MAX_CHARS - 200 ? (
+              <span
+                className={cn(
+                  "pointer-events-none absolute bottom-2.5 start-0 text-[10px] tabular-nums",
+                  text.length > MAX_CHARS - 100
+                    ? "text-rose-500"
+                    : "text-stone-400",
+                )}
+              >
+                {text.length}/{MAX_CHARS}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <button
@@ -405,29 +543,35 @@ export function TicketComposer({
           disabled={!canSend}
           onClick={() => void submit()}
           className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition active:scale-[0.94]",
-            isStore
-              ? "bg-gold text-primary shadow-[0_8px_18px_-10px_var(--gold-glow)] hover:brightness-95 disabled:opacity-35 disabled:shadow-none"
-              : "bg-zinc-900 text-white hover:bg-zinc-800 disabled:bg-zinc-300",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition duration-150",
+            "active:scale-[0.94]",
+            canSend
+              ? isStore
+                ? "bg-gold text-ink-on-gold"
+                : "bg-zinc-900 text-white"
+              : isStore
+                ? "text-secondary/35"
+                : "text-stone-300",
           )}
           aria-label="ارسال پیام"
         >
           <Icon
             icon={sending ? SpinnerGap : PaperPlaneTilt}
             size={18}
-            className={sending ? "animate-spin" : undefined}
+            weight={canSend ? "fill" : "regular"}
+            className={cn(
+              sending && "animate-spin",
+              !sending && "-scale-x-100",
+            )}
           />
         </button>
       </div>
-      <p
-        className={cn(
-          "mt-1.5 hidden px-1 text-[11px] sm:block",
-          isStore ? "text-secondary" : "text-stone-400",
-        )}
-      >
-        Enter ارسال · Shift+Enter خط جدید · Paste/Drop برای فایل
-        {canned.length ? " · میانبر پاسخ آماده با /" : ""}
-      </p>
+      {!isStore ? (
+        <p className="mt-1.5 hidden px-1 text-[11px] font-light text-stone-400 sm:block">
+          Enter ارسال · Shift+Enter خط جدید · Paste/Drop برای فایل
+          {canned.length ? " · / برای پاسخ آماده" : ""}
+        </p>
+      ) : null}
     </div>
   );
 }

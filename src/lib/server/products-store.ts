@@ -41,6 +41,7 @@ import {
 } from "./mysql";
 import { revalidatePath } from "next/cache";
 import { getActiveSellerIdsAsync } from "./sellers-store";
+import { parseImageFits, pruneImageFits } from "@/lib/product-image";
 import {
   applyStockUpdates,
   stockDefaultsForCreate,
@@ -85,6 +86,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
       categoryLabels[categoryId] ||
       categoryId,
     images: parseJsonField<string[]>(row.images, []),
+    imageFits: parseImageFits(honeyMeta.imageFits),
     weightOptions: parseJsonField<WeightOption[]>(row.weight_options, []),
     discountPrice: row.discount_price
       ? Number(row.discount_price)
@@ -97,6 +99,10 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     brandId: row.brand_id ? String(row.brand_id) : null,
     rating: Number(row.rating ?? 0),
     reviewCount: Number(row.review_count ?? 0),
+    viewsLast24h:
+      typeof honeyMeta.viewsLast24h === "number"
+        ? honeyMeta.viewsLast24h
+        : undefined,
     isBestseller: toBool(row.bestseller),
     isNew: toBool(row.featured),
     ingredients: (honeyMeta.ingredients as string) ?? undefined,
@@ -120,6 +126,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
 function mapProductToRow(
   product: Partial<Product> & { id: string; slug: string; title: string },
 ) {
+  const imageFits = pruneImageFits(product.imageFits, product.images ?? []);
   return {
     id: product.id,
     slug: product.slug,
@@ -141,6 +148,10 @@ function mapProductToRow(
       ingredients: product.ingredients,
       shippingInfo: product.shippingInfo,
       categoryLabel: product.categoryLabel,
+      ...(typeof product.viewsLast24h === "number"
+        ? { viewsLast24h: product.viewsLast24h }
+        : {}),
+      ...(imageFits ? { imageFits } : {}),
     },
     seller_id: product.sellerId ?? null,
     approval_status: product.approvalStatus ?? "approved",
@@ -363,10 +374,12 @@ async function fetchAllFromMysql(): Promise<Product[] | null> {
     );
     return rows.map((row) => mapRowToProduct(row));
   } catch (err) {
-    console.error(
-      "[products] fetch failed:",
-      err instanceof Error ? err.message : err,
-    );
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[products] MySQL fetch unavailable, using local catalog:",
+        err instanceof Error ? err.message : err,
+      );
+    }
     return null;
   }
 }
@@ -527,15 +540,11 @@ export async function getAllProductsAsync(
   let seedOrDb: Product[];
   if (fromDb === null) {
     seedOrDb = getAllProductsSync();
-  } else if (fromDb.length === 0) {
-    seedOrDb = getAllProductsSync();
   } else {
-    const byId = new Map<string, Product>();
-    for (const p of getAllProductsSync()) byId.set(p.id, p);
-    for (const p of fromDb) byId.set(p.id, p);
-    seedOrDb = Array.from(byId.values());
+    seedOrDb = fromDb;
   }
-  const base = await mergeWithRuntime(seedOrDb);
+  const base =
+    fromDb === null ? await mergeWithRuntime(seedOrDb) : seedOrDb;
   const withOverrides = await applyLocalOverrides(base);
   const scope = options?.scope ?? "public";
 
@@ -666,7 +675,7 @@ export async function filterProductsAsync(
 export async function getBestsellersAsync(limit = 8): Promise<Product[]> {
   const catalog = await getAllProductsAsync();
   return catalog
-    .filter((p) => p.isBestseller && p.inStock)
+    .filter((p) => !p.deletedAt && p.isBestseller && p.inStock)
     .sort((a, b) => b.reviewCount - a.reviewCount)
     .slice(0, limit);
 }

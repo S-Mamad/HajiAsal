@@ -1,16 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { PhoneLoginForm } from "@/components/auth/PhoneLoginForm";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { AuthWelcome } from "@/components/auth/AuthWelcome";
-import { hajiasalPath, sellerPublicUrl } from "@/lib/paths";
+import { hajiasalPath, sellerPublicUrl, sitePublicUrl } from "@/lib/paths";
 import { useAuth } from "@/hooks/useAuth";
 import { isProfileComplete } from "@/lib/auth/profile-complete";
-import { safeInternalRedirect } from "@/lib/safe-redirect";
+import { safeAuthRedirect } from "@/lib/safe-redirect";
 import { maskPhone } from "@/lib/auth/phone-mask";
 
 type Step = "auth" | "complete-profile" | "welcome";
@@ -20,32 +19,127 @@ type WelcomeUser = {
   phone: string;
 };
 
+const PANEL_BOUNCE_KEY = "hajiasal.panel.handoff.bounce";
+
+/** Panel return targets: skip welcome splash so login does not feel like a restart. */
+function isPanelRedirect(target: string): boolean {
+  try {
+    if (/^https?:\/\//i.test(target)) {
+      const path = new URL(target).pathname;
+      return path.startsWith("/admin") || path.startsWith("/seller");
+    }
+  } catch {
+    /* fall through */
+  }
+  return (
+    target.startsWith("/admin") ||
+    target.startsWith("/seller") ||
+    target.includes("/admin/") ||
+    target.includes("/seller/")
+  );
+}
+
+function readBounceTarget(): string | null {
+  try {
+    return sessionStorage.getItem(PANEL_BOUNCE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeBounceTarget(target: string) {
+  try {
+    sessionStorage.setItem(PANEL_BOUNCE_KEY, target);
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearBounceTarget() {
+  try {
+    sessionStorage.removeItem(PANEL_BOUNCE_KEY);
+  } catch {
+    /* private mode */
+  }
+}
+
+async function panelHandoffUrl(redirect: string): Promise<string | null> {
+  const res = await fetch("/api/auth/panel-handoff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    signal: AbortSignal.timeout(8000),
+    body: JSON.stringify({ redirect }),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { url?: string };
+  return typeof data.url === "string" && data.url.startsWith("http")
+    ? data.url
+    : null;
+}
+
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading, refresh } = useAuth();
+  const navigatedRef = useRef(false);
 
-  const redirect = safeInternalRedirect(
+  const redirect = safeAuthRedirect(
     searchParams.get("redirect"),
     hajiasalPath("/account"),
   );
+  const stayOnLogin = searchParams.get("stay") === "1";
   const wantComplete = searchParams.get("step") === "complete";
 
   const [step, setStep] = useState<Step>("auth");
   const [phone, setPhone] = useState("");
   const [welcomeUser, setWelcomeUser] = useState<WelcomeUser | null>(null);
+  const [panelNavFailed, setPanelNavFailed] = useState(stayOnLogin);
+  const [handingOff, setHandingOff] = useState(false);
+
+  const navigateAfterAuth = async (target: string) => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+
+    if (/^https?:\/\//i.test(target) && isPanelRedirect(target)) {
+      setHandingOff(true);
+      writeBounceTarget(target);
+      try {
+        const url = await panelHandoffUrl(target);
+        window.location.replace(url ?? target);
+      } catch {
+        navigatedRef.current = false;
+        setHandingOff(false);
+        setPanelNavFailed(true);
+      }
+      return;
+    }
+
+    if (/^https?:\/\//i.test(target)) {
+      window.location.replace(target);
+      return;
+    }
+
+    clearBounceTarget();
+    router.replace(target);
+    router.refresh();
+  };
 
   useEffect(() => {
     if (authLoading) return;
+    if (handingOff) return;
 
-    // Logged-in complete user opened /login directly (not mid-welcome).
     if (
       user &&
       isProfileComplete(user.fullName) &&
       step === "auth" &&
       !welcomeUser
     ) {
-      router.replace(redirect);
+      const bounced = readBounceTarget() === redirect;
+      if (isPanelRedirect(redirect) && (stayOnLogin || panelNavFailed || bounced)) {
+        return;
+      }
+      void navigateAfterAuth(redirect);
       return;
     }
 
@@ -63,7 +157,17 @@ function LoginPageContent() {
     if (wantComplete && !user && step === "complete-profile") {
       setStep("auth");
     }
-  }, [authLoading, user, step, welcomeUser, redirect, router, wantComplete]);
+  }, [
+    authLoading,
+    user,
+    step,
+    welcomeUser,
+    redirect,
+    wantComplete,
+    stayOnLogin,
+    panelNavFailed,
+    handingOff,
+  ]);
 
   const handleNeedsRegister = (p: string) => {
     setPhone(p);
@@ -71,13 +175,19 @@ function LoginPageContent() {
   };
 
   const handleWelcome = (u: WelcomeUser) => {
+    clearBounceTarget();
+    setPanelNavFailed(false);
+    // Admin/seller return: go straight to panel (no welcome flash / auto-timer).
+    if (isPanelRedirect(redirect)) {
+      void navigateAfterAuth(redirect);
+      return;
+    }
     setWelcomeUser(u);
     setStep("welcome");
   };
 
   const finishWelcome = () => {
-    router.push(redirect);
-    router.refresh();
+    void navigateAfterAuth(redirect);
   };
 
   const title =
@@ -94,26 +204,7 @@ function LoginPageContent() {
         ? "در حال انتقال به حساب شما"
         : "با شماره موبایل؛ اگر حساب ندارید همین‌جا ساخته می‌شود";
 
-  if (authLoading) {
-    return (
-      <AuthLayout title="ورود یا ثبت‌نام" subtitle="لطفاً کمی صبر کنید">
-        <p className="text-sm text-muted">در حال بررسی نشست...</p>
-      </AuthLayout>
-    );
-  }
-
-  if (
-    user &&
-    isProfileComplete(user.fullName) &&
-    step === "auth" &&
-    !welcomeUser
-  ) {
-    return (
-      <AuthLayout title="ورود یا ثبت‌نام" subtitle="در حال انتقال...">
-        <p className="text-sm text-muted">در حال هدایت...</p>
-      </AuthLayout>
-    );
-  }
+  const showAuthForm = step === "auth" && !welcomeUser;
 
   return (
     <AuthLayout title={title} subtitle={subtitle}>
@@ -144,27 +235,36 @@ function LoginPageContent() {
         </div>
       ) : null}
 
-      {step === "auth" ? (
+      {showAuthForm ? (
         <>
+          {handingOff ? (
+            <p className="mb-5 text-sm text-muted">در حال ورود به پنل...</p>
+          ) : null}
+          {panelNavFailed && isPanelRedirect(redirect) ? (
+            <p className="mb-5 rounded-xl border border-border bg-surface-elevated/60 px-4 py-3 text-sm leading-6 text-primary">
+              ورود به پنل کامل نشد. شماره را وارد کنید تا کد دوباره برایتان
+              ارسال شود.
+            </p>
+          ) : null}
           <PhoneLoginForm
             onNeedsRegister={handleNeedsRegister}
             onWelcome={handleWelcome}
           />
           <p className="mt-8 text-center text-xs leading-relaxed text-muted">
             با ادامه،{" "}
-            <Link
-              href={hajiasalPath("/terms")}
+            <a
+              href={`${sitePublicUrl()}/terms`}
               className="text-gold hover:underline"
             >
               قوانین
-            </Link>{" "}
+            </a>{" "}
             و{" "}
-            <Link
-              href={hajiasalPath("/privacy")}
+            <a
+              href={`${sitePublicUrl()}/privacy`}
               className="text-gold hover:underline"
             >
               حریم خصوصی
-            </Link>{" "}
+            </a>{" "}
             را می‌پذیرید.
           </p>
           <p className="mt-4 text-center text-xs text-muted">

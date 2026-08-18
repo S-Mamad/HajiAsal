@@ -96,4 +96,59 @@ describe("SmsOtpProvider channel priority", () => {
     expect(result.success).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("uses console shared before REST BaseService when both exist", async () => {
+    vi.stubEnv("SMS_PROVIDER", "melipayamak");
+    vi.stubEnv("MELIPAYAMAK_OTP_TOKEN", "tok");
+    vi.stubEnv("MELIPAYAMAK_BODY_ID", "12345");
+    vi.stubEnv("MELIPAYAMAK_USERNAME", "user");
+    vi.stubEnv("MELIPAYAMAK_PASSWORD", "pass");
+
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (href.includes("/shared/")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "ارسال موفق بود" }),
+        };
+      }
+      throw new Error(`unexpected url ${href}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { SmsOtpProvider } = await import("./sms-otp-provider");
+    const result = await new SmsOtpProvider().send("09123456789", "7788");
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/shared/");
+  });
+
+  it("does not fall through to gateway or simple when pattern is configured", async () => {
+    vi.stubEnv("SMS_PROVIDER", "melipayamak");
+    vi.stubEnv("MELIPAYAMAK_OTP_TOKEN", "tok");
+    vi.stubEnv("MELIPAYAMAK_BODY_ID", "12345");
+    vi.stubEnv(
+      "MELIPAYAMAK_OTP_URL",
+      "https://console.melipayamak.com/api/send/otp/tok",
+    );
+
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const href = String(url);
+      if (href.includes("/shared/")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "اعتبار کافی نیست" }),
+        };
+      }
+      throw new Error(`unexpected fallback ${href}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { SmsOtpProvider } = await import("./sms-otp-provider");
+    const result = await new SmsOtpProvider().send("09123456789", "7788");
+    expect(result.success).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

@@ -13,6 +13,7 @@ import {
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 import { getSessionFromRequest } from "@/lib/auth/session";
+import { enqueueTelegramAlert } from "@/lib/server/telegram-alert-queue";
 
 const BUYER_ONLY_MESSAGE =
   "ثبت نظر فقط برای خریداران امکان‌پذیر است.";
@@ -134,6 +135,15 @@ export async function POST(request: Request) {
       author,
       rating: parsed.data.rating,
       comment: parsed.data.comment,
+    });
+
+    void enqueueTelegramAlert("review.created", {
+      reviewId: review.id,
+      productId,
+      author,
+      rating: parsed.data.rating,
+      comment: parsed.data.comment,
+      phone,
     });
 
     return NextResponse.json({

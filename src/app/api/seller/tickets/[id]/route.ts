@@ -17,6 +17,11 @@ import {
 } from "@/lib/server/mysql";
 import type { RowDataPacket } from "mysql2/promise";
 import { allowTicketMysqlFallthrough } from "@/lib/server/production";
+import {
+  assertMessageRateLimitAsync,
+  getTypingActors,
+  setTyping,
+} from "@/lib/server/ticket-runtime";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -55,6 +60,8 @@ export async function GET(request: Request, { params }: Params) {
           `SELECT * FROM seller_ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC`,
           [id],
         );
+        const typing = getTypingActors("seller", id, sellerId);
+        const adminTyping = typing.some((t) => t.actorType === "admin");
         return NextResponse.json({
           ticket: {
             id: String(ticket.id),
@@ -66,6 +73,7 @@ export async function GET(request: Request, { params }: Params) {
             updatedAt: toIso(ticket.updated_at),
           },
           messages: messages.map(mapMysqlSellerMessage),
+          typing: { adminTyping },
         });
       }
       // Miss in MySQL: fall through to memory when allowed (create may have
@@ -97,6 +105,8 @@ export async function GET(request: Request, { params }: Params) {
   if (!mem) {
     return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
   }
+  const typing = getTypingActors("seller", id, sellerId);
+  const adminTyping = typing.some((t) => t.actorType === "admin");
   return NextResponse.json({
     ticket: {
       id: mem.id,
@@ -108,11 +118,12 @@ export async function GET(request: Request, { params }: Params) {
       updatedAt: mem.updatedAt,
     },
     messages: mem.messages,
+    typing: { adminTyping },
   });
 }
 
 const replySchema = z.object({
-  body: z.string().min(1).max(5000),
+  body: z.string().min(1).max(5000).optional(),
   attachmentUrl: z
     .string()
     .url()
@@ -123,6 +134,7 @@ const replySchema = z.object({
   attachmentMime: z.string().max(120).nullable().optional(),
   clientMessageId: z.string().max(64).optional(),
   replyToId: z.string().nullable().optional(),
+  typing: z.boolean().optional(),
 });
 
 export async function POST(request: Request, { params }: Params) {
@@ -137,9 +149,20 @@ export async function POST(request: Request, { params }: Params) {
 
   const sellerId = gated.ctx.seller.id;
 
-  const { assertMessageRateLimitAsync } = await import(
-    "@/lib/server/ticket-runtime"
-  );
+  if (parsed.data.typing) {
+    setTyping({
+      channel: "seller",
+      ticketId: id,
+      actorId: sellerId,
+      actorType: "seller",
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  if (!parsed.data.body?.trim()) {
+    return NextResponse.json({ error: "متن نامعتبر" }, { status: 400 });
+  }
+
   const rl = await assertMessageRateLimitAsync(`seller:${sellerId}`);
   if (!rl.ok) {
     return NextResponse.json(

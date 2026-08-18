@@ -1,19 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  CheckCircle,
+  MapPin,
+  Plus,
+  Star,
+  TrashSimple,
+} from "@phosphor-icons/react";
 import type { UserAddress } from "@/types/auth";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { AccountPageHeader } from "@/components/account/AccountPageHeader";
 import { AccountSkeleton } from "@/components/account/AccountSkeleton";
-import { AccountSurface } from "@/components/account/AccountSurface";
-import iranLocations from "@/data/iran-locations.json";
-
-type LocationEntry = { province: string; cities: string[] };
-
-const selectClass =
-  "h-11 w-full rounded-xl border border-border bg-surface-elevated px-4 text-sm text-primary transition-colors focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30 disabled:opacity-55";
+import {
+  AddressMapSheet,
+  type NewAddressPayload,
+} from "@/components/checkout/AddressMapSheet";
+import { Icon } from "@/components/ui/Icon";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 type AddressesPageClientProps = {
   initialAddresses?: UserAddress[];
@@ -22,99 +27,68 @@ type AddressesPageClientProps = {
 export function AddressesPageClient({
   initialAddresses,
 }: AddressesPageClientProps) {
+  const { user } = useAuth();
   const hasInitial = initialAddresses !== undefined;
   const [addresses, setAddresses] = useState<UserAddress[]>(
     initialAddresses ?? [],
   );
   const [loading, setLoading] = useState(!hasInitial);
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [defaultingId, setDefaultingId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [province, setProvince] = useState("");
-  const [city, setCity] = useState("");
-  const [address, setAddress] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [label, setLabel] = useState("");
 
-  const cities =
-    (iranLocations as LocationEntry[]).find((l) => l.province === province)
-      ?.cities ?? [];
-
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const r = await fetch("/api/account/addresses");
       if (!r.ok) throw new Error("failed");
-      const d = await r.json();
+      const d = (await r.json()) as { addresses?: UserAddress[] };
       setAddresses(d.addresses ?? []);
     } catch {
       setError("بارگذاری آدرس‌ها ممکن نشد.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (hasInitial) return;
     void load();
-  }, [hasInitial]);
+  }, [hasInitial, load]);
 
-  const resetForm = () => {
-    setProvince("");
-    setCity("");
-    setAddress("");
-    setPostalCode("");
-    setLabel("");
+  const onSaved = async (payload: NewAddressPayload) => {
+    const res = await fetch("/api/account/addresses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        isDefault: addresses.length === 0 ? true : payload.isDefault,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      message?: string;
+      error?: string;
+    };
+    if (!res.ok || !data.success) {
+      throw new Error(
+        data.message && /[\u0600-\u06FF]/.test(data.message)
+          ? data.message
+          : data.error && /[\u0600-\u06FF]/.test(data.error)
+            ? data.error
+            : "ذخیره آدرس ناموفق بود",
+      );
+    }
+    setMapOpen(false);
     setError("");
-  };
-
-  const onAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (!province || !city || address.trim().length < 5 || !postalCode.trim()) {
-      setError("استان، شهر، آدرس کامل و کد پستی الزامی است.");
-      return;
-    }
-    if (!/^\d{10}$/.test(postalCode.trim())) {
-      setError("کد پستی باید ۱۰ رقم باشد.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch("/api/account/addresses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: label.trim() || undefined,
-          province,
-          city,
-          address: address.trim(),
-          postalCode: postalCode.trim(),
-          isDefault: addresses.length === 0,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? data.message ?? "ذخیره آدرس انجام نشد.");
-        return;
-      }
-      setShowForm(false);
-      resetForm();
-      await load();
-    } catch {
-      setError("ارتباط برقرار نشد. دوباره تلاش کنید.");
-    } finally {
-      setSaving(false);
-    }
+    await load();
   };
 
   const onDelete = async (id: string) => {
     setDeletingId(id);
     setError("");
     try {
-      const res = await fetch(`/api/account/addresses?id=${id}`, {
+      const res = await fetch(`/api/account/addresses?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -138,7 +112,10 @@ export function AddressesPageClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action: "setDefault" }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        addresses?: UserAddress[];
+      };
       if (!res.ok) {
         setError(data.error ?? "تنظیم آدرس پیش‌فرض انجام نشد.");
         return;
@@ -168,19 +145,19 @@ export function AddressesPageClient({
     <div>
       <AccountPageHeader
         title="آدرس‌های من"
-        subtitle="آدرس ارسال را ذخیره کنید تا در خرید بعدی خودکار پر شود."
+        subtitle="موقعیت را روی نقشه مشخص کنید تا در خرید بعدی خودکار پر شود."
         action={
           <Button
             type="button"
             size="sm"
-            variant={showForm ? "outline" : "primary"}
             className="w-full sm:w-auto"
             onClick={() => {
-              setShowForm((v) => !v);
               setError("");
+              setMapOpen(true);
             }}
           >
-            {showForm ? "انصراف" : "آدرس جدید"}
+            <Icon icon={Plus} size={16} weight="bold" />
+            آدرس جدید
           </Button>
         }
       />
@@ -194,157 +171,153 @@ export function AddressesPageClient({
         </p>
       ) : null}
 
-      {showForm ? (
-        <form
-          onSubmit={onAdd}
-          className="account-surface mb-6 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5"
+      {addresses.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            setError("");
+            setMapOpen(true);
+          }}
+          className="flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed border-border bg-surface px-4 py-10 text-center transition hover:border-gold/40 hover:bg-gold-dim/20"
         >
-          <Input
-            label="برچسب (اختیاری)"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="خانه، محل کار"
-          />
-          <div className="flex flex-col gap-1.5">
-            <label
-              className="text-sm font-medium text-secondary"
-              htmlFor="addr-province"
-            >
-              استان
-            </label>
-            <select
-              id="addr-province"
-              value={province}
-              onChange={(e) => {
-                setProvince(e.target.value);
-                setCity("");
-              }}
-              className={selectClass}
-              required
-            >
-              <option value="">انتخاب استان</option>
-              {(iranLocations as LocationEntry[]).map((l) => (
-                <option key={l.province} value={l.province}>
-                  {l.province}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label
-              className="text-sm font-medium text-secondary"
-              htmlFor="addr-city"
-            >
-              شهر
-            </label>
-            <select
-              id="addr-city"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className={selectClass}
-              required
-              disabled={!province}
-            >
-              <option value="">انتخاب شهر</option>
-              {cities.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Input
-            label="آدرس کامل"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="خیابان، کوچه، پلاک، واحد"
-            required
-          />
-          <Input
-            label="کد پستی"
-            dir="ltr"
-            inputMode="numeric"
-            maxLength={10}
-            value={postalCode}
-            onChange={(e) =>
-              setPostalCode(e.target.value.replace(/\D/g, "").slice(0, 10))
-            }
-            placeholder="۱۰ رقم"
-            required
-          />
-          <Button type="submit" disabled={saving} className="mt-1">
-            {saving ? "در حال ذخیره..." : "ذخیره آدرس"}
-          </Button>
-        </form>
-      ) : null}
-
-      <ul className="flex flex-col gap-3">
-        {addresses.length === 0 && !showForm ? (
-          <EmptyState
-            title="آدرسی ذخیره نشده"
-            description="اولین آدرس ارسال را اضافه کنید تا تسویه حساب سریع‌تر شود."
-            action={
-              <Button type="button" size="sm" onClick={() => setShowForm(true)}>
-                افزودن آدرس
-              </Button>
-            }
-          />
-        ) : null}
-        {addresses.map((a) => (
-          <AccountSurface as="li" key={a.id} className="list-none sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  {a.label ? (
-                    <p className="text-xs font-semibold text-gold">{a.label}</p>
-                  ) : (
-                    <p className="text-xs font-medium text-secondary">آدرس</p>
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold-dim text-gold">
+            <Icon icon={MapPin} size={22} weight="duotone" />
+          </span>
+          <span className="text-sm font-semibold text-primary">
+            اولین آدرس را از روی نقشه اضافه کنید
+          </span>
+          <span className="max-w-xs text-[12.5px] leading-relaxed text-secondary">
+            پین را روی محل تحویل بگذارید؛ استان، شهر و جزئیات از نقشه پر می‌شود.
+          </span>
+          <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-gold px-4 py-2 text-[12.5px] font-semibold text-ink-on-gold">
+            <Icon icon={Plus} size={14} weight="bold" />
+            افزودن با نقشه
+          </span>
+        </button>
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {addresses.map((addr) => {
+            const name = addr.receiverName || addr.label || "گیرنده";
+            const busy =
+              deletingId === addr.id || defaultingId === addr.id;
+            return (
+              <li key={addr.id}>
+                <article
+                  className={cn(
+                    "rounded-2xl border bg-white px-3.5 py-3 shadow-sm transition dark:bg-surface",
+                    addr.isDefault
+                      ? "border-gold/60 bg-gold-dim/25"
+                      : "border-border",
                   )}
-                  {a.isDefault ? (
-                    <span className="rounded-md bg-gold-dim px-2 py-0.5 text-[10px] font-medium text-gold">
-                      پیش‌فرض
-                    </span>
-                  ) : null}
-                </div>
-                <p className="mt-1.5 text-sm font-medium text-primary">
-                  {a.province}، {a.city}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-secondary">
-                  {a.address}
-                </p>
-                <p
-                  className="mt-1.5 font-mono text-xs tabular-nums text-dim"
-                  dir="ltr"
                 >
-                  {a.postalCode}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {!a.isDefault ? (
-                  <button
-                    type="button"
-                    onClick={() => void onSetDefault(a.id)}
-                    disabled={defaultingId === a.id || deletingId === a.id}
-                    className="rounded-lg px-2 py-1 text-xs font-medium text-gold transition-colors hover:bg-gold-dim disabled:opacity-50"
-                  >
-                    {defaultingId === a.id
-                      ? "در حال تنظیم..."
-                      : "پیش‌فرض کردن"}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void onDelete(a.id)}
-                  disabled={deletingId === a.id || defaultingId === a.id}
-                  className="rounded-lg px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40"
-                >
-                  {deletingId === a.id ? "در حال حذف..." : "حذف"}
-                </button>
-              </div>
-            </div>
-          </AccountSurface>
-        ))}
-      </ul>
+                  <div className="flex items-start gap-2.5">
+                    <Icon
+                      icon={CheckCircle}
+                      size={20}
+                      weight={addr.isDefault ? "fill" : "regular"}
+                      className={cn(
+                        "mt-0.5 shrink-0",
+                        addr.isDefault ? "text-gold" : "text-border-bright",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-[14px] font-semibold text-primary">
+                          {name}
+                        </p>
+                        {addr.isDefault ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-gold-dim px-2 py-0.5 text-[10px] font-medium text-gold">
+                            <Icon icon={Star} size={10} weight="fill" />
+                            پیش‌فرض
+                          </span>
+                        ) : null}
+                        {addr.label && addr.receiverName ? (
+                          <span className="rounded-md bg-surface-muted px-2 py-0.5 text-[10px] text-secondary">
+                            {addr.label}
+                          </span>
+                        ) : null}
+                      </div>
+                      {addr.receiverPhone ? (
+                        <p
+                          className="mt-0.5 text-[12px] tabular-nums text-secondary"
+                          dir="ltr"
+                        >
+                          {addr.receiverPhone}
+                        </p>
+                      ) : null}
+                      <p className="mt-1.5 text-[12.5px] text-secondary">
+                        {addr.city}
+                        {addr.province ? `، ${addr.province}` : ""}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-relaxed text-secondary">
+                        {addr.address}
+                        {addr.plaque ? `، پلاک ${addr.plaque}` : ""}
+                        {addr.unit ? `، واحد ${addr.unit}` : ""}
+                      </p>
+                      {addr.postalCode ? (
+                        <p
+                          className="mt-1.5 inline-flex items-center gap-1 text-[11px] tabular-nums text-dim"
+                          dir="ltr"
+                        >
+                          <Icon icon={MapPin} size={11} weight="fill" />
+                          {addr.postalCode}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-border/60 pt-2">
+                    {!addr.isDefault ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void onSetDefault(addr.id)}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[11.5px] font-medium text-gold transition hover:bg-gold-dim disabled:opacity-50"
+                      >
+                        <Icon icon={Star} size={13} weight="duotone" />
+                        {defaultingId === addr.id
+                          ? "در حال تنظیم..."
+                          : "پیش‌فرض کردن"}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onDelete(addr.id)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[11.5px] text-dim transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/40"
+                    >
+                      <Icon icon={TrashSimple} size={14} />
+                      {deletingId === addr.id ? "در حال حذف..." : "حذف"}
+                    </button>
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setMapOpen(true);
+              }}
+              className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border text-[13px] text-secondary transition hover:border-gold/40 hover:bg-gold-dim/15 hover:text-primary"
+            >
+              <Icon icon={Plus} size={15} weight="bold" />
+              افزودن آدرس جدید روی نقشه
+            </button>
+          </li>
+        </ul>
+      )}
+
+      <AddressMapSheet
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        defaultReceiverName={user?.fullName ?? ""}
+        defaultReceiverPhone={user?.phone ?? ""}
+        onSaved={onSaved}
+      />
     </div>
   );
 }

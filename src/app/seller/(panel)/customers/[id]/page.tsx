@@ -9,24 +9,51 @@ export default function SellerCustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const phone = decodeURIComponent(params.id ?? "");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [data, setData] = useState<{
-    customer?: { fullName: string; phone: string; city: string; orderCount: number; totalSpent: number };
-    orders?: Array<{ id: string; sellerSubtotal: number; status: string; createdAt: string }>;
+    customer?: {
+      fullName: string;
+      phone: string;
+      city: string;
+      orderCount: number;
+      totalSpent: number;
+    };
+    orders?: Array<{
+      id: string;
+      sellerSubtotal: number;
+      status: string;
+      createdAt: string;
+    }>;
   }>({});
 
   const load = useCallback(async () => {
-    const res = await fetch(
-      `/api/seller/customers?phone=${encodeURIComponent(phone)}`,
-    );
-    if (res.status === 401) {
-      router.push(hajiasalPath("/seller"));
-      return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/seller/customers?phone=${encodeURIComponent(phone)}`,
+      );
+      if (res.status === 401) {
+        router.push(hajiasalPath("/seller"));
+        return;
+      }
+      if (res.status === 403) {
+        setError("دسترسی به این مشتری مجاز نیست.");
+        return;
+      }
+      if (res.status === 404) {
+        router.push(hajiasalPath("/seller/customers"));
+        return;
+      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "خطا در بارگذاری");
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در بارگذاری");
+    } finally {
+      setLoading(false);
     }
-    if (res.status === 404) {
-      router.push(hajiasalPath("/seller/customers"));
-      return;
-    }
-    setData(await res.json());
   }, [phone, router]);
 
   useEffect(() => {
@@ -41,7 +68,11 @@ export default function SellerCustomerDetailPage() {
       >
         بازگشت
       </AdminButton>
-      {data.customer ? (
+      {loading ? (
+        <p className="text-sm text-stone-500">در حال بارگذاری...</p>
+      ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {!loading && !error && data.customer ? (
         <div className="rounded-xl border border-stone-200 bg-white p-4">
           <h3 className="text-lg font-semibold">{data.customer.fullName}</h3>
           <p className="mt-1 text-sm text-stone-600">

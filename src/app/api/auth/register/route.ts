@@ -5,12 +5,36 @@ import {
   findProfileByPhone,
   updateProfile,
 } from "@/lib/server/profiles";
-import { getSessionFromRequest, createSessionToken, sessionCookieOptions } from "@/lib/auth/session";
+import { getSessionFromRequest, createSessionToken, applySessionCookieToResponse } from "@/lib/auth/session";
 import { clearAllAuthSessions } from "@/lib/auth/clear-sibling-sessions";
+import { isTrustedMutationOrigin } from "@/lib/auth/request-origin";
+import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    if (!isTrustedMutationOrigin(request)) {
+      return NextResponse.json(
+        { success: false, message: "درخواست نامعتبر است" },
+        { status: 403 },
+      );
+    }
+
     const session = getSessionFromRequest(request);
+    const limited = await checkRateLimitAsync(
+      `auth-register:ip:${getClientIp(request)}`,
+      8,
+      15 * 60 * 1000,
+    );
+    if (!limited.ok) {
+      return NextResponse.json(
+        { success: false, message: "تعداد درخواست زیاد است. کمی بعد تلاش کنید." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limited.retryAfterSec) },
+        },
+      );
+    }
+
     const body = await request.json();
     const parsed = registerSchema.safeParse(body);
 
@@ -78,15 +102,8 @@ export async function POST(request: Request) {
       message: "ثبت‌نام با موفقیت انجام شد",
     });
 
-    const cookie = sessionCookieOptions(token);
     await clearAllAuthSessions(request, response);
-    response.cookies.set(cookie.name, cookie.value, {
-      httpOnly: cookie.httpOnly,
-      secure: cookie.secure,
-      sameSite: cookie.sameSite,
-      path: cookie.path,
-      maxAge: cookie.maxAge,
-    });
+    applySessionCookieToResponse(response, token);
 
     return response;
   } catch {

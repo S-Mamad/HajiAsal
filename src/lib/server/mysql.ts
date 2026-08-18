@@ -188,6 +188,20 @@ export async function withMysqlTransaction<T>(
   });
 }
 
+/** Hold one pooled connection (e.g. GET_LOCK which is connection-scoped). */
+export async function withMysqlConnection<T>(
+  fn: (conn: PoolConnection) => Promise<T>,
+): Promise<T> {
+  return withMysqlCircuit(async (p) => {
+    const conn = await p.getConnection();
+    try {
+      return await fn(conn);
+    } finally {
+      conn.release();
+    }
+  });
+}
+
 export function isDuplicateKeyError(err: unknown): boolean {
   return Boolean(
     err &&

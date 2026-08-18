@@ -23,8 +23,13 @@ export function SiteSettingsProvider({
   useEffect(() => {
     setShippingConfig({
       shippingCost: settings.shippingCost,
+      freeShippingThreshold: settings.freeShippingThreshold ?? 0,
     });
-  }, [settings, setShippingConfig]);
+  }, [
+    settings.shippingCost,
+    settings.freeShippingThreshold,
+    setShippingConfig,
+  ]);
 
   return (
     <SiteSettingsContext.Provider value={settings}>

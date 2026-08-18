@@ -16,7 +16,10 @@ interface AdminCrudListProps<T> {
   searchKeys: (row: T) => string;
   emptyMessage?: string;
   createPermission?: AdminPermission;
+  editPermission?: AdminPermission;
   deletePermission?: AdminPermission;
+  /** When false, hide the per-row edit action (create-only modules). */
+  allowEdit?: boolean;
   onCreateClick?: () => void;
   createLabel?: string;
   dataKey?: string;
@@ -38,7 +41,9 @@ export function AdminCrudList<T>({
   searchKeys,
   emptyMessage,
   createPermission,
+  editPermission,
   deletePermission,
+  allowEdit = true,
   onCreateClick,
   createLabel = "افزودن",
   dataKey = "items",
@@ -55,6 +60,7 @@ export function AdminCrudList<T>({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -79,18 +85,31 @@ export function AdminCrudList<T>({
   const bulkDelete = async () => {
     setDeleting(true);
     try {
-      for (const id of selected) {
+      let deleted = 0;
+      let lastError = "";
+      for (const id of pendingIds) {
         const res = await fetch(`${endpoint}?id=${encodeURIComponent(id)}`, {
           method: "DELETE",
           credentials: "include",
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error ?? "حذف ناموفق");
+          lastError = data.error ?? "حذف ناموفق";
+          break;
         }
+        deleted += 1;
       }
-      toast.success("حذف انجام شد");
+      if (deleted === pendingIds.length) {
+        toast.success("حذف انجام شد");
+      } else if (deleted > 0) {
+        toast.error(
+          `${deleted.toLocaleString("fa-IR")} مورد حذف شد؛ بقیه ناموفق: ${lastError}`,
+        );
+      } else {
+        throw new Error(lastError || "حذف ناموفق");
+      }
       setSelected([]);
+      setPendingIds([]);
       setConfirmOpen(false);
       await load();
     } catch (err) {
@@ -105,25 +124,55 @@ export function AdminCrudList<T>({
       <DataTable
         columns={[
           ...columns,
-          {
-            key: "_actions",
-            header: "عملیات",
-            render: (row) => (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="text-xs text-amber-800 hover:underline"
-                  onClick={() => {
-                    setEditing(row);
-                    setFormOpen(true);
-                    onCreateClick?.();
-                  }}
-                >
-                  ویرایش
-                </button>
-              </div>
-            ),
-          },
+          ...(allowEdit || deletePermission
+            ? [
+                {
+                  key: "_actions",
+                  header: "عملیات",
+                  render: (row: T) => {
+                    const id = rowKey(row);
+                    const editBtn = (
+                      <button
+                        type="button"
+                        className="text-xs text-amber-800 hover:underline"
+                        onClick={() => {
+                          setEditing(row);
+                          setFormOpen(true);
+                        }}
+                      >
+                        ویرایش
+                      </button>
+                    );
+                    const deleteBtn = (
+                      <button
+                        type="button"
+                        className="text-xs text-red-700 hover:underline"
+                        onClick={() => {
+                          setPendingIds([id]);
+                          setConfirmOpen(true);
+                        }}
+                      >
+                        حذف
+                      </button>
+                    );
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {allowEdit ? (
+                          editPermission ? (
+                            <Can permission={editPermission}>{editBtn}</Can>
+                          ) : (
+                            editBtn
+                          )
+                        ) : null}
+                        {deletePermission ? (
+                          <Can permission={deletePermission}>{deleteBtn}</Can>
+                        ) : null}
+                      </div>
+                    );
+                  },
+                } satisfies DataTableColumn<T>,
+              ]
+            : []),
         ]}
         data={rows}
         rowKey={rowKey}
@@ -189,7 +238,11 @@ export function AdminCrudList<T>({
               <AdminButton
                 type="button"
                 variant="outline"
-                onClick={() => setConfirmOpen(true)}
+                onClick={() => {
+                  setPendingIds(selected);
+                  setConfirmOpen(true);
+                }}
+                disabled={selected.length === 0}
               >
                 حذف گروهی
               </AdminButton>
@@ -210,10 +263,13 @@ export function AdminCrudList<T>({
 
       <ConfirmModal
         open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        onClose={() => {
+          setConfirmOpen(false);
+          setPendingIds([]);
+        }}
         onConfirm={() => void bulkDelete()}
         title="حذف موارد انتخاب‌شده"
-        description={`${selected.length} مورد حذف می‌شود. این عمل قابل بازگشت نیست.`}
+        description={`${pendingIds.length.toLocaleString("fa-IR")} مورد حذف می‌شود. این عمل قابل بازگشت نیست.`}
         confirmLabel="حذف"
         danger
         loading={deleting}

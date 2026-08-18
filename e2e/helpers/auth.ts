@@ -96,12 +96,13 @@ export async function loginAsAdmin(page: Page): Promise<boolean> {
   const otp = process.env.AUTH_TEST_OTP ?? "1234";
 
   try {
-    const send = await page.request.post("/api/admin/auth/otp/send", {
+    // Shared storefront OTP — eligibility checked on /admin after cookie is set.
+    const send = await page.request.post("/api/auth/otp/send", {
       data: { phone },
       timeout: 30_000,
     });
     if (!send.ok()) return false;
-    const verify = await page.request.post("/api/admin/auth/otp/verify", {
+    const verify = await page.request.post("/api/auth/otp/verify", {
       data: { phone, code: otp },
       timeout: 30_000,
     });
@@ -114,11 +115,9 @@ export async function loginAsAdmin(page: Page): Promise<boolean> {
     /* fall through to UI */
   }
 
-  await page.goto("/admin");
   try {
-    await completeOtpOnPage(page, phone, otp);
-    await page.waitForURL(/\/admin\/dashboard/, { timeout: 20_000 });
-    return true;
+    await loginAsTestUser(page, "/admin/dashboard");
+    return /\/admin\/dashboard/.test(page.url());
   } catch {
     return false;
   }
@@ -130,12 +129,12 @@ export async function loginAsSeller(page: Page): Promise<boolean> {
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      const send = await page.request.post("/api/seller/auth/otp/send", {
+      const send = await page.request.post("/api/auth/otp/send", {
         data: { phone },
         timeout: 30_000,
       });
       if (send.ok()) {
-        const verify = await page.request.post("/api/seller/auth/otp/verify", {
+        const verify = await page.request.post("/api/auth/otp/verify", {
           data: { phone, code: otp },
           timeout: 30_000,
         });
@@ -149,11 +148,9 @@ export async function loginAsSeller(page: Page): Promise<boolean> {
       /* UI fallback */
     }
 
-    await page.goto("/seller");
     try {
-      await completeOtpOnPage(page, phone, otp);
-      await page.waitForURL(/\/seller\/dashboard/, { timeout: 20_000 });
-      return true;
+      await loginAsTestUser(page, "/seller/dashboard");
+      return /\/seller\/dashboard/.test(page.url());
     } catch {
       if (attempt < 2) {
         await page.waitForTimeout(2_000 * (attempt + 1));
@@ -164,3 +161,4 @@ export async function loginAsSeller(page: Page): Promise<boolean> {
   }
   return false;
 }
+

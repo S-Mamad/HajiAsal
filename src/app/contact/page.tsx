@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,8 +26,9 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function ContactPage() {
+function ContactPageInner() {
   const siteData = useSiteSettings();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -45,6 +47,22 @@ export default function ContactPage() {
   });
 
   const phoneValue = watch("phone") ?? "";
+
+  useEffect(() => {
+    const orderId = searchParams.get("orderId")?.trim();
+    const tracking = searchParams.get("tracking")?.trim();
+    if (!orderId && !tracking) return;
+    const bits = [
+      orderId ? `شناسه سفارش: ${orderId}` : null,
+      tracking ? `کد پیگیری: ${tracking}` : null,
+    ].filter(Boolean);
+    setValue("subject", "پشتیبانی سفارش", { shouldValidate: true });
+    setValue(
+      "message",
+      `${bits.join("\n")}\n\nتوضیح مشکل:\n`,
+      { shouldValidate: true },
+    );
+  }, [searchParams, setValue]);
 
   const onSubmit = async (data: FormData) => {
     setStatus("loading");
@@ -222,5 +240,19 @@ export default function ContactPage() {
         />
       </Reveal>
     </div>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center text-secondary">
+          در حال بارگذاری...
+        </div>
+      }
+    >
+      <ContactPageInner />
+    </Suspense>
   );
 }

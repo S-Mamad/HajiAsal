@@ -1,14 +1,14 @@
+"use client";
+
 import Image from "next/image";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
 import { hajiasalPath } from "@/lib/paths";
 
-const siteData = site as SiteConfig;
-
 export function BrandStory() {
+  const siteData = useSiteSettings();
   return (
     <section id="about" className="bg-void py-12 md:py-24">
       <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-14 md:px-8">
@@ -16,8 +16,8 @@ export function BrandStory() {
           <div className="mx-auto w-full max-w-[280px] sm:max-w-xs md:mx-0 md:max-w-[320px]">
             <div className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-border shadow-[0_24px_60px_-28px_rgba(0,0,0,0.65)]">
               <Image
-                src="/images/about/brand-story-honey.webp"
-                alt="عسل طبیعی حاجی عسل در فضای کارگاه"
+                src="/images/hajiasal/hero-studio.webp"
+                alt="عسل طبیعی حاجی عسل"
                 fill
                 sizes="(max-width: 768px) 280px, 320px"
                 className="object-cover"
@@ -48,7 +48,7 @@ export function BrandStory() {
               variant="outline"
               className="w-full sm:w-auto"
             >
-              بیشتر درباره ما
+              بیشتر
             </Button>
           </Reveal>
         </div>

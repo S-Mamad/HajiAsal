@@ -40,7 +40,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const gate = await gateAdmin(request, "notifications.manage");
+  // Mark-as-read is allowed for anyone who can view notifications.
+  const gate = await gateAdmin(request, "notifications.view");
   if (!gate.ok) return gate.response;
   const body = await request.json();
   const id = body.id as string | undefined;

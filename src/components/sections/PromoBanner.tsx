@@ -14,7 +14,7 @@ export function PromoBanner() {
             <div
               className="absolute inset-0 bg-cover bg-center opacity-20 md:opacity-25"
               style={{
-                backgroundImage: "url(/images/hajiasal/hero-studio.png)",
+                backgroundImage: "url(/images/hajiasal/hero-studio.webp)",
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-surface/80 via-surface/90 to-surface md:bg-gradient-to-l md:from-surface md:via-surface/90 md:to-surface/70" />

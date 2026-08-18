@@ -329,10 +329,14 @@ async function fetchSellersFromMysql(): Promise<Seller[] | null> {
     );
     return rows.map((row) => mapRowToSeller(row));
   } catch (error) {
-    console.error(
-      "[sellers] fetch failed:",
-      error instanceof Error ? error.message : error,
-    );
+    // Soft-fail to seed/local sellers. Avoid console.error — Next.js DevTools
+    // surfaces it as a blocking overlay even when the page still renders.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[sellers] MySQL fetch unavailable, using local catalog:",
+        error instanceof Error ? error.message : error,
+      );
+    }
     return null;
   }
 }

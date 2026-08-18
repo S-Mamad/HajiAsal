@@ -1,11 +1,16 @@
 import type { SessionPayload } from "@/types/auth";
+import { readCookieValue } from "@/lib/auth/cookie-value";
 
 export const CUSTOMER_COOKIE = "hajiasal_customer_session";
 
 function getSecret(): string {
   const secret = process.env.AUTH_SESSION_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("AUTH_SESSION_SECRET is required in production");
+  if (process.env.NODE_ENV === "production") {
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        "AUTH_SESSION_SECRET must be at least 32 characters in production",
+      );
+    }
   }
   return secret ?? "dev-only-insecure-secret-change-me";
 }
@@ -67,8 +72,8 @@ export async function parseSessionTokenEdge(
 }
 
 export function getSessionTokenFromRequest(request: Request): string | null {
-  const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(new RegExp(`${CUSTOMER_COOKIE}=([^;]+)`));
-  const token = match?.[1];
-  return token ? decodeURIComponent(token) : null;
+  return readCookieValue(
+    request.headers.get("cookie") ?? "",
+    CUSTOMER_COOKIE,
+  );
 }

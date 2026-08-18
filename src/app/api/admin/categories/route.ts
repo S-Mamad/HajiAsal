@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import {
-  getAllCategoriesAsync,
-  upsertCategoryAsync,
+  countProductsInCategoryAsync,
   deleteCategoryAsync,
+  getAllCategoriesAsync,
+  reassignProductsCategoryAsync,
+  upsertCategoryAsync,
 } from "@/lib/server/categories";
 import { logAdminAction } from "@/lib/server/audit-log";
 
 const categorySchema = z.object({
-  id: z.string().min(1),
-  slug: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  image: z.string().optional(),
+  id: z.string().min(1).max(80),
+  slug: z.string().min(1).max(80),
+  name: z.string().min(1).max(80),
+  description: z.string().max(240).optional(),
+  image: z.string().max(400).optional(),
   sortOrder: z.number().default(0),
 });
 
@@ -52,6 +55,8 @@ export async function POST(request: Request) {
       entityType: "category",
       entityId: category.id,
     });
+    revalidatePath("/", "layout");
+    revalidatePath("/shop");
 
     return NextResponse.json({ success: true, category });
   } catch {
@@ -65,8 +70,38 @@ export async function DELETE(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
+  const reassignTo = searchParams.get("reassignTo");
   if (!id) {
     return NextResponse.json({ error: "شناسه الزامی است" }, { status: 400 });
+  }
+
+  const productCount = await countProductsInCategoryAsync(id);
+  if (productCount > 0 && !reassignTo) {
+    const categories = await getAllCategoriesAsync();
+    return NextResponse.json(
+      {
+        error: `این دسته ${productCount.toLocaleString("fa-IR")} محصول دارد. ابتدا محصولات را به دسته دیگری منتقل کنید.`,
+        productCount,
+        categories: categories.filter((c) => c.id !== id),
+      },
+      { status: 409 },
+    );
+  }
+
+  if (productCount > 0 && reassignTo) {
+    if (reassignTo === id) {
+      return NextResponse.json(
+        { error: "دسته مقصد باید متفاوت باشد" },
+        { status: 400 },
+      );
+    }
+    const moved = await reassignProductsCategoryAsync(id, reassignTo);
+    if (!moved) {
+      return NextResponse.json(
+        { error: "انتقال محصولات ناموفق بود" },
+        { status: 500 },
+      );
+    }
   }
 
   const ok = await deleteCategoryAsync(id);
@@ -79,6 +114,8 @@ export async function DELETE(request: Request) {
     entityType: "category",
     entityId: id,
   });
+  revalidatePath("/", "layout");
+  revalidatePath("/shop");
 
   return NextResponse.json({ success: true });
 }

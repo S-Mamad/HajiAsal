@@ -8,6 +8,10 @@ import {
   isTelegramNotifyEnabled,
   sendTelegramAdminTestPing,
 } from "@/lib/server/telegram-notify";
+import {
+  countTelegramDlq,
+  countTelegramOutboxPending,
+} from "@/lib/server/telegram/outbox";
 
 /**
  * GET: status (no secrets). POST: send one safe ping to admin chats only.
@@ -23,6 +27,10 @@ export async function GET(request: Request) {
   const proxySecretSet = Boolean(process.env.TELEGRAM_PROXY_SECRET?.trim());
   const chatIds = getTelegramAdminChatIds();
   const apiBase = getTelegramApiBaseUrl();
+  const [dlqCount, pendingCount] = await Promise.all([
+    countTelegramDlq(),
+    countTelegramOutboxPending(),
+  ]);
 
   return NextResponse.json({
     enabled: isTelegramNotifyEnabled(),
@@ -32,7 +40,11 @@ export async function GET(request: Request) {
     apiBaseUrl: apiBase,
     usingCloudflareProxy: !apiBase.includes("api.telegram.org"),
     chatCount: chatIds.length,
-    note: "اعلان فقط به چت‌های ادمین می‌رود؛ به مشتری پیامک/تلگرام خودکار از این مسیر ارسال نمی‌شود.",
+    outboxPending: pendingCount,
+    dlqCount,
+    cronSecretConfigured: Boolean(process.env.CRON_SECRET?.trim()),
+    note:
+      "اعلان فقط به چت‌های ادمین می‌رود. فروشگاه رویداد را در MySQL می‌نویسد؛ کرون دقیقه‌ای /api/cron/telegram-outbox صف را خالی می‌کند.",
   });
 }
 

@@ -34,6 +34,7 @@ export default function AdminMediaPage() {
       searchKeys={(r) => `${r.originalName} ${r.mimeType} ${r.url}`}
       createPermission="media.manage"
       deletePermission="media.manage"
+      allowEdit={false}
       createLabel="ثبت رسانه"
       exportFilename="media"
       exportRow={(r) => ({

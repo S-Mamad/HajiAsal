@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       category: data.category as ProductCategory,
       categoryLabel: data.categoryLabel || data.category,
       images: data.images,
+      imageFits: data.imageFits,
       weightOptions: data.weightOptions,
       discountPrice: data.discountPrice ?? undefined,
       inStock: data.inStock,

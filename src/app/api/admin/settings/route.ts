@@ -12,9 +12,54 @@ import {
 } from "@/lib/server/site-settings";
 import { logAdminAction } from "@/lib/server/audit-log";
 import { isZibalConfigured, isZibalRefundConfigured } from "@/lib/server/zibal";
+import {
+  resolveShippingMethodCopy,
+  resolveShippingQuoteSettings,
+} from "@/lib/shipping";
+import { resolveCartPromo } from "@/lib/cart-promo";
+import { normalizeSearchSuggestions, resolveSearchUi } from "@/lib/search-ui";
+import { revalidatePath } from "next/cache";
+import { sanitizePlainText } from "@/lib/server/safe-copy";
+
+const methodCopySchema = z.object({
+  label: z.string().max(80).optional(),
+  description: z.string().max(200).optional(),
+  eta: z.string().max(80).optional(),
+});
 
 const patchSchema = z.object({
   shippingCost: z.number().min(0).optional(),
+  expressShippingCost: z.number().min(0).optional(),
+  pickupShippingCost: z.number().min(0).optional(),
+  freeShippingThreshold: z.number().min(0).optional(),
+  freeShippingIncludesExpress: z.boolean().optional(),
+  shippingMethods: z
+    .object({
+      standard: methodCopySchema.optional(),
+      express: methodCopySchema.optional(),
+      pickup: methodCopySchema.optional(),
+    })
+    .optional(),
+  cartPromo: z
+    .object({
+      freeShippingBarEnabled: z.boolean().optional(),
+      freeShippingRemainingText: z.string().max(120).optional(),
+      freeShippingUnlockedText: z.string().max(120).optional(),
+      impulseEnabled: z.boolean().optional(),
+      impulseTitle: z.string().max(80).optional(),
+      impulseMode: z.enum(["popular", "manual"]).optional(),
+      impulseProductIds: z.array(z.string().max(80)).max(24).optional(),
+      impulseLimit: z.number().int().min(1).max(16).optional(),
+    })
+    .optional(),
+  searchUi: z
+    .object({
+      placeholder: z.string().max(80).optional(),
+      suggestionsTitle: z.string().max(40).optional(),
+      hint: z.string().max(160).optional(),
+      suggestions: z.array(z.string().max(80)).max(16).optional(),
+    })
+    .optional(),
 });
 
 export async function GET(request: Request) {
@@ -84,7 +129,20 @@ export async function GET(request: Request) {
       sellerUrl: Boolean(process.env.NEXT_PUBLIC_SELLER_URL),
     },
     settings: {
-      shippingCost: settings.shippingCost,
+      ...resolveShippingQuoteSettings(settings),
+      shippingMethods: {
+        standard: resolveShippingMethodCopy(
+          "standard",
+          settings.shippingMethods,
+        ),
+        express: resolveShippingMethodCopy(
+          "express",
+          settings.shippingMethods,
+        ),
+        pickup: resolveShippingMethodCopy("pickup", settings.shippingMethods),
+      },
+      cartPromo: resolveCartPromo(settings),
+      searchUi: resolveSearchUi(settings),
     },
     missing,
     productionReady:
@@ -107,12 +165,76 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "اطلاعات نامعتبر" }, { status: 400 });
     }
 
-    const updated = await updateSiteSettings(parsed.data);
+    const patch = parsed.data;
+    if (patch.shippingMethods) {
+      for (const method of Object.values(patch.shippingMethods)) {
+        if (!method) continue;
+        if (method.label !== undefined) {
+          method.label = sanitizePlainText(method.label, 80);
+        }
+        if (method.description !== undefined) {
+          method.description = sanitizePlainText(method.description, 200);
+        }
+        if (method.eta !== undefined) {
+          method.eta = sanitizePlainText(method.eta, 80);
+        }
+      }
+    }
+    if (patch.cartPromo) {
+      if (patch.cartPromo.freeShippingRemainingText !== undefined) {
+        patch.cartPromo.freeShippingRemainingText = sanitizePlainText(
+          patch.cartPromo.freeShippingRemainingText,
+          120,
+        );
+      }
+      if (patch.cartPromo.freeShippingUnlockedText !== undefined) {
+        patch.cartPromo.freeShippingUnlockedText = sanitizePlainText(
+          patch.cartPromo.freeShippingUnlockedText,
+          120,
+        );
+      }
+      if (patch.cartPromo.impulseTitle !== undefined) {
+        patch.cartPromo.impulseTitle = sanitizePlainText(
+          patch.cartPromo.impulseTitle,
+          80,
+        );
+      }
+    }
+    if (patch.searchUi) {
+      if (patch.searchUi.placeholder !== undefined) {
+        patch.searchUi.placeholder = sanitizePlainText(
+          patch.searchUi.placeholder,
+          80,
+        );
+      }
+      if (patch.searchUi.suggestionsTitle !== undefined) {
+        patch.searchUi.suggestionsTitle = sanitizePlainText(
+          patch.searchUi.suggestionsTitle,
+          40,
+        );
+      }
+      if (patch.searchUi.hint !== undefined) {
+        patch.searchUi.hint = sanitizePlainText(patch.searchUi.hint, 160);
+      }
+      if (patch.searchUi.suggestions) {
+        patch.searchUi.suggestions = normalizeSearchSuggestions(
+          patch.searchUi.suggestions.map((s) => sanitizePlainText(s, 80)),
+          [],
+        );
+      }
+    }
+
+    const updated = await updateSiteSettings(patch);
+    try {
+      revalidatePath("/", "layout");
+    } catch {
+      /* tests / non-request runtime */
+    }
     await logAdminAction({
       action: "settings.update",
       entityType: "site_settings",
       entityId: "hajiasal",
-      payload: parsed.data,
+      payload: patch,
     });
 
     return NextResponse.json({ success: true, settings: updated });

@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/server/audit-log";
 import {
   getSupportTicket,
   listSupportTicketMessages,
+  markSupportTicketRead,
   upsertSupportTicket,
 } from "@/lib/server/support-tickets";
 import {
@@ -13,6 +14,7 @@ import {
   updateSellerTicketMeta,
 } from "@/lib/server/seller-tickets-memory";
 import { getSellerByIdAsync } from "@/lib/server/sellers";
+import { applyDeliveryReceipts } from "@/lib/tickets/read-receipts";
 import type { TicketChannel } from "@/lib/tickets/types";
 
 type Params = { params: Promise<{ id: string }> };
@@ -44,13 +46,18 @@ export async function GET(request: Request, { params }: Params) {
       if (!ticket) {
         return NextResponse.json({ error: "تیکت یافت نشد" }, { status: 404 });
       }
-      const messages = await listSupportTicketMessages(id);
+      const seen =
+        (await markSupportTicketRead(id, "admin").catch(() => null)) ?? ticket;
+      const messages = applyDeliveryReceipts(
+        await listSupportTicketMessages(id),
+        seen,
+      );
       return NextResponse.json({
         ticket: {
-          ...ticket,
+          ...seen,
           channel: "customer" as const,
-          partyName: ticket.customerName,
-          partyPhone: ticket.customerPhone,
+          partyName: seen.customerName,
+          partyPhone: seen.customerPhone,
         },
         messages,
       });

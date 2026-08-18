@@ -5,6 +5,7 @@ import {
   isMysqlUsable,
   mysqlExecute,
   mysqlQueryOne,
+  withMysqlConnection,
 } from "./mysql";
 import { isProduction } from "./production";
 
@@ -16,14 +17,26 @@ const KNOWN_PROVIDERS = new Set<PaymentProvider>([
   "zarinpal",
 ]);
 
+/** Reuse the same gateway session within this window (same order + amount). */
+export const PAYMENT_REF_REUSE_TTL_MS = 15 * 60 * 1000;
+
 export type PaymentBinding = {
   provider: PaymentProvider;
   paymentRef: string;
   /** Gateway settle/ref id after successful verify (e.g. Zarinpal ref_id). */
   settleRef?: string;
+  /** Order total in toman when the ref was created (reuse safety). */
+  amountToman?: number;
+  /** Redirect URL for providers that cannot reconstruct it (Snappay). */
+  redirectUrl?: string;
+  updatedAt?: string;
 };
 
 type MemoryRefs = Map<string, PaymentBinding>;
+
+type MemoryLock = {
+  promise: Promise<unknown>;
+};
 
 function memoryStore(): MemoryRefs {
   const g = globalThis as typeof globalThis & {
@@ -31,6 +44,14 @@ function memoryStore(): MemoryRefs {
   };
   if (!g.__hajiasalPaymentRefs) g.__hajiasalPaymentRefs = new Map();
   return g.__hajiasalPaymentRefs;
+}
+
+function memoryLocks(): Map<string, MemoryLock> {
+  const g = globalThis as typeof globalThis & {
+    __hajiasalPaymentLocks?: Map<string, MemoryLock>;
+  };
+  if (!g.__hajiasalPaymentLocks) g.__hajiasalPaymentLocks = new Map();
+  return g.__hajiasalPaymentLocks;
 }
 
 function normalizeRef(ref: string): string {
@@ -48,6 +69,24 @@ function safeEqual(a: string, b: string): boolean {
   }
 }
 
+function rowToBinding(row: RowDataPacket): PaymentBinding | null {
+  const provider = String(row.provider) as PaymentProvider;
+  if (!KNOWN_PROVIDERS.has(provider)) return null;
+  return {
+    provider,
+    paymentRef: String(row.payment_ref ?? ""),
+    settleRef: row.settle_ref ? String(row.settle_ref) : undefined,
+    amountToman:
+      row.amount_toman != null && row.amount_toman !== ""
+        ? Number(row.amount_toman)
+        : undefined,
+    redirectUrl: row.redirect_url ? String(row.redirect_url) : undefined,
+    updatedAt: row.updated_at
+      ? new Date(row.updated_at as string | Date).toISOString()
+      : undefined,
+  };
+}
+
 async function ensurePaymentRefsTable(): Promise<void> {
   await mysqlExecute(
     `CREATE TABLE IF NOT EXISTS order_payment_refs (
@@ -55,16 +94,22 @@ async function ensurePaymentRefsTable(): Promise<void> {
       provider VARCHAR(32) NOT NULL,
       payment_ref VARCHAR(255) NOT NULL,
       settle_ref VARCHAR(255) NULL,
+      amount_toman INT NULL,
+      redirect_url VARCHAR(512) NULL,
       created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
   );
-  try {
-    await mysqlExecute(
-      `ALTER TABLE order_payment_refs ADD COLUMN settle_ref VARCHAR(255) NULL`,
-    );
-  } catch {
-    /* column already exists */
+  for (const sql of [
+    `ALTER TABLE order_payment_refs ADD COLUMN settle_ref VARCHAR(255) NULL`,
+    `ALTER TABLE order_payment_refs ADD COLUMN amount_toman INT NULL`,
+    `ALTER TABLE order_payment_refs ADD COLUMN redirect_url VARCHAR(512) NULL`,
+  ]) {
+    try {
+      await mysqlExecute(sql);
+    } catch {
+      /* column already exists */
+    }
   }
 }
 
@@ -78,15 +123,23 @@ export async function setOrderPaymentRef(
   orderId: string,
   provider: PaymentProvider,
   ref: string,
+  options?: {
+    amountToman?: number;
+    redirectUrl?: string;
+  },
 ): Promise<void> {
   const value = normalizeRef(ref);
   if (!orderId || !value) return;
 
+  const nowIso = new Date().toISOString();
   const prev = memoryStore().get(orderId);
   memoryStore().set(orderId, {
     provider,
     paymentRef: value,
     settleRef: prev?.settleRef,
+    amountToman: options?.amountToman ?? prev?.amountToman,
+    redirectUrl: options?.redirectUrl ?? prev?.redirectUrl,
+    updatedAt: nowIso,
   });
 
   if (!isMysqlUsable()) return;
@@ -94,10 +147,20 @@ export async function setOrderPaymentRef(
   try {
     await ensurePaymentRefsTable();
     await mysqlExecute(
-      `INSERT INTO order_payment_refs (order_id, provider, payment_ref)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE provider = VALUES(provider), payment_ref = VALUES(payment_ref)`,
-      [orderId, provider, value],
+      `INSERT INTO order_payment_refs (order_id, provider, payment_ref, amount_toman, redirect_url)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         provider = VALUES(provider),
+         payment_ref = VALUES(payment_ref),
+         amount_toman = VALUES(amount_toman),
+         redirect_url = VALUES(redirect_url)`,
+      [
+        orderId,
+        provider,
+        value,
+        options?.amountToman ?? null,
+        options?.redirectUrl ?? null,
+      ],
     );
   } catch (error) {
     console.error(
@@ -155,17 +218,16 @@ export async function getOrderPaymentBinding(
   if (isMysqlConfigured()) {
     try {
       const row = await mysqlQueryOne<RowDataPacket>(
-        `SELECT provider, payment_ref, settle_ref FROM order_payment_refs WHERE order_id = ? LIMIT 1`,
+        `SELECT provider, payment_ref, settle_ref, amount_toman, redirect_url, updated_at
+         FROM order_payment_refs WHERE order_id = ? LIMIT 1`,
         [orderId],
       );
       if (row) {
-        const provider = String(row.provider) as PaymentProvider;
-        if (!KNOWN_PROVIDERS.has(provider)) return null;
-        return {
-          provider,
-          paymentRef: String(row.payment_ref ?? ""),
-          settleRef: row.settle_ref ? String(row.settle_ref) : undefined,
-        };
+        const binding = rowToBinding(row);
+        if (binding) {
+          memoryStore().set(orderId, binding);
+          return binding;
+        }
       }
     } catch {
       /* fall through to memory */
@@ -173,6 +235,98 @@ export async function getOrderPaymentBinding(
   }
 
   return memoryStore().get(orderId) ?? null;
+}
+
+/**
+ * Return an existing fresh payment session for the same order/provider/amount,
+ * or null when a new gateway request is required.
+ */
+export async function getReusablePaymentBinding(
+  orderId: string,
+  provider: PaymentProvider,
+  amountToman: number,
+  ttlMs: number = PAYMENT_REF_REUSE_TTL_MS,
+): Promise<PaymentBinding | null> {
+  const binding = await getOrderPaymentBinding(orderId);
+  if (!binding?.paymentRef) return null;
+  if (binding.provider !== provider) return null;
+  // Legacy rows without amount must not be reused (amount may have changed).
+  if (
+    binding.amountToman == null ||
+    !Number.isFinite(binding.amountToman)
+  ) {
+    return null;
+  }
+  if (Math.round(binding.amountToman) !== Math.round(amountToman)) {
+    return null;
+  }
+  const updatedMs = binding.updatedAt
+    ? new Date(binding.updatedAt).getTime()
+    : 0;
+  if (!updatedMs || Number.isNaN(updatedMs)) return null;
+  if (Date.now() - updatedMs > ttlMs) return null;
+  return binding;
+}
+
+/**
+ * Serialize payment-create per order across concurrent clicks.
+ * Uses MySQL GET_LOCK when available; otherwise process-local lock chain.
+ */
+export async function withPaymentCreateLock<T>(
+  orderId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const lockName = `pay_create_${orderId}`.slice(0, 64);
+
+  if (isMysqlUsable()) {
+    try {
+      return await withMysqlConnection(async (conn) => {
+        const [rows] = await conn.query<RowDataPacket[]>(
+          `SELECT GET_LOCK(?, 10) AS locked`,
+          [lockName],
+        );
+        const locked = Number(
+          Array.isArray(rows) ? rows[0]?.locked : 0,
+        );
+        if (locked !== 1) {
+          throw new Error("PAYMENT_CREATE_IN_FLIGHT");
+        }
+        try {
+          return await fn();
+        } finally {
+          await conn
+            .query(`SELECT RELEASE_LOCK(?) AS released`, [lockName])
+            .catch(() => null);
+        }
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "PAYMENT_CREATE_IN_FLIGHT"
+      ) {
+        throw error;
+      }
+      /* fall through to memory lock if MySQL is unreachable */
+    }
+  }
+
+  const locks = memoryLocks();
+  const prev = locks.get(orderId)?.promise ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const next = prev.then(() => gate);
+  locks.set(orderId, { promise: next });
+  await prev.catch(() => undefined);
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (locks.get(orderId)?.promise === next) {
+      locks.delete(orderId);
+    }
+  }
 }
 
 /**
@@ -215,6 +369,7 @@ export async function assertOrderPaymentRef(
 /** @internal */
 export function __resetPaymentRefsForTests(): void {
   memoryStore().clear();
+  memoryLocks().clear();
 }
 
 /** Hash helper kept for potential signed-state callbacks. */

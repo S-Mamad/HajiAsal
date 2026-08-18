@@ -1,28 +1,29 @@
 import type { CartItem } from "@/types";
 import { getEffectiveWeightPrice } from "@/lib/products";
+import { shippingCostForMethod } from "@/lib/shipping";
+import { getHeldQtyForProduct } from "./cart-holds";
 import { getProductByIdAsync } from "./products-store";
 import { getSiteSettings } from "./site-settings";
 
-export type ShippingMethodId = "standard" | "express" | "pickup";
+export type { ShippingMethodId } from "@/lib/shipping";
+export { shippingCostForMethod } from "@/lib/shipping";
 
 export async function calcShippingCost(
   method: string | undefined,
-  _subtotal: number,
+  subtotal: number,
 ): Promise<number> {
   const settings = await getSiteSettings();
-  const base = settings.shippingCost;
-  if (method === "pickup") return 0;
-  if (method === "express") {
-    return base + 35000;
-  }
-  return base;
+  return shippingCostForMethod(method, subtotal, settings);
 }
 
 /**
  * Rebuild cart lines from catalog prices (never trust client prices).
- * Uses async product store so admin/seller stock & price overrides apply.
+ * Soft cart holds from other sessions reduce available stock.
  */
-export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
+export async function rebuildOrderItems(
+  rawItems: CartItem[],
+  opts?: { holdSessionId?: string | null },
+): Promise<
   | { ok: true; items: CartItem[]; subtotal: number }
   | { ok: false; message: string }
 > {
@@ -35,7 +36,6 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
 
   const items: CartItem[] = [];
   let subtotal = 0;
-  /** Aggregate requested qty by productId (multi-weight lines share one stock pool). */
   const qtyByProduct = new Map<
     string,
     { qty: number; title: string; stockQty: number | null }
@@ -77,8 +77,14 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
       };
     }
 
-    const stockQty =
+    const catalogStock =
       typeof product.stockQty === "number" ? product.stockQty : null;
+    const othersHeld =
+      catalogStock == null
+        ? 0
+        : await getHeldQtyForProduct(product.id, opts?.holdSessionId ?? null);
+    const stockQty =
+      catalogStock == null ? null : Math.max(0, catalogStock - othersHeld);
     const prev = qtyByProduct.get(product.id);
     const aggregated = (prev?.qty ?? 0) + requestedQty;
     if (stockQty != null && aggregated > stockQty) {
@@ -93,8 +99,6 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
       stockQty,
     });
 
-    const quantity = requestedQty;
-
     const unitPrice = getEffectiveWeightPrice(product, weight);
 
     items.push({
@@ -107,10 +111,10 @@ export async function rebuildOrderItems(rawItems: CartItem[]): Promise<
         grams: weight.grams,
         price: unitPrice,
       },
-      quantity,
+      quantity: requestedQty,
       sellerId: product.sellerId,
     });
-    subtotal += unitPrice * quantity;
+    subtotal += unitPrice * requestedQty;
   }
 
   return { ok: true, items, subtotal };

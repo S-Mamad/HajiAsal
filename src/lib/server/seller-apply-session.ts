@@ -10,12 +10,21 @@ type ApplyPayload = {
 };
 
 function secret(): string {
-  return (
+  const value =
     process.env.SELLER_APPLY_SECRET ||
+    process.env.AUTH_SESSION_SECRET ||
     process.env.AUTH_SECRET ||
     process.env.NEXTAUTH_SECRET ||
-    "dev-seller-apply-secret"
-  );
+    "";
+  if (process.env.NODE_ENV === "production") {
+    if (!value || value.length < 32) {
+      throw new Error(
+        "SELLER_APPLY_SECRET or AUTH_SESSION_SECRET must be at least 32 characters in production",
+      );
+    }
+    return value;
+  }
+  return value || "dev-seller-apply-secret";
 }
 
 function b64url(buf: Buffer): string {

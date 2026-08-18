@@ -17,6 +17,10 @@ import {
   type ZibalVerifyResult,
 } from "@/lib/server/zibal";
 import { notifyTelegram } from "@/lib/server/telegram-notify";
+import { enqueueTelegramAlert } from "@/lib/server/telegram-alert-queue";
+import type { GatewayRefundResult } from "@/lib/server/payment-refund";
+import { consumeCartHoldsForSession } from "@/lib/server/cart-holds";
+import { clientReplaceRedirect } from "@/lib/server/payment-return-redirect";
 
 const PAYABLE_STATUSES = new Set(["pending_payment"]);
 
@@ -35,16 +39,18 @@ function failedRedirect(requestUrl: string, orderId?: string) {
   const qs = orderId
     ? `payment=failed&orderId=${encodeURIComponent(orderId)}`
     : "payment=failed";
-  return NextResponse.redirect(new URL(`/checkout?${qs}`, siteUrl || requestUrl));
+  return clientReplaceRedirect(
+    new URL(`/checkout?${qs}`, siteUrl || requestUrl).toString(),
+  );
 }
 
 function cancelledRedirect(orderId: string) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  return NextResponse.redirect(
+  return clientReplaceRedirect(
     new URL(
       `/checkout?payment=cancelled&orderId=${encodeURIComponent(orderId)}`,
       siteUrl,
-    ),
+    ).toString(),
   );
 }
 
@@ -55,8 +61,8 @@ function successRedirect(orderId: string, tracking: string, ref?: string) {
     tracking,
   });
   if (ref) qs.set("ref", ref);
-  return NextResponse.redirect(
-    new URL(`/checkout/success?${qs.toString()}`, siteUrl),
+  return clientReplaceRedirect(
+    new URL(`/checkout/success?${qs.toString()}`, siteUrl).toString(),
   );
 }
 
@@ -68,6 +74,7 @@ async function verifyAndConfirm(input: {
   orderId: string;
   trackId: string;
   order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>;
+  request?: Request;
 }): Promise<
   | { ok: true; settleRef: string; tracking: string; alreadyConfirmed?: boolean }
   | { ok: false; reason: "verify" | "amount" | "confirm" }
@@ -98,6 +105,22 @@ async function verifyAndConfirm(input: {
   // Fail-closed: amount must be present and match (coerce string/number from API).
   const paidAmount = Number(verifyData.amount);
   if (!Number.isFinite(paidAmount) || paidAmount !== amountRial) {
+    let refund: GatewayRefundResult | null = null;
+    try {
+      refund = await refundOrderAtGateway(input.order);
+    } catch (error) {
+      console.error(
+        "[checkout/verify] auto-refund after amount mismatch:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+    if (!refund?.ok) {
+      void enqueueTelegramAlert("api.error_critical", {
+        route: "checkout/verify",
+        message: `پرداخت زیبال با مبلغ ناسازگار؛ استرداد خودکار ناموفق (${refund?.error ?? "exception"}). orderId=${input.orderId} paid=${paidAmount} expected=${amountRial}`,
+        orderId: input.orderId,
+      });
+    }
     return { ok: false, reason: "amount" };
   }
 
@@ -105,14 +128,28 @@ async function verifyAndConfirm(input: {
   if (settleRef) await setOrderSettleRef(input.orderId, settleRef);
 
   const confirmed = await confirmPaidOrder(input.orderId);
+  if (confirmed.ok && input.request) {
+    const cookie = input.request.headers.get("cookie") ?? "";
+    const match = cookie.match(/(?:^|;\s*)hajiasal_cart_hold=([a-f0-9]{32})/i);
+    if (match?.[1]) void consumeCartHoldsForSession(match[1]);
+  }
   if (!confirmed.ok) {
+    let refund: GatewayRefundResult | null = null;
     try {
-      await refundOrderAtGateway(input.order);
+      refund = await refundOrderAtGateway(input.order);
     } catch (error) {
       console.error(
         "[checkout/verify] auto-refund after confirm failure:",
         error instanceof Error ? error.message : error,
       );
+    }
+    // Zibal corporate refund is not wired — never pretend money was returned.
+    if (!refund?.ok) {
+      void enqueueTelegramAlert("api.error_critical", {
+        route: "checkout/verify",
+        message: `پرداخت زیبال موفق ولی confirm سفارش شکست؛ استرداد خودکار ناموفق (${refund?.error ?? "exception"}). orderId=${input.orderId} — از پنل زیبال دستی استرداد کنید.`,
+        orderId: input.orderId,
+      });
     }
     return { ok: false, reason: "confirm" };
   }
@@ -138,7 +175,17 @@ export async function GET(request: Request) {
     15 * 60 * 1000,
   );
   if (!limited.ok) {
-    return failedRedirect(request.url, orderId ?? undefined);
+    const retryAfter = Math.max(3, limited.retryAfterSec ?? 5);
+    const retryUrl = request.url;
+    const html = `<!DOCTYPE html><html lang="fa"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta http-equiv="refresh" content="${retryAfter};url=${retryUrl.replace(/"/g, "&quot;")}"/><title>تأیید پرداخت</title></head><body dir="rtl" style="font-family:Tahoma,sans-serif;padding:2rem;text-align:center;background:#fafafa;color:#1c1917"><p>پرداخت شما در حال تأیید است. لطفاً این صفحه را نبندید.</p><p style="color:#78716c;font-size:0.9rem">تلاش مجدد تا ${retryAfter} ثانیه دیگر…</p><p><a href="${retryUrl.replace(/"/g, "&quot;")}">تأیید دوباره</a></p></body></html>`;
+    return new NextResponse(html, {
+      status: 429,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Retry-After": String(retryAfter),
+        "Cache-Control": "no-store",
+      },
+    });
   }
 
   if (!trackId || !orderId) {
@@ -170,6 +217,10 @@ export async function GET(request: Request) {
       order.status === "shipped" ||
       order.status === "delivered"
     ) {
+      const refOk = await assertOrderPaymentRef(orderId, "zibal", trackId);
+      if (!refOk) {
+        return failedRedirect(request.url, orderId);
+      }
       return alreadyPaidRedirect(orderId, order.trackingCode ?? "");
     }
     return failedRedirect(request.url, orderId);
@@ -181,7 +232,7 @@ export async function GET(request: Request) {
     return failedRedirect(request.url, orderId);
   }
 
-  const result = await verifyAndConfirm({ orderId, trackId, order });
+  const result = await verifyAndConfirm({ orderId, trackId, order, request });
   if (result.ok) {
     return successRedirect(orderId, result.tracking, result.settleRef);
   }
@@ -270,7 +321,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await verifyAndConfirm({ orderId, trackId, order });
+    const result = await verifyAndConfirm({
+      orderId,
+      trackId,
+      order,
+      request,
+    });
     if (result.ok) {
       return NextResponse.json({
         success: true,

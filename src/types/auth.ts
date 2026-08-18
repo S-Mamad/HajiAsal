@@ -4,8 +4,13 @@ export interface CustomerUser {
   fullName: string | null;
   email: string | null;
   newsletterOptIn: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  sellerPanel?: {
+    url: string;
+    shopName: string;
+    status: string;
+  } | null;
 }
 
 export interface SessionPayload {
@@ -25,4 +30,10 @@ export interface UserAddress {
   postalCode: string;
   isDefault: boolean;
   createdAt: string;
+  lat?: number | null;
+  lng?: number | null;
+  plaque?: string | null;
+  unit?: string | null;
+  receiverName?: string | null;
+  receiverPhone?: string | null;
 }

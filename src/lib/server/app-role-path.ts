@@ -8,6 +8,22 @@ export type RolePathAction =
   | { type: "not_found" }
   | { type: "redirect"; targetBase: "admin" | "seller"; pathname: string };
 
+function isSharedAuthSurface(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname.startsWith("/api/auth")
+  );
+}
+
+function isPublicAsset(pathname: string): boolean {
+  return (
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/fonts/") ||
+    pathname.startsWith("/vendor/")
+  );
+}
+
 function isAdminSurface(pathname: string): boolean {
   return (
     pathname === "/admin" ||
@@ -15,7 +31,9 @@ function isAdminSurface(pathname: string): boolean {
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/cron") ||
-    pathname.startsWith("/uploads/")
+    pathname.startsWith("/uploads/") ||
+    isSharedAuthSurface(pathname) ||
+    isPublicAsset(pathname)
   );
 }
 
@@ -24,7 +42,9 @@ function isSellerSurface(pathname: string): boolean {
     pathname === "/seller" ||
     pathname.startsWith("/seller/") ||
     pathname.startsWith("/api/seller") ||
-    pathname.startsWith("/uploads/")
+    pathname.startsWith("/uploads/") ||
+    isSharedAuthSurface(pathname) ||
+    isPublicAsset(pathname)
   );
 }
 

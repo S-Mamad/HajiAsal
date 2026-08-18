@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { useSellerCan } from "@/components/seller/layout/SellerCapabilitiesContext";
@@ -19,6 +20,7 @@ type Notif = {
 
 export function NotificationCenter() {
   const canView = useSellerCan("notifications.view");
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
@@ -45,6 +47,10 @@ export function NotificationCenter() {
     const t = window.setInterval(() => void load(), 60_000);
     return () => window.clearInterval(t);
   }, [load, canView]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   if (!canView) return null;
 
@@ -79,12 +85,12 @@ export function NotificationCenter() {
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 cursor-default"
+            className="fixed inset-0 z-40 cursor-default lg:start-[15.5rem]"
             aria-label="بستن"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute end-0 z-50 mt-2 w-80 overflow-hidden rounded-[10px] border border-zinc-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2">
+          <div className="fixed inset-x-3 top-[4.25rem] z-50 overflow-hidden rounded-[var(--panel-radius)] border border-[var(--panel-border)] bg-[var(--panel-surface)] shadow-[0_18px_40px_-24px_rgba(24,24,27,0.45)] lg:absolute lg:inset-x-auto lg:end-0 lg:top-auto lg:mt-2 lg:w-80">
+            <div className="flex items-center justify-between border-b border-[var(--panel-border)] px-3 py-2">
               <span className="text-sm font-semibold text-zinc-900">اعلان‌ها</span>
               <button
                 type="button"

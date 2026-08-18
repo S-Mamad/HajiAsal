@@ -58,6 +58,7 @@ export function AdminSimpleModulePage<T extends { id: string }>({
       rowKey={(r) => r.id}
       searchKeys={searchKeys}
       createPermission={createPermission}
+      editPermission={createPermission}
       deletePermission={deletePermission}
       exportFilename={exportFilename}
       exportRow={(r) => {
@@ -140,15 +141,28 @@ function FormModal<T extends Record<string, unknown>>({
     }
   }, [open, editing, fields, fromRow, setValues]);
 
+  const missingRequired = fields.some(
+    (f) => f.required && !(values[f.key] ?? "").trim(),
+  );
+
   return (
     <AdminModal
       open={open}
       onClose={onClose}
       title={title}
       footer={
-        <AdminButton disabled={saving} onClick={onSave}>
-          {saving ? "..." : "ذخیره"}
-        </AdminButton>
+        <>
+          <AdminButton type="button" variant="outline" onClick={onClose}>
+            انصراف
+          </AdminButton>
+          <AdminButton
+            type="button"
+            disabled={saving || missingRequired}
+            onClick={onSave}
+          >
+            {saving ? "در حال ذخیره..." : "ذخیره"}
+          </AdminButton>
+        </>
       }
     >
       <div className="space-y-3">

@@ -29,6 +29,9 @@ export default function SellerProductNewPage() {
   const [grams, setGrams] = useState("1000");
   const [weightLabel, setWeightLabel] = useState("۱ کیلو");
   const [images, setImages] = useState<string[]>([]);
+  const [imageFits, setImageFits] = useState<
+    Record<string, { scale: number; x: number; y: number }>
+  >({});
   const [stockQty, setStockQty] = useState("1");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,6 +50,7 @@ export default function SellerProductNewPage() {
           category,
           categoryLabel: cat?.label ?? category,
           images,
+          imageFits,
           weightOptions: [
             {
               label: weightLabel,
@@ -91,7 +95,14 @@ export default function SellerProductNewPage() {
       <Input label="گرم" value={grams} onChange={(e) => setGrams(e.target.value)} type="number" />
       <Input label="برچسب وزن" value={weightLabel} onChange={(e) => setWeightLabel(e.target.value)} />
       <Input label="موجودی" value={stockQty} onChange={(e) => setStockQty(e.target.value)} type="number" />
-      <SellerProductImageField images={images} onChange={setImages} />
+      <SellerProductImageField
+        images={images}
+        imageFits={imageFits}
+        onChange={(nextImages, nextFits) => {
+          setImages(nextImages);
+          setImageFits(nextFits);
+        }}
+      />
       <div className="flex gap-2">
         <AdminButton onClick={() => void submit(false)} disabled={saving || !title || !price}>
           ثبت و ارسال برای تأیید

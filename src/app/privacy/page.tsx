@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import site from "@/data/site.json";
-import type { SiteConfig } from "@/types";
 import { TrustPageLayout } from "@/components/layout/TrustPageLayout";
 import { hajiasalPath } from "@/lib/paths";
+import { getSiteSettings } from "@/lib/server/site-settings";
 
-const siteData = site as SiteConfig;
-const content = siteData.trustPages!.privacy;
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSiteSettings();
+  const content = site.trustPages!.privacy;
+  return {
+    title: content.title,
+    description: content.intro,
+    alternates: { canonical: hajiasalPath("/privacy") },
+  };
+}
 
-export const metadata: Metadata = {
-  title: content.title,
-  description: content.intro,
-  alternates: { canonical: hajiasalPath("/privacy") },
-};
-
-export default function PrivacyPage() {
-  return <TrustPageLayout content={content} />;
+export default async function PrivacyPage() {
+  const site = await getSiteSettings();
+  return <TrustPageLayout kind="privacy" content={site.trustPages!.privacy} />;
 }

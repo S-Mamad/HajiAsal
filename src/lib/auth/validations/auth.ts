@@ -23,7 +23,11 @@ export const otpVerifySchema = z.object({
 
 export const registerSchema = z.object({
   phone: phoneSchema,
-  fullName: z.string().min(2, "نام الزامی است"),
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "نام الزامی است")
+    .max(80, "نام بیش از حد طولانی است"),
   email: z.string().email("ایمیل نامعتبر").optional().or(z.literal("")),
   newsletterOptIn: z.boolean().optional(),
 });

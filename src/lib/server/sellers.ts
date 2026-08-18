@@ -5,7 +5,6 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { cookies } from "next/headers";
 import type { RowDataPacket } from "mysql2/promise";
 import catalogData from "@/data/seller-catalog.json";
 import { readJsonFile, writeJsonFile } from "./db";
@@ -25,6 +24,7 @@ import { getAllOrders, type StoredOrder } from "./orders";
 import { isMysqlConfigured, mysqlExecute, mysqlQuery, mysqlQueryOne, toIso } from "./mysql";
 import type { Product } from "@/types";
 import { isSellerProductAwaitingReview } from "@/lib/product-approval";
+import { readCookieValue } from "@/lib/auth/cookie-value";
 import {
   getAllSellersSync,
   getSellerByIdAsync,
@@ -516,23 +516,27 @@ export async function revokeSellerSession(token: string): Promise<void> {
 }
 
 function getTokenFromCookieHeader(cookieHeader: string): string | null {
-  const match = cookieHeader.match(new RegExp(`${SELLER_COOKIE}=([^;]+)`));
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  return readCookieValue(cookieHeader, SELLER_COOKIE);
 }
 
 export async function getSellerFromRequest(
   request: Request,
 ): Promise<Seller | null> {
-  const token = getTokenFromCookieHeader(request.headers.get("cookie") ?? "");
-  if (!token) return null;
-  return validateSellerSessionToken(token);
+  const { getSessionFromRequest } = await import("@/lib/auth/session");
+  const { resolveSellerFromCustomerSession } = await import(
+    "@/lib/auth/panel-access"
+  );
+  const session = getSessionFromRequest(request);
+  return resolveSellerFromCustomerSession(session);
 }
 
 export async function getSellerFromCookies(): Promise<Seller | null> {
-  const store = await cookies();
-  const token = store.get(SELLER_COOKIE)?.value;
-  if (!token) return null;
-  return validateSellerSessionToken(token);
+  const { getSessionFromCookies } = await import("@/lib/auth/session");
+  const { resolveSellerFromCustomerSession } = await import(
+    "@/lib/auth/panel-access"
+  );
+  const session = await getSessionFromCookies();
+  return resolveSellerFromCustomerSession(session);
 }
 
 export function sellerCookieOptions(token: string) {
@@ -549,10 +553,27 @@ export function sellerCookieOptions(token: string) {
 
 export async function buildSellerDashboard(
   sellerId: string,
-  opts?: { lowStockThreshold?: number; includeWallet?: boolean },
+  opts?: {
+    lowStockThreshold?: number;
+    includeWallet?: boolean;
+    includeOrders?: boolean;
+    includeProducts?: boolean;
+    includeTickets?: boolean;
+    includeRevenue?: boolean;
+  },
 ) {
-  const products = await getSellerProducts(sellerId);
-  const orders = await getSellerOrders(sellerId, products);
+  const includeOrders = opts?.includeOrders !== false;
+  const includeProducts = opts?.includeProducts !== false;
+  const includeTickets = opts?.includeTickets !== false;
+  const includeRevenue = opts?.includeRevenue !== false;
+  const includeWallet = opts?.includeWallet !== false;
+
+  const products = includeProducts || includeRevenue || includeOrders
+    ? await getSellerProducts(sellerId)
+    : [];
+  const orders = includeOrders || includeRevenue
+    ? await getSellerOrders(sellerId, products.length ? products : undefined)
+    : [];
 
   const { getSellerWalletBalance } = await import("./seller-wallet");
   const { listSellerNotifications } = await import("./seller-notifications");
@@ -564,45 +585,56 @@ export async function buildSellerDashboard(
   startOfToday.setHours(0, 0, 0, 0);
   const todayTs = startOfToday.getTime();
   const lowStockThreshold = opts?.lowStockThreshold ?? 10;
-  const includeWallet = opts?.includeWallet !== false;
 
   // Revenue KPIs exclude unpaid + cancelled — pending_payment is not money yet.
-  const revenueOrders = orders.filter(
-    (o) => o.status !== "cancelled" && o.status !== "pending_payment",
-  );
+  const revenueOrders = includeRevenue
+    ? orders.filter(
+        (o) => o.status !== "cancelled" && o.status !== "pending_payment",
+      )
+    : [];
   const sumInRange = (from: number) =>
     revenueOrders
       .filter((o) => new Date(o.createdAt).getTime() >= from)
       .reduce((s, o) => s + o.sellerSubtotal, 0);
 
-  const salesToday = sumInRange(todayTs);
-  const salesWeek = sumInRange(now - 7 * dayMs);
-  const salesMonth = sumInRange(now - 30 * dayMs);
-  const revenueTotal = revenueOrders.reduce((s, o) => s + o.sellerSubtotal, 0);
+  const salesToday = includeRevenue ? sumInRange(todayTs) : 0;
+  const salesWeek = includeRevenue ? sumInRange(now - 7 * dayMs) : 0;
+  const salesMonth = includeRevenue ? sumInRange(now - 30 * dayMs) : 0;
+  const revenueTotal = includeRevenue
+    ? revenueOrders.reduce((s, o) => s + o.sellerSubtotal, 0)
+    : 0;
 
-  const pending = orders.filter(
-    (o) =>
-      o.status === "pending_payment" ||
-      o.status === "confirmed" ||
-      o.status === "processing",
-  );
-  const pendingProducts = products.filter((p) =>
-    isSellerProductAwaitingReview(p),
-  );
-  const lowStockCount = products.filter((p) => {
-    const qty = p.stockQty ?? (p.inStock ? 1 : 0);
-    return qty <= lowStockThreshold;
-  }).length;
-  const outOfStock = products.filter((p) => !p.inStock);
+  const pending = includeOrders
+    ? orders.filter(
+        (o) =>
+          o.status === "pending_payment" ||
+          o.status === "confirmed" ||
+          o.status === "processing",
+      )
+    : [];
+  const pendingProducts = includeProducts
+    ? products.filter((p) => isSellerProductAwaitingReview(p))
+    : [];
+  const lowStockCount = includeProducts
+    ? products.filter((p) => {
+        const qty = p.stockQty ?? (p.inStock ? 1 : 0);
+        return qty <= lowStockThreshold;
+      }).length
+    : 0;
+  const outOfStock = includeProducts
+    ? products.filter((p) => !p.inStock)
+    : [];
 
   const salesByDay: { date: string; amount: number }[] = [];
-  for (let i = 6; i >= 0; i -= 1) {
-    const d = new Date(todayTs - i * dayMs);
-    const key = d.toISOString().slice(0, 10);
-    const amount = revenueOrders
-      .filter((o) => o.createdAt.slice(0, 10) === key)
-      .reduce((s, o) => s + o.sellerSubtotal, 0);
-    salesByDay.push({ date: key, amount });
+  if (includeRevenue) {
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date(todayTs - i * dayMs);
+      const key = d.toISOString().slice(0, 10);
+      const amount = revenueOrders
+        .filter((o) => o.createdAt.slice(0, 10) === key)
+        .reduce((s, o) => s + o.sellerSubtotal, 0);
+      salesByDay.push({ date: key, amount });
+    }
   }
 
   let walletAvailable = 0;
@@ -642,7 +674,7 @@ export async function buildSellerDashboard(
     updatedAt: string;
   }> = [];
   let openTicketsCount = 0;
-  if (isMysqlConfigured()) {
+  if (includeTickets && isMysqlConfigured()) {
     try {
       const openRow = await mysqlQuery<{
         c: number;
@@ -677,12 +709,12 @@ export async function buildSellerDashboard(
 
   return {
     kpis: {
-      productCount: products.length,
+      productCount: includeProducts ? products.length : 0,
       pendingProducts: pendingProducts.length,
       outOfStock: outOfStock.length,
       lowStockCount,
       lowStockThreshold,
-      orderCount: orders.length,
+      orderCount: includeOrders ? orders.length : 0,
       pendingOrders: pending.length,
       revenue: revenueTotal,
       salesToday,
@@ -701,9 +733,9 @@ export async function buildSellerDashboard(
       notifications: unreadNotifications,
     },
     salesByDay,
-    recentOrders: orders.slice(0, 8),
+    recentOrders: includeOrders ? orders.slice(0, 8) : [],
     recentTickets,
     recentNotifications,
-    products: products.slice(0, 6),
+    products: includeProducts ? products.slice(0, 6) : [],
   };
 }

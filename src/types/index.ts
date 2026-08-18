@@ -83,6 +83,8 @@ export interface Product {
   category: ProductCategory;
   categoryLabel: string;
   images: string[];
+  /** Per-image pan/zoom inside the square storefront frame. Keyed by image URL. */
+  imageFits?: Record<string, { scale: number; x: number; y: number }>;
   weightOptions: WeightOption[];
   discountPrice?: number;
   inStock: boolean;
@@ -92,6 +94,8 @@ export interface Product {
   brandId?: string | null;
   rating: number;
   reviewCount: number;
+  /** Page views in the last 24h — drives PLP FOMO badge when >= 50. */
+  viewsLast24h?: number;
   isBestseller?: boolean;
   isNew?: boolean;
   ingredients?: string;
@@ -109,16 +113,23 @@ export interface Product {
   customFields?: Record<string, unknown>;
 }
 
+export type CartItemAvailability = "ok" | "price_changed" | "out_of_stock";
+
 export interface CartItem {
   productId: string;
   slug: string;
   title: string;
   image: string;
+  /** Snapshot of the product square crop at add-to-cart time. */
+  imageFit?: { scale: number; x: number; y: number };
   weight: WeightOption;
   quantity: number;
   /** Snapshot for client-side stock guards */
   inStock?: boolean;
   stockQty?: number;
+  /** Unit price when first added (for price-change UX). */
+  priceAtAdd?: number;
+  availability?: CartItemAvailability;
   /** Seller ownership at order time (wallet credits must use this, not live catalog). */
   sellerId?: string;
 }
@@ -202,9 +213,39 @@ export interface SiteConfig {
     minOrder: number;
     percent: number;
   };
-  /** @deprecated ارسال رایگان حذف شده؛ فقط برای سازگاری داده قدیمی */
+  /** آستانه ارسال رایگان (تومان). ۰ یا خالی = غیرفعال */
   freeShippingThreshold?: number;
+  /** پست پیشتاز (تومان) */
   shippingCost: number;
+  /** پست ویژه (تومان). اگر نباشد: shippingCost + ۳۵۰۰۰ */
+  expressShippingCost?: number;
+  /** تحویل حضوری (تومان). پیش‌فرض ۰ */
+  pickupShippingCost?: number;
+  /** اگر false باشد ارسال رایگان شامل پست ویژه نمی‌شود */
+  freeShippingIncludesExpress?: boolean;
+  /** نوار ارسال رایگان و پیشنهاد لحظه آخر در سبد */
+  cartPromo?: {
+    freeShippingBarEnabled?: boolean;
+    freeShippingRemainingText?: string;
+    freeShippingUnlockedText?: string;
+    impulseEnabled?: boolean;
+    impulseTitle?: string;
+    impulseMode?: "popular" | "manual";
+    impulseProductIds?: string[];
+    impulseLimit?: number;
+  };
+  /** متن کادر جستجو و چیپ‌های پیشنهادی فروشگاه */
+  searchUi?: {
+    placeholder?: string;
+    suggestionsTitle?: string;
+    hint?: string;
+    suggestions?: string[];
+  };
+  shippingMethods?: {
+    standard?: { label?: string; description?: string; eta?: string };
+    express?: { label?: string; description?: string; eta?: string };
+    pickup?: { label?: string; description?: string; eta?: string };
+  };
   milestones: Array<{
     year: string;
     title: string;
@@ -222,6 +263,7 @@ export interface SiteConfig {
   aboutPage: {
     paragraphs: string[];
   };
+  faq?: Array<{ id: string; question: string; answer: string }>;
   team?: TeamMember[];
   values?: BrandValue[];
   gallery?: GalleryImage[];

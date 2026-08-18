@@ -7,6 +7,7 @@ import { Funnel, MagnifyingGlass } from "@phosphor-icons/react";
 import { DataTable } from "@/components/admin/ui/DataTable";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
 import { useAdminToast } from "@/components/admin/ui/AdminToast";
+import { Can } from "@/components/admin/auth/AdminAuthProvider";
 import { Icon } from "@/components/ui/Icon";
 import type { OrderStatus } from "@/lib/server/orders";
 import { hajiasalPath } from "@/lib/paths";
@@ -115,15 +116,17 @@ export default function AdminOrdersPage() {
           >
             بروزرسانی
           </AdminButton>
-          <AdminButton
-            href="/api/admin/orders/export"
-            variant="outline"
-            size="sm"
-            external
-            className="w-full sm:w-auto"
-          >
-            خروجی CSV
-          </AdminButton>
+          <Can permission="reports.export">
+            <AdminButton
+              href="/api/admin/orders/export"
+              variant="outline"
+              size="sm"
+              external
+              className="w-full sm:w-auto"
+            >
+              خروجی CSV
+            </AdminButton>
+          </Can>
         </div>
       </div>
 
@@ -194,27 +197,29 @@ export default function AdminOrdersPage() {
                     {row.customer?.fullName || "—"}
                   </p>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {row.customer.city}
+              {row.customer?.city ?? "—"}
               <span className="mx-1.5 text-zinc-300">·</span>
-              <span dir="ltr">{row.customer.phone}</span>
+              <span dir="ltr">{row.customer?.phone ?? ""}</span>
             </p>
             <p className="mt-2 text-sm font-semibold text-zinc-800">
               {row.total.toLocaleString("fa-IR")} تومان
             </p>
-            <select
-              value={row.status}
-              onChange={(e) =>
-                void updateStatus(row.id, e.target.value as OrderStatus)
-              }
-              className="mt-3 h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm"
-              aria-label={`وضعیت سفارش ${row.id}`}
-            >
-              {STATUS_OPTIONS.filter((o) => o.value !== "all").map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <Can permission="orders.edit">
+              <select
+                value={row.status}
+                onChange={(e) =>
+                  void updateStatus(row.id, e.target.value as OrderStatus)
+                }
+                className="mt-3 h-11 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-sm"
+                aria-label={`وضعیت سفارش ${row.id}`}
+              >
+                {STATUS_OPTIONS.filter((o) => o.value !== "all").map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </Can>
             <div className="mt-3 flex gap-2">
               <AdminButton
                 href={hajiasalPath(`/admin/orders/${row.id}`)}
@@ -224,16 +229,18 @@ export default function AdminOrdersPage() {
               >
                 جزئیات
               </AdminButton>
-              <AdminButton
-                href={`/api/orders/${row.id}/invoice?print=1`}
-                variant="outline"
-                size="sm"
-                external
-                target="_blank"
-                className="flex-1"
-              >
-                فاکتور
-              </AdminButton>
+              <Can permission="orders.print">
+                <AdminButton
+                  href={`/api/orders/${row.id}/invoice`}
+                  variant="outline"
+                  size="sm"
+                  external
+                  target="_blank"
+                  className="flex-1"
+                >
+                  فاکتور
+                </AdminButton>
+              </Can>
             </div>
           </li>
           ))
@@ -314,22 +321,24 @@ export default function AdminOrdersPage() {
               sortable: true,
               getSortValue: (row) => row.status,
               render: (row) => (
-                <select
-                  value={row.status}
-                  onChange={(e) =>
-                    void updateStatus(row.id, e.target.value as OrderStatus)
-                  }
-                  className="h-10 min-w-[9rem] rounded-lg border border-zinc-200 bg-white px-2 text-sm"
-                  aria-label={`وضعیت سفارش ${row.id}`}
-                >
-                  {STATUS_OPTIONS.filter((o) => o.value !== "all").map(
-                    (opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ),
-                  )}
-                </select>
+                <Can permission="orders.edit">
+                  <select
+                    value={row.status}
+                    onChange={(e) =>
+                      void updateStatus(row.id, e.target.value as OrderStatus)
+                    }
+                    className="h-10 min-w-[9rem] rounded-lg border border-zinc-200 bg-white px-2 text-sm"
+                    aria-label={`وضعیت سفارش ${row.id}`}
+                  >
+                    {STATUS_OPTIONS.filter((o) => o.value !== "all").map(
+                      (opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </Can>
               ),
             },
             {
@@ -344,15 +353,17 @@ export default function AdminOrdersPage() {
                   >
                     جزئیات
                   </AdminButton>
-                  <AdminButton
-                    href={`/api/orders/${row.id}/invoice?print=1`}
-                    variant="outline"
-                    size="sm"
-                    external
-                    target="_blank"
-                  >
-                    فاکتور
-                  </AdminButton>
+                  <Can permission="orders.print">
+                    <AdminButton
+                      href={`/api/orders/${row.id}/invoice`}
+                      variant="outline"
+                      size="sm"
+                      external
+                      target="_blank"
+                    >
+                      فاکتور
+                    </AdminButton>
+                  </Can>
                 </div>
               ),
             },

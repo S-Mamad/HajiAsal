@@ -64,6 +64,7 @@ export default function SellerProductEditPage() {
         category: product.category,
         categoryLabel: cat?.label ?? product.categoryLabel,
         images: product.images,
+        imageFits: product.imageFits ?? {},
         weightOptions: product.weightOptions,
         stockQty: product.stockQty,
         inStock: (product.stockQty ?? 0) > 0,
@@ -148,7 +149,10 @@ export default function SellerProductEditPage() {
       />
       <SellerProductImageField
         images={product.images ?? []}
-        onChange={(images) => setProduct({ ...product, images })}
+        imageFits={product.imageFits}
+        onChange={(images, imageFits) =>
+          setProduct({ ...product, images, imageFits })
+        }
       />
       <div className="flex flex-wrap gap-2">
         <AdminButton disabled={saving} onClick={() => void persist()}>

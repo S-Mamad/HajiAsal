@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { SiteConfig } from "@/types";
 import type { StoredOrder } from "@/lib/server/orders";
 import { getBrandLogoDataUri } from "@/lib/server/brand-logo";
+import { tomanAmountInWords } from "@/lib/persian-words";
 
 export type InvoiceAudience = "customer" | "admin" | "seller";
 
@@ -14,7 +17,11 @@ export interface InvoiceBuildOptions {
   discount?: number;
   total?: number;
   sellerShopName?: string;
-  autoPrint?: boolean;
+  /**
+   * @deprecated PDF is generated on the server via `?download=1`.
+   * Kept for call-site compatibility; ignored.
+   */
+  autoDownloadPdf?: boolean;
 }
 
 function escapeHtml(value: string): string {
@@ -49,7 +56,6 @@ function formatDateTime(iso: string): string {
 
 function paymentLabel(method: StoredOrder["paymentMethod"]): string {
   if (method === "snappay") return "خرید اقساطی اسنپ‌پی";
-  if (method === "online") return "پرداخت آنلاین (زرین‌پال)";
   return "پرداخت آنلاین";
 }
 
@@ -71,9 +77,51 @@ function shippingLabel(method?: string): string {
   return "ارسال عادی";
 }
 
+let cachedFontFaceCss: string | undefined;
+
+function vazirmatnFontFaceCss(): string {
+  if (cachedFontFaceCss) return cachedFontFaceCss;
+  const fontsDir = join(process.cwd(), "public", "fonts", "vazirmatn");
+  try {
+    const regular = readFileSync(join(fontsDir, "Vazirmatn-Regular.woff2"));
+    const bold = readFileSync(join(fontsDir, "Vazirmatn-Bold.woff2"));
+    cachedFontFaceCss = `
+    @font-face {
+      font-family: "Vazirmatn";
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(data:font/woff2;base64,${regular.toString("base64")}) format("woff2");
+    }
+    @font-face {
+      font-family: "Vazirmatn";
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url(data:font/woff2;base64,${bold.toString("base64")}) format("woff2");
+    }`;
+  } catch {
+    cachedFontFaceCss = `
+    @font-face {
+      font-family: "Vazirmatn";
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url("/fonts/vazirmatn/Vazirmatn-Regular.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Vazirmatn";
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url("/fonts/vazirmatn/Vazirmatn-Bold.woff2") format("woff2");
+    }`;
+  }
+  return cachedFontFaceCss;
+}
+
 /**
- * Professional RTL invoice HTML — print-ready / downloadable.
- * Use browser "Save as PDF" for PDF output without a native PDF engine.
+ * RTL invoice preview (print-friendly). PDF download is served by the API.
  */
 export function buildProfessionalInvoiceHtml(
   order: StoredOrder,
@@ -85,7 +133,6 @@ export function buildProfessionalInvoiceHtml(
   const shipping = options.shipping ?? order.shipping;
   const discount = options.discount ?? order.discount;
   const total = options.total ?? order.total;
-  const autoPrint = options.autoPrint ?? false;
 
   const titlePrefix =
     audience === "seller"
@@ -105,6 +152,7 @@ export function buildProfessionalInvoiceHtml(
             <div class="item-meta">${escapeHtml(item.weight.label)} · ${item.weight.grams.toLocaleString("fa-IR")} گرم</div>
           </td>
           <td class="num">${item.quantity.toLocaleString("fa-IR")}</td>
+          <td>عدد</td>
           <td class="num">${formatPrice(item.weight.price)}</td>
           <td class="num strong">${formatPrice(lineTotal)}</td>
         </tr>`;
@@ -120,6 +168,7 @@ export function buildProfessionalInvoiceHtml(
     .join(" · ");
 
   const logoSrc = getBrandLogoDataUri();
+  const totalInWords = tomanAmountInWords(total);
 
   return `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -128,65 +177,89 @@ export function buildProfessionalInvoiceHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(titlePrefix)} · ${escapeHtml(order.id)}</title>
   <style>
+    ${vazirmatnFontFaceCss()}
     :root {
-      --ink: #1f1812;
-      --muted: #6b5a48;
-      --line: rgba(42, 33, 24, 0.12);
-      --gold: #b8862e;
+      --ink: #1a120c;
+      --muted: #7a6550;
+      --line: #e2d5c2;
+      --gold: #c4922a;
+      --gold-deep: #8a6418;
       --paper: #fffdf9;
       --soft: #f3ebe0;
+      --viewer: #3d3832;
+      --accent-bar: linear-gradient(90deg, #c4922a, #e0b35a 55%, #c4922a);
     }
     * { box-sizing: border-box; }
+    html, body { margin: 0; }
     body {
-      margin: 0;
-      padding: 24px;
-      background: #e8dfd2;
+      background:
+        radial-gradient(ellipse at top, #524a42 0%, var(--viewer) 55%);
       color: var(--ink);
-      font-family: Tahoma, "Segoe UI", Arial, sans-serif;
-      line-height: 1.6;
+      font-family: "Vazirmatn", Tahoma, sans-serif;
+      font-weight: 400;
+      line-height: 1.7;
+      min-height: 100dvh;
     }
     .toolbar {
-      max-width: 860px;
-      margin: 0 auto 16px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 16px;
+      background: rgba(28, 22, 18, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .toolbar button, .toolbar a {
+    .toolbar a, .toolbar button {
       appearance: none;
-      border: 1px solid var(--line);
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 26px;
+      font-size: 14px;
+      font-family: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 148px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .toolbar a:hover, .toolbar button:hover { transform: translateY(-1px); }
+    .toolbar .btn-print {
       background: #fff;
       color: var(--ink);
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-      text-decoration: none;
     }
-    .toolbar .primary {
+    .toolbar .btn-pdf {
       background: var(--gold);
-      border-color: var(--gold);
-      color: #1f1812;
-      font-weight: 700;
+      color: #1c140e;
+      box-shadow: 0 6px 18px rgba(196, 146, 42, 0.35);
     }
+    .viewer { padding: 32px 16px 56px; }
     .sheet {
-      max-width: 860px;
+      width: 210mm;
+      min-height: 297mm;
+      max-width: 100%;
       margin: 0 auto;
       background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 16px;
+      color: var(--ink);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
       overflow: hidden;
-      box-shadow: 0 12px 40px rgba(42, 33, 24, 0.08);
+      border-radius: 2px;
     }
+    .accent { height: 4px; background: var(--accent-bar); }
     .head {
       display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 20px;
-      padding: 28px 32px 20px;
-      background: linear-gradient(180deg, #fff 0%, var(--soft) 100%);
-      border-bottom: 1px solid var(--line);
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+      padding: 28px 28px 20px;
+      background: var(--soft);
     }
     .brand-lockup {
       display: flex;
@@ -198,30 +271,29 @@ export function buildProfessionalInvoiceHtml(
       width: auto;
       object-fit: contain;
       flex-shrink: 0;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.08));
     }
     .brand-name {
       margin: 0;
       font-size: 26px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: -0.02em;
-      color: var(--ink);
     }
     .brand-tag {
       margin: 6px 0 0;
       color: var(--muted);
       font-size: 13px;
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+    .doc-title {
+      display: inline-block;
       margin-top: 14px;
-      padding: 6px 10px;
+      padding: 5px 14px;
+      border: 1px solid var(--gold);
       border-radius: 999px;
-      background: rgba(184, 134, 46, 0.14);
-      color: #8a6418;
+      color: var(--gold-deep);
       font-size: 12px;
       font-weight: 700;
+      background: rgba(255,255,255,0.55);
     }
     .meta-box {
       background: #fff;
@@ -229,21 +301,35 @@ export function buildProfessionalInvoiceHtml(
       border-radius: 12px;
       padding: 14px 16px;
       font-size: 13px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset;
     }
     .meta-box .label { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
-    .meta-box .value { font-weight: 700; }
+    .meta-box .value { font-weight: 700; word-break: break-word; }
+    .meta-id {
+      font-size: 15px;
+      letter-spacing: 0.02em;
+    }
     .meta-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin-top: 10px;
+      margin-top: 12px;
     }
-    .body { padding: 24px 32px 28px; }
+    .body { padding: 22px 28px 28px; }
     .section-title {
       margin: 0 0 12px;
       font-size: 14px;
-      font-weight: 800;
-      color: var(--ink);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::before {
+      content: "";
+      width: 3px;
+      height: 14px;
+      border-radius: 2px;
+      background: var(--gold);
     }
     .parties {
       display: grid;
@@ -255,26 +341,27 @@ export function buildProfessionalInvoiceHtml(
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 14px 16px;
-      background: #fff;
       font-size: 13px;
+      background: #fff;
     }
     .card h3 {
-      margin: 0 0 8px;
+      margin: 0 0 10px;
       font-size: 12px;
-      color: var(--gold);
-      letter-spacing: 0.04em;
+      color: var(--gold-deep);
+      font-weight: 700;
     }
+    .card strong { font-size: 14px; }
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       font-size: 13px;
-      background: #fff;
       border: 1px solid var(--line);
       border-radius: 12px;
       overflow: hidden;
     }
     th, td {
-      padding: 12px 10px;
+      padding: 11px 10px;
       text-align: right;
       border-bottom: 1px solid var(--line);
       vertical-align: top;
@@ -282,19 +369,33 @@ export function buildProfessionalInvoiceHtml(
     th {
       background: var(--soft);
       font-size: 12px;
-      color: var(--muted);
       font-weight: 700;
     }
+    tbody tr:nth-child(even) td { background: #fbf7f1; }
     tr:last-child td { border-bottom: none; }
     .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .strong { font-weight: 800; }
+    .strong { font-weight: 700; }
     .item-title { font-weight: 700; }
-    .item-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .item-meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .words-box {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--soft);
+      font-size: 13px;
+    }
+    .words-box .label {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .words-box .value { font-weight: 700; }
     .totals-wrap {
       display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 16px;
-      margin-top: 18px;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+      margin-top: 16px;
     }
     .notes {
       border: 1px dashed var(--line);
@@ -302,14 +403,14 @@ export function buildProfessionalInvoiceHtml(
       padding: 14px;
       color: var(--muted);
       font-size: 12px;
-      background: rgba(255,255,255,0.6);
+      background: #fff;
     }
     .totals {
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 8px 14px;
-      background: #fff;
       font-size: 13px;
+      background: #fff;
     }
     .totals .row {
       display: flex;
@@ -320,36 +421,54 @@ export function buildProfessionalInvoiceHtml(
     }
     .totals .row:last-child { border-bottom: none; }
     .totals .grand {
-      margin-top: 4px;
+      margin-top: 2px;
       padding-top: 12px;
       border-top: 2px solid var(--ink);
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--gold);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gold-deep);
+    }
+    .signs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 36px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .signs .line {
+      margin: 40px auto 0;
+      width: 68%;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
     }
     .foot {
-      margin-top: 22px;
+      margin-top: 24px;
       padding-top: 14px;
       border-top: 1px solid var(--line);
       color: var(--muted);
       font-size: 11px;
       text-align: center;
     }
-    @media (max-width: 720px) {
-      body { padding: 12px; }
-      .head, .parties, .totals-wrap, .meta-grid { grid-template-columns: 1fr; }
+    @media (max-width: 820px) {
+      .viewer { padding: 12px 8px 36px; }
+      .sheet { width: 100%; min-height: 0; border-radius: 0; }
+      .head, .parties, .totals-wrap, .meta-grid, .signs { grid-template-columns: 1fr; }
       .body, .head { padding: 18px; }
     }
+    @page { size: A4; margin: 10mm; }
     @media print {
-      body { background: #fff; padding: 0; }
+      body { background: #fff; }
       .toolbar { display: none !important; }
+      .viewer { padding: 0; }
       .sheet {
+        width: auto;
+        min-height: auto;
         box-shadow: none;
-        border: none;
         border-radius: 0;
-        max-width: none;
       }
-      .brand-logo {
+      .brand-logo, .head, .totals .grand, th, .accent, tbody tr:nth-child(even) td {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
@@ -358,125 +477,156 @@ export function buildProfessionalInvoiceHtml(
 </head>
 <body>
   <div class="toolbar">
-    <button type="button" class="primary" onclick="window.print()">چاپ / ذخیره PDF</button>
-    <a href="?download=1">دانلود HTML فاکتور</a>
+    <button type="button" class="btn-print" onclick="window.print()">چاپ</button>
+    <a class="btn-pdf" id="btn-pdf" href="?download=1" download="invoice-${escapeHtml(order.id)}.pdf">دانلود PDF</a>
   </div>
-  <div class="sheet">
-    <div class="head">
-      <div>
-        <div class="brand-lockup">
-          <img
-            class="brand-logo"
-            src="${logoSrc}"
-            alt="${escapeHtml(site.brand.name)}"
-            width="48"
-            height="72"
-          />
-          <div>
-            <h1 class="brand-name">${escapeHtml(site.brand.name)}</h1>
-            <p class="brand-tag">${escapeHtml(site.brand.tagline)}</p>
+  <div class="viewer">
+    <div class="sheet" id="sheet">
+      <div class="accent" aria-hidden="true"></div>
+      <div class="head">
+        <div>
+          <div class="brand-lockup">
+            <img
+              class="brand-logo"
+              src="${logoSrc}"
+              alt="${escapeHtml(site.brand.name)}"
+              width="48"
+              height="72"
+            />
+            <div>
+              <h1 class="brand-name">${escapeHtml(site.brand.name)}</h1>
+              <p class="brand-tag">${escapeHtml(site.brand.tagline)}</p>
+            </div>
+          </div>
+          <div class="doc-title">${escapeHtml(titlePrefix)}</div>
+        </div>
+        <div class="meta-box">
+          <div class="label">شماره فاکتور</div>
+          <div class="value meta-id" dir="ltr">${escapeHtml(order.id)}</div>
+          <div class="meta-grid">
+            <div>
+              <div class="label">تاریخ صدور</div>
+              <div class="value">${formatDateTime(order.createdAt)}</div>
+            </div>
+            <div>
+              <div class="label">وضعیت سفارش</div>
+              <div class="value">${statusLabel(order.status)}</div>
+            </div>
+            ${
+              order.trackingCode
+                ? `<div>
+              <div class="label">کد پیگیری</div>
+              <div class="value" dir="ltr">${escapeHtml(order.trackingCode)}</div>
+            </div>`
+                : ""
+            }
+            <div>
+              <div class="label">روش پرداخت</div>
+              <div class="value">${paymentLabel(order.paymentMethod)}</div>
+            </div>
           </div>
         </div>
-        <div class="badge">${escapeHtml(titlePrefix)}</div>
       </div>
-      <div class="meta-box">
-        <div class="label">شماره فاکتور / سفارش</div>
-        <div class="value" dir="ltr">${escapeHtml(order.id)}</div>
-        <div class="meta-grid">
+
+      <div class="body">
+        <div class="parties">
+          <div class="card">
+            <h3>فروشنده</h3>
+            <div><strong>${escapeHtml(site.brand.name)}</strong></div>
+            <div>${escapeHtml(site.footer.address || "")}</div>
+            <div dir="ltr">${escapeHtml(site.footer.phone || "")}</div>
+            <div>${escapeHtml(site.footer.email || "")}</div>
+            ${
+              options.sellerShopName
+                ? `<div style="margin-top:8px;color:var(--muted)">سهم فروشگاه: ${escapeHtml(options.sellerShopName)}</div>`
+                : ""
+            }
+          </div>
+          <div class="card">
+            <h3>خریدار</h3>
+            <div><strong>${escapeHtml(order.customer.fullName)}</strong></div>
+            <div dir="ltr">${escapeHtml(order.customer.phone)}</div>
+            <div>${escapeHtml(order.customer.province)}، ${escapeHtml(order.customer.city)}</div>
+            <div>${escapeHtml(order.customer.address)}</div>
+            ${
+              order.customer.postalCode
+                ? `<div>کدپستی: <span dir="ltr">${escapeHtml(order.customer.postalCode)}</span></div>`
+                : ""
+            }
+          </div>
+        </div>
+
+        <h2 class="section-title">اقلام فاکتور</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:48px">ردیف</th>
+              <th>شرح کالا</th>
+              <th style="width:64px">تعداد</th>
+              <th style="width:56px">واحد</th>
+              <th style="width:120px">فی</th>
+              <th style="width:130px">مبلغ</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+
+        <div class="words-box">
+          <div class="label">مبلغ به حروف</div>
+          <div class="value">${escapeHtml(totalInWords)}</div>
+        </div>
+
+        <div class="totals-wrap">
+          <div class="notes">
+            <strong>توضیحات ارسال:</strong>
+            ${shippingLabel(order.shippingMethod)}
+            ${order.couponCode ? `<br/><strong>کد تخفیف:</strong> <span dir="ltr">${escapeHtml(order.couponCode)}</span>` : ""}
+            <br/><br/>
+            این سند برای پیگیری سفارش صادر شده است.
+            در صورت مغایرت، حداکثر تا ۷۲ ساعت با پشتیبانی تماس بگیرید.
+          </div>
+          <div class="totals">
+            <div class="row"><span>جمع جزء</span><span class="num">${formatPrice(subtotal)}</span></div>
+            <div class="row"><span>هزینه ارسال</span><span class="num">${formatPrice(shipping)}</span></div>
+            ${
+              discount > 0
+                ? `<div class="row"><span>تخفیف</span><span class="num">−${formatPrice(discount)}</span></div>`
+                : ""
+            }
+            <div class="row grand"><span>مبلغ قابل پرداخت</span><span class="num">${formatPrice(total)}</span></div>
+          </div>
+        </div>
+
+        <div class="signs">
           <div>
-            <div class="label">تاریخ ثبت</div>
-            <div class="value">${formatDateTime(order.createdAt)}</div>
+            <div class="line">مهر و امضای فروشنده</div>
           </div>
           <div>
-            <div class="label">وضعیت</div>
-            <div class="value">${statusLabel(order.status)}</div>
+            <div class="line">امضای خریدار</div>
           </div>
-          ${
-            order.trackingCode
-              ? `<div>
-            <div class="label">کد پیگیری</div>
-            <div class="value" dir="ltr">${escapeHtml(order.trackingCode)}</div>
-          </div>`
-              : ""
-          }
-          <div>
-            <div class="label">روش پرداخت</div>
-            <div class="value">${paymentLabel(order.paymentMethod)}</div>
-          </div>
+        </div>
+
+        <div class="foot">
+          ${footerContact || escapeHtml(site.brand.name)}
+          <br/>تاریخ صدور سند: ${formatDate(new Date().toISOString())}
         </div>
       </div>
     </div>
-
-    <div class="body">
-      <div class="parties">
-        <div class="card">
-          <h3>فروشنده</h3>
-          <div><strong>${escapeHtml(site.brand.name)}</strong></div>
-          <div>${escapeHtml(site.footer.address || "")}</div>
-          <div dir="ltr">${escapeHtml(site.footer.phone || "")}</div>
-          <div>${escapeHtml(site.footer.email || "")}</div>
-          ${
-            options.sellerShopName
-              ? `<div style="margin-top:8px;color:var(--muted)">سهم فروشگاه: ${escapeHtml(options.sellerShopName)}</div>`
-              : ""
-          }
-        </div>
-        <div class="card">
-          <h3>خریدار</h3>
-          <div><strong>${escapeHtml(order.customer.fullName)}</strong></div>
-          <div dir="ltr">${escapeHtml(order.customer.phone)}</div>
-          <div>${escapeHtml(order.customer.province)}، ${escapeHtml(order.customer.city)}</div>
-          <div>${escapeHtml(order.customer.address)}</div>
-          ${
-            order.customer.postalCode
-              ? `<div>کدپستی: <span dir="ltr">${escapeHtml(order.customer.postalCode)}</span></div>`
-              : ""
-          }
-        </div>
-      </div>
-
-      <h2 class="section-title">اقلام فاکتور</h2>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:48px">ردیف</th>
-            <th>شرح کالا</th>
-            <th style="width:70px">تعداد</th>
-            <th style="width:120px">فی</th>
-            <th style="width:130px">مبلغ</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-
-      <div class="totals-wrap">
-        <div class="notes">
-          <strong>توضیحات ارسال:</strong>
-          ${shippingLabel(order.shippingMethod)}
-          ${order.couponCode ? `<br/><strong>کد تخفیف:</strong> <span dir="ltr">${escapeHtml(order.couponCode)}</span>` : ""}
-          <br/><br/>
-          این سند برای پیگیری سفارش و حسابرسی فروش صادر شده است.
-          در صورت مغایرت، حداکثر تا ۷۲ ساعت با پشتیبانی تماس بگیرید.
-        </div>
-        <div class="totals">
-          <div class="row"><span>جمع جزء</span><span class="num">${formatPrice(subtotal)}</span></div>
-          <div class="row"><span>هزینه ارسال</span><span class="num">${formatPrice(shipping)}</span></div>
-          ${
-            discount > 0
-              ? `<div class="row"><span>تخفیف</span><span class="num">−${formatPrice(discount)}</span></div>`
-              : ""
-          }
-          <div class="row grand"><span>مبلغ قابل پرداخت</span><span class="num">${formatPrice(total)}</span></div>
-        </div>
-      </div>
-
-      <div class="foot">
-        ${footerContact || escapeHtml(site.brand.name)}
-        <br/>صدور: ${formatDate(new Date().toISOString())}
-      </div>
-    </div>
   </div>
-  ${autoPrint ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250));</script>" : ""}
+  <script>
+    (function () {
+      var a = document.getElementById("btn-pdf");
+      if (!a) return;
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("download", "1");
+        a.setAttribute("href", u.pathname + u.search);
+        a.setAttribute("download", "invoice-${order.id}.pdf");
+      } catch (e) {
+        a.setAttribute("href", "?download=1");
+      }
+    })();
+  <\/script>
 </body>
 </html>`;
 }

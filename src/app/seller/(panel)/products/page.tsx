@@ -47,10 +47,7 @@ export default function SellerProductsPage() {
     setLoading(true);
     setError("");
     try {
-      const [res, settingsRes] = await Promise.all([
-        fetch("/api/seller/products"),
-        fetch("/api/seller/settings"),
-      ]);
+      const res = await fetch("/api/seller/products");
       if (res.status === 401) {
         router.push(hajiasalPath("/seller"));
         return;
@@ -58,10 +55,8 @@ export default function SellerProductsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا");
       setProducts(data.products ?? []);
-      if (settingsRes.ok) {
-        const settings = await settingsRes.json();
-        const threshold = settings.shopSettings?.lowStockThreshold;
-        if (typeof threshold === "number") setLowStockThreshold(threshold);
+      if (typeof data.lowStockThreshold === "number") {
+        setLowStockThreshold(data.lowStockThreshold);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");

@@ -1,6 +1,7 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { CaretDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 export function FormField({
@@ -74,8 +75,18 @@ export function AdminSelect({
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(controlClass, className)} {...props}>
-      {children}
-    </select>
+    <span className="relative block">
+      <select
+        className={cn(controlClass, "appearance-none pe-10", className)}
+        {...props}
+      >
+        {children}
+      </select>
+      <CaretDown
+        size={14}
+        className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-zinc-400"
+        aria-hidden
+      />
+    </span>
   );
 }

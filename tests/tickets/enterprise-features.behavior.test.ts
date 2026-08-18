@@ -67,6 +67,7 @@ import {
   validateChatFile,
   AUTO_CLOSE_PENDING_DAYS,
 } from "@/lib/tickets/types";
+import { isWithinSupportHours } from "@/lib/support-fab/hours";
 import { POST as adminReply } from "@/app/api/admin/tickets/[id]/reply/route";
 import { POST as sessionPost } from "@/app/api/admin/tickets/[id]/session/route";
 import { GET as toolsGet, POST as toolsPost } from "@/app/api/admin/tickets/tools/route";
@@ -292,7 +293,10 @@ describe("ticket enterprise features", () => {
       body: "سلام اپراتور آنلاین هست؟",
     });
     const messages = await listSupportTicketMessages(ticket.id);
-    expect(messages.some((m) => m.body.includes("زنده"))).toBe(true);
+    expect(messages.some((m) => m.senderType === "system")).toBe(true);
+    if (isWithinSupportHours()) {
+      expect(messages.some((m) => m.body.includes("زنده"))).toBe(true);
+    }
   });
 
   it("prepareOutboundBody masks and departments", () => {

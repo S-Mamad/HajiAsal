@@ -54,10 +54,20 @@ export function Header() {
   }, [pathname]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 6);
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        setScrolled(window.scrollY > 6);
+      });
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   const openSearch = () => {
@@ -74,8 +84,7 @@ export function Header() {
     <>
       <header
         className={cn(
-          "site-header fixed inset-x-0 top-0 h-16 sm:h-[4.75rem]",
-          mobileOpen ? "z-[100]" : "z-50",
+          "site-header fixed inset-x-0 top-0 z-50 h-16 sm:h-[4.75rem]",
           scrolled && "is-scrolled",
         )}
       >

@@ -14,14 +14,14 @@ export function PriceDisplay({
   className,
 }: PriceDisplayProps) {
   const sizeClasses = {
-    sm: "text-sm",
-    md: "text-base",
-    lg: "text-2xl md:text-3xl",
+    sm: "text-sm leading-none",
+    md: "text-base leading-none",
+    lg: "text-2xl leading-none md:text-3xl",
   };
 
   if (discountPrice && discountPrice < price) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn("flex items-baseline justify-start gap-2", className)}>
         <span
           className={cn("font-bold text-gold", sizeClasses[size])}
         >
@@ -41,7 +41,11 @@ export function PriceDisplay({
 
   return (
     <span
-      className={cn("font-bold text-gold", sizeClasses[size], className)}
+      className={cn(
+        "inline-block text-start font-bold text-gold",
+        sizeClasses[size],
+        className,
+      )}
     >
       {formatPrice(price)}
     </span>

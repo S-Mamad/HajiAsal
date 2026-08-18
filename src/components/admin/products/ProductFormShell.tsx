@@ -26,6 +26,8 @@ import { AutosaveIndicator, type AutosaveState } from "./AutosaveIndicator";
 import { RevisionsDrawer } from "./RevisionsDrawer";
 import { DynamicFieldRenderer } from "./DynamicFieldRenderer";
 import { useAdminAuth, Can } from "@/components/admin/auth/AdminAuthProvider";
+import { productImageFitSchema } from "@/lib/server/product-schemas";
+import { pruneImageFits } from "@/lib/product-image";
 
 const formSchema = z.object({
   title: z.string().min(1, "عنوان الزامی است"),
@@ -35,6 +37,10 @@ const formSchema = z.object({
   category: z.string().min(1),
   categoryLabel: z.string().default(""),
   images: z.array(z.string()).default([]),
+  imageFits: z
+    .record(z.string(), productImageFitSchema)
+    .optional()
+    .default({}),
   weightOptions: z
     .array(
       z.object({
@@ -111,6 +117,7 @@ function toFormValues(product?: Product | null): ProductFormValues {
       category: "mountain",
       categoryLabel: "کوهستان",
       images: [],
+      imageFits: {},
       weightOptions: [{ label: "۱ کیلوگرم", grams: 1000, price: 0 }],
       discountPrice: "",
       inStock: true,
@@ -134,6 +141,7 @@ function toFormValues(product?: Product | null): ProductFormValues {
     category: product.category,
     categoryLabel: product.categoryLabel,
     images: product.images ?? [],
+    imageFits: product.imageFits ?? {},
     weightOptions: product.weightOptions?.length
       ? product.weightOptions
       : [{ label: "۱ کیلوگرم", grams: 1000, price: 0 }],
@@ -229,6 +237,7 @@ export function ProductFormShell({
           CATEGORY_OPTIONS.find((c) => c.id === data.category)?.label ||
           data.category,
         images: data.images,
+        imageFits: pruneImageFits(data.imageFits, data.images) ?? {},
         inStock,
         stockQty,
         isBestseller: data.isBestseller,
@@ -568,13 +577,25 @@ export function ProductFormShell({
         );
       case "media":
         return (
-          <Controller
-            control={form.control}
-            name="images"
-            render={({ field }) => (
-              <MediaDropzone images={field.value} onChange={field.onChange} />
-            )}
-          />
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-500">
+              قاب مربع همان قالب فروشگاه است. زوم و جابه‌جایی روی سایت هم اعمال می‌شود.
+            </p>
+            <Controller
+              control={form.control}
+              name="images"
+              render={({ field }) => (
+                <MediaDropzone
+                  images={field.value}
+                  onChange={field.onChange}
+                  imageFits={form.watch("imageFits")}
+                  onFitsChange={(next) =>
+                    form.setValue("imageFits", next, { shouldDirty: true })
+                  }
+                />
+              )}
+            />
+          </div>
         );
       case "seo":
         return (

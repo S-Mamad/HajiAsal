@@ -16,6 +16,7 @@
 | `NEXT_PUBLIC_SELLER_URL` | `https://seller.hajiasal.ir` |
 | `ADMIN_PRIMARY_PHONES` | شماره‌های ادمین اصلی، جدا با ویرگول (پیش‌فرض: `09351925900,09135201973`) |
 | `AUTH_SESSION_SECRET` | کلید HMAC نشست مشتری (حداقل ۳۲ کاراکتر؛ یکسان روی هر سه اپ) |
+| `AUTH_COOKIE_DOMAIN` | دامنه مشترک کوکی (مثلاً `.hajiasal.ir`) — **اجباری روی production سه‌ساب‌دامین**؛ لوکال خالی بگذارید |
 | `AUTH_TEST_PHONE` / `AUTH_TEST_OTP` | **فقط توسعه**؛ در production غیرفعال اجباری |
 | `SMS_PROVIDER` / `MELIPAYAMAK_OTP_URL` | OTP پیامک (ادمین، فروشنده، مشتری). پیش‌فرض: کانال OTP کنسول (سریع‌تر از پیامک آزاد) |
 | `MELIPAYAMAK_BODY_ID` (+ اختیاری `MELIPAYAMAK_SHARED_URL` یا `MELIPAYAMAK_USERNAME`/`PASSWORD`) | الگو/سرویس مشترک — سریع‌ترین دلیوری OTP |
@@ -27,7 +28,7 @@
 | `ZIBAL_REFUND_ENABLED` / `ZIBAL_API_KEY` | فقط فروشگاه — استرداد API (نیاز به بانکداری شرکتی) |
 | `TRUST_X_FORWARDED_FOR` | معمولاً `true` پشت پروکسی cPanel |
 
-ورود ادمین و فروشنده فقط OTP است؛ `ADMIN_PASSWORD` و `SELLER_*_PASSWORD` دیگر مسیر ورود production نیستند.
+ورود ادمین و فروشنده از **سشن مشتری سایت اصلی** است (`/login` روی فروشگاه)؛ واجد شرایط بودن با تلفن در `admin_users` / `sellers`. مسیر OTP جداگانه پنل حذف شده است.
 
 ## Migration
 

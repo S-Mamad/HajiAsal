@@ -93,10 +93,12 @@ export async function getAllReviews(): Promise<Review[]> {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
       );
     } catch (error) {
-      console.error(
-        "[reviews] fetch failed:",
-        error instanceof Error ? error.message : error,
-      );
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[reviews] MySQL fetch unavailable, using local reviews:",
+          error instanceof Error ? error.message : error,
+        );
+      }
     }
   }
 

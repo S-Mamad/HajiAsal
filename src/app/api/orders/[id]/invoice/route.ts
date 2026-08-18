@@ -13,6 +13,10 @@ import {
   buildProfessionalInvoiceHtml,
   type InvoiceAudience,
 } from "@/lib/server/invoice";
+import {
+  buildInvoicePdfBuffer,
+  invoicePdfFilename,
+} from "@/lib/server/invoice-pdf";
 import { checkRateLimitAsync, getClientIp } from "@/lib/server/rate-limit";
 
 export async function GET(
@@ -44,7 +48,6 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const download = searchParams.get("download") === "1";
-  const print = searchParams.get("print") === "1";
   const phoneParam = normalizePhone(searchParams.get("phone") ?? "");
   const trackingParam = (searchParams.get("tracking") ?? "").toUpperCase();
 
@@ -104,10 +107,9 @@ export async function GET(
   }
 
   const site = await getSiteSettings();
-  const html = buildProfessionalInvoiceHtml(order, {
+  const buildOptions = {
     site,
     audience,
-    autoPrint: print && !download,
     ...(audience === "seller"
       ? {
           items: sellerItems,
@@ -118,19 +120,37 @@ export async function GET(
           sellerShopName,
         }
       : {}),
-  });
-
-  const filename = `invoice-${order.id}.html`;
-  const headers: Record<string, string> = {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "no-store",
-  };
+  } as const;
 
   if (download) {
-    headers["Content-Disposition"] = `attachment; filename="${filename}"`;
-  } else {
-    headers["Content-Disposition"] = `inline; filename="${filename}"`;
+    try {
+      const pdf = await buildInvoicePdfBuffer(order, buildOptions);
+      const filename = invoicePdfFilename(order.id);
+      const asciiName = `invoice-${order.id}.pdf`;
+      return new NextResponse(new Uint8Array(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Cache-Control": "no-store",
+          "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        },
+      });
+    } catch (err) {
+      console.error("[invoice] pdf build failed", err);
+      const detail =
+        err instanceof Error && err.message.includes("فونت")
+          ? err.message
+          : "ساخت فایل PDF ناموفق بود. دوباره تلاش کنید یا از چاپ استفاده کنید.";
+      return NextResponse.json({ error: detail }, { status: 500 });
+    }
   }
 
-  return new NextResponse(html, { headers });
+  const html = buildProfessionalInvoiceHtml(order, buildOptions);
+
+  return new NextResponse(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Disposition": "inline",
+    },
+  });
 }

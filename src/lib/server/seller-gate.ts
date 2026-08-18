@@ -7,6 +7,7 @@ import {
   canSeller,
   type SellerCapability,
 } from "@/lib/seller/capabilities";
+import { getTrustedClientIp } from "@/lib/server/client-ip";
 
 export type SellerAuthContext = {
   seller: Seller;
@@ -93,7 +94,5 @@ export async function gateSellerAny(
 }
 
 export function clientIpFromRequest(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
-  return request.headers.get("x-real-ip") ?? "unknown";
+  return getTrustedClientIp(request);
 }

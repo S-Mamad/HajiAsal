@@ -19,6 +19,7 @@ export default function SellerTicketDetailPage() {
     priority: string;
   } | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -46,6 +47,9 @@ export default function SellerTicketDetailPage() {
         const data = await res.json();
         setTicket(data.ticket);
         setMessages(data.messages ?? []);
+        setTypingLabel(
+          data.typing?.adminTyping ? "پشتیبان در حال نوشتن…" : null,
+        );
       } catch {
         setError("خطا در بارگذاری تیکت");
       } finally {
@@ -112,7 +116,14 @@ export default function SellerTicketDetailPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: next }),
     });
-    if (res.ok) await load({ silent: true });
+    if (res.ok) {
+      await load({ silent: true });
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setError(
+      (data as { error?: string }).error ?? "تغییر وضعیت تیکت ناموفق بود",
+    );
   };
 
   return (
@@ -139,6 +150,14 @@ export default function SellerTicketDetailPage() {
           onRetryLoad={() => void load()}
           onPollUpdate={() => void load({ silent: true })}
           pollUrl={`/api/seller/tickets/${params.id}`}
+          typingLabel={typingLabel}
+          onTyping={() => {
+            void fetch(`/api/seller/tickets/${params.id}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ typing: true }),
+            });
+          }}
           onSend={send}
           onUpload={upload}
           headerActions={
@@ -154,7 +173,7 @@ export default function SellerTicketDetailPage() {
           }
         />
       ) : loading ? (
-        <div className="h-[min(70vh,40rem)] animate-pulse rounded-xl bg-stone-100" />
+        <div className="h-[min(70vh,40rem)] animate-pulse rounded-2xl bg-stone-100" />
       ) : (
         <p className="text-sm text-rose-600">{error || "تیکت یافت نشد"}</p>
       )}
