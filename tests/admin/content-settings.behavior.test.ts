@@ -158,4 +158,42 @@ describe("content vs settings allowlist", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it("settings PATCH accepts support widget copy", async () => {
+    authMock.asRole("super_admin");
+    const payload = {
+      supportWidgetCopy: {
+        statusQueue: "در صف پاسخ",
+        welcomeLineQueue: "پیام شما ثبت شد",
+      },
+    };
+    const res = await patchSettings(
+      authedAdminRequest("http://localhost/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updateSiteSettings).toHaveBeenCalledWith(payload);
+  });
+
+  it("content PATCH accepts pageCopy", async () => {
+    authMock.asRole("content");
+    const payload = {
+      pageCopy: {
+        cart: { title: "سبد من" },
+        footer: { bottomTagline: "ارسال سریع" },
+      },
+    };
+    const res = await patchContent(
+      authedAdminRequest("http://localhost/api/admin/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updateSiteSettings).toHaveBeenCalled();
+  });
 });

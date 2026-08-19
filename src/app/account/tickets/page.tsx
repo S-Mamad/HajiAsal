@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChatCircle, Plus } from "@phosphor-icons/react";
+import { ChatCircle, ChatCircleDots, Plus } from "@phosphor-icons/react";
 import { AccountSkeleton } from "@/components/account/AccountSkeleton";
 import { SupportPresenceDot } from "@/components/support-fab/SupportPresenceDot";
 import {
@@ -10,6 +10,7 @@ import {
   ticketStatusHint,
 } from "@/components/tickets/chat-utils";
 import { Icon } from "@/components/ui/Icon";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ type Ticket = {
 const NEEDS_YOU = new Set(["pending", "answered"]);
 
 export default function AccountTicketsPage() {
+  const copy = usePageCopy();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,7 +132,7 @@ export default function AccountTicketsPage() {
                       live ? "bg-gold-dim text-gold" : "bg-surface-muted text-secondary",
                     )}
                   >
-                    <Icon icon={ChatCircle} size={20} weight="regular" />
+                    <Icon icon={ChatCircleDots} size={20} weight="fill" />
                     {unread > 0 ? (
                       <span className="absolute -end-0.5 -top-0.5 flex h-[1.15rem] min-w-[1.15rem] items-center justify-center rounded-full bg-gold px-1 text-[9px] font-bold leading-none text-ink-on-gold ring-2 ring-surface">
                         {unread > 9 ? "۹+" : unread.toLocaleString("fa-IR")}
@@ -166,7 +168,7 @@ export default function AccountTicketsPage() {
                     <p className="mt-0.5 truncate text-[12.5px] leading-5 text-secondary">
                       {unread > 0
                         ? `${unread.toLocaleString("fa-IR")} پیام جدید از پشتیبانی`
-                        : ticketStatusHint(t.status)}
+                        : ticketStatusHint(t.status, copy.tickets.statusHints)}
                     </p>
                   </div>
                 </Link>

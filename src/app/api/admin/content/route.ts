@@ -47,6 +47,7 @@ const contentPatchSchema = z
     brandStory: z
       .object({
         title: text.optional(),
+        image: text.optional(),
         paragraphs: z.array(text).max(8).optional(),
       })
       .optional(),
@@ -111,6 +112,36 @@ const contentPatchSchema = z
         shipping: trustPageSchema.optional(),
       })
       .optional(),
+    pageCopy: z.object({}).passthrough().optional(),
+    homeSlider: z
+      .object({
+        autoplay: z.boolean().optional(),
+        intervalMs: z.number().min(2000).max(30000).optional(),
+      })
+      .optional(),
+    homeSections: z
+      .object({
+        amazingDeals: z
+          .object({
+            enabled: z.boolean().optional(),
+            title: text.optional(),
+            subtitle: text.optional(),
+            limit: z.number().min(1).max(24).optional(),
+            sort: z.enum(["discount-desc", "popular", "newest"]).optional(),
+          })
+          .optional(),
+        sellerBanner: z
+          .object({
+            enabled: z.boolean().optional(),
+            title: text.optional(),
+            description: text.optional(),
+            image: text.optional(),
+            ctaText: text.optional(),
+            ctaHref: text.optional(),
+          })
+          .optional(),
+      })
+      .optional(),
   })
   .strict();
 
@@ -147,6 +178,8 @@ export async function PATCH(request: Request) {
       revalidatePath("/", "layout");
       revalidatePath("/faq");
       revalidatePath("/about");
+      revalidatePath("/contact");
+      revalidatePath("/cart");
       revalidatePath("/shipping");
       revalidatePath("/privacy");
       revalidatePath("/terms");

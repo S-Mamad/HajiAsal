@@ -21,6 +21,8 @@ interface CategoryRow {
   description?: string;
   image?: string;
   sortOrder: number;
+  showOnHome?: boolean;
+  homeLabel?: string;
 }
 
 function slugify(value: string): string {
@@ -43,6 +45,9 @@ export default function AdminCategoriesPage() {
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  const [showOnHome, setShowOnHome] = useState(true);
+  const [homeLabel, setHomeLabel] = useState("");
+  const [sortOrderInput, setSortOrderInput] = useState("0");
   const [deleting, setDeleting] = useState<CategoryRow | null>(null);
   const [reassignTo, setReassignTo] = useState("");
   const [deleteHint, setDeleteHint] = useState("");
@@ -76,6 +81,9 @@ export default function AdminCategoriesPage() {
     setSlug("");
     setDescription("");
     setImage("");
+    setShowOnHome(true);
+    setHomeLabel("");
+    setSortOrderInput(String(categories.length));
     setFormOpen(true);
   };
 
@@ -85,6 +93,9 @@ export default function AdminCategoriesPage() {
     setSlug(row.slug);
     setDescription(row.description ?? "");
     setImage(row.image ?? "");
+    setShowOnHome(row.showOnHome !== false);
+    setHomeLabel(row.homeLabel ?? "");
+    setSortOrderInput(String(row.sortOrder));
     setFormOpen(true);
   };
 
@@ -106,7 +117,9 @@ export default function AdminCategoriesPage() {
           name: name.trim(),
           description: description.trim() || undefined,
           image: image.trim() || undefined,
-          sortOrder: editing?.sortOrder ?? categories.length,
+          sortOrder: Number(sortOrderInput) || 0,
+          showOnHome,
+          homeLabel: homeLabel.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -279,6 +292,29 @@ export default function AdminCategoriesPage() {
               onChange={(e) => setImage(e.target.value)}
             />
           </FormField>
+          <FormField label="ترتیب نمایش">
+            <AdminInput
+              dir="ltr"
+              type="number"
+              value={sortOrderInput}
+              onChange={(e) => setSortOrderInput(e.target.value)}
+            />
+          </FormField>
+          <FormField label="عنوان نمایشی در صفحه اصلی">
+            <AdminInput
+              value={homeLabel}
+              onChange={(e) => setHomeLabel(e.target.value)}
+              placeholder="در صورت خالی بودن، نام دسته نمایش داده می‌شود"
+            />
+          </FormField>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showOnHome}
+              onChange={(e) => setShowOnHome(e.target.checked)}
+            />
+            نمایش در صفحه اصلی
+          </label>
         </div>
       </AdminModal>
 

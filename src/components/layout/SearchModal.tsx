@@ -11,11 +11,11 @@ import {
   ClockCounterClockwise,
 } from "@phosphor-icons/react";
 import type { Product } from "@/types";
-import { ProductImage } from "@/components/ui/ProductImage";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import { formatPrice, cn } from "@/lib/utils";
 import { getMinPrice } from "@/lib/products";
 import { hajiasalPath } from "@/lib/paths";
-import { catalogImageFit, catalogMediaClass, imageFitForSrc } from "@/lib/product-image";
+import { imageFitForSrc } from "@/lib/product-image";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { EmptyState, ErrorState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
@@ -25,6 +25,8 @@ import { resolveSearchUi } from "@/lib/search-ui";
 interface SearchModalProps {
   open: boolean;
   onClose: () => void;
+  /** Seed input when the modal opens (e.g. current shop ?q=) */
+  initialQuery?: string;
 }
 
 const RECENT_KEY = "hajiasal.search.recent";
@@ -54,7 +56,11 @@ function pushRecent(term: string) {
   }
 }
 
-export function SearchModal({ open, onClose }: SearchModalProps) {
+export function SearchModal({
+  open,
+  onClose,
+  initialQuery = "",
+}: SearchModalProps) {
   const site = useSiteSettings();
   const searchUi = resolveSearchUi(site);
   const [query, setQuery] = useState("");
@@ -64,8 +70,19 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const openedRef = useRef(false);
 
   useBodyScrollLock(open);
+
+  useEffect(() => {
+    if (open && !openedRef.current) {
+      setQuery(initialQuery);
+      setResults([]);
+      setError(null);
+      setLoading(false);
+    }
+    openedRef.current = open;
+  }, [open, initialQuery]);
 
   const search = useCallback(async (q: string, signal?: AbortSignal) => {
     const trimmed = q.trim();
@@ -321,21 +338,14 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
                               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
                             )}
                           >
-                            <div
-                              className={cn(
-                                catalogMediaClass(thumbSrc, thumbFit),
-                                "relative h-14 w-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-border/60",
-                              )}
-                            >
-                              <ProductImage
-                                src={thumbSrc}
-                                alt={product.title}
-                                fill
-                                fit={catalogImageFit(thumbSrc, thumbFit)}
-                                imageFit={thumbFit}
-                                sizes="56px"
-                              />
-                            </div>
+                            <FramedProductImage
+                              src={thumbSrc}
+                              alt={product.title}
+                              imageFit={thumbFit}
+                              sizes="56px"
+                              className="h-14 w-14 shrink-0 rounded-xl ring-1 ring-border/60"
+                              aspectClassName="relative h-full w-full overflow-hidden"
+                            />
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-primary">
                                 {product.title}

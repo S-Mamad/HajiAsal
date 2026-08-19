@@ -1,6 +1,7 @@
 "use client";
 
 import type { SocialLinks } from "@/types";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { cn } from "@/lib/utils";
 import {
   SocialBrandIcon,
@@ -12,7 +13,6 @@ type SocialKey = keyof Pick<
   "eitaa" | "telegram" | "instagram" | "rubika" | "bale" | "soroush"
 >;
 
-const HANDLE = "@hajiasal_ir";
 
 const NETWORKS: Array<{
   key: SocialKey;
@@ -68,6 +68,7 @@ export function SocialFollowSection({
   className,
   compact = false,
 }: SocialFollowSectionProps) {
+  const copy = usePageCopy();
   if (!social) return null;
 
   const items = NETWORKS.filter((n) => Boolean(social[n.key]));
@@ -111,12 +112,12 @@ export function SocialFollowSection({
     <section className={cn("w-full", className)} aria-label="شبکه‌های اجتماعی">
       <div className="mb-6 text-center sm:text-start">
         <h3 className="text-base font-semibold text-primary md:text-lg">
-          ما را در شبکه‌های اجتماعی دنبال کنید
+          {copy.social.heading}
         </h3>
         <p className="mt-1.5 text-sm text-secondary">
           همه کانال‌ها با شناسه{" "}
           <span dir="ltr" className="font-medium text-gold">
-            {HANDLE}
+            {copy.social.handle}
           </span>
         </p>
       </div>

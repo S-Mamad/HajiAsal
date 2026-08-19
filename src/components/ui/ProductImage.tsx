@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   productImageFitStyle,
   resolveProductImageSrc,
+  shouldUnoptimizeProductImage,
   type ProductImageFit,
 } from "@/lib/product-image";
 
@@ -39,9 +40,9 @@ export function ProductImage({
     setImgSrc(resolved);
   }, [resolved]);
 
-  const isSvg = imgSrc.toLowerCase().endsWith(".svg");
   const cropStyle = productImageFitStyle(imageFit);
   const objectFit = cropStyle ? "cover" : fit;
+  const unoptimized = shouldUnoptimizeProductImage(imgSrc);
 
   return (
     <Image
@@ -50,7 +51,7 @@ export function ProductImage({
       fill={fill}
       sizes={sizes}
       priority={priority}
-      unoptimized={isSvg}
+      unoptimized={unoptimized}
       className={cn(
         fill && "h-full w-full",
         objectFit === "contain" ? "object-contain" : "object-cover",

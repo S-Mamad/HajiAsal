@@ -26,6 +26,7 @@ export {
   getProductByIdAsync,
   filterProductsAsync,
   getBestsellersAsync,
+  getAmazingDealsAsync,
   searchProductsAsync,
   updateProductAsync,
   createProductAsync,

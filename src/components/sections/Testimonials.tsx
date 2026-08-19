@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { SealCheck } from "@phosphor-icons/react";
 import { Reveal } from "@/components/ui/Reveal";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import type { Review } from "@/lib/server/reviews";
 
 interface TestimonialsProps {
@@ -11,6 +12,7 @@ interface TestimonialsProps {
 }
 
 export function Testimonials({ reviews }: TestimonialsProps) {
+  const copy = usePageCopy();
   const [active, setActive] = useState(0);
   const list = reviews.length > 0 ? reviews : [];
   const review = list[active] ?? list[0];
@@ -41,10 +43,10 @@ export function Testimonials({ reviews }: TestimonialsProps) {
       <div className="mx-auto max-w-2xl px-5 md:px-8">
         <Reveal className="mb-8 text-center md:mb-14">
           <p className="mb-2 text-[10px] font-medium tracking-[0.22em] text-gold md:mb-3 md:text-[11px]">
-            صدای مشتریان
+            {copy.home.testimonialsEyebrow}
           </p>
           <h2 className="font-display text-[1.35rem] tracking-tight text-primary md:text-3xl">
-            نظر خریداران
+            {copy.home.testimonialsTitle}
           </h2>
         </Reveal>
 

@@ -100,7 +100,7 @@ function TrackOrderInner() {
       />
       <form onSubmit={handleTrack} className="mb-8 space-y-3">
         <Input
-          placeholder="TRK-XXXXXXXX"
+          placeholder="482731"
           dir="ltr"
           value={tracking}
           onChange={(e) => setTracking(e.target.value)}

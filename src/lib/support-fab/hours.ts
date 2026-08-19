@@ -1,11 +1,12 @@
 import {
-  AFTER_HOURS_GREETING,
-  LIVE_GREETING,
-  OFFLINE_OPERATOR_GREETING,
   SUPPORT_END_HOUR,
   SUPPORT_START_HOUR,
   SUPPORT_TIME_ZONE,
 } from "./constants";
+import {
+  DEFAULT_SUPPORT_WIDGET_COPY,
+  widgetGuestGreeting,
+} from "./copy";
 
 export function getHourInTimeZone(
   now: Date,
@@ -31,7 +32,5 @@ export function supportGreeting(input: {
   withinHours: boolean;
   operatorOnline: boolean;
 }): string {
-  if (!input.withinHours) return AFTER_HOURS_GREETING;
-  if (!input.operatorOnline) return OFFLINE_OPERATOR_GREETING;
-  return LIVE_GREETING;
+  return widgetGuestGreeting(DEFAULT_SUPPORT_WIDGET_COPY, input);
 }

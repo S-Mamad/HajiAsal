@@ -7,6 +7,7 @@ import { ProductCard } from "@/components/product";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Reveal } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { hajiasalPath } from "@/lib/paths";
 
 interface BestsellersCarouselProps {
@@ -14,6 +15,7 @@ interface BestsellersCarouselProps {
 }
 
 export function BestsellersCarousel({ products }: BestsellersCarouselProps) {
+  const copy = usePageCopy();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   if (products.length === 0) return null;
@@ -32,8 +34,8 @@ export function BestsellersCarousel({ products }: BestsellersCarouselProps) {
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <Reveal className="mb-5 flex items-end justify-between gap-4 md:mb-8">
           <SectionHeading
-            title="پرفروش‌ترین‌ها"
-            subtitle="محبوب‌ترین عسل‌های حاجی عسل"
+            title={copy.home.bestsellersTitle}
+            subtitle={copy.home.bestsellersSubtitle}
           />
           <div className="hidden items-center gap-2 md:flex">
             <button

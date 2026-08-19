@@ -38,7 +38,8 @@ function openMysqlCircuit(error: unknown): void {
 
 function isConnectionError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const err = error as { code?: string; errno?: number };
+  const err = error as { code?: string; errno?: number; message?: string };
+  const msg = String(err.message ?? "");
   return (
     err.code === "ECONNREFUSED" ||
     err.code === "ETIMEDOUT" ||
@@ -46,7 +47,10 @@ function isConnectionError(error: unknown): boolean {
     err.code === "ECONNRESET" ||
     err.code === "PROTOCOL_CONNECTION_LOST" ||
     err.code === "ER_ACCESS_DENIED_ERROR" ||
-    err.errno === -4078
+    err.code === "ER_CON_COUNT_ERROR" ||
+    err.errno === -4078 ||
+    err.errno === 1040 ||
+    msg.includes("Too many connections")
   );
 }
 
@@ -132,6 +136,11 @@ export function toIso(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string") return value;
   return new Date().toISOString();
+}
+
+/** MySQL DATETIME(3) strict mode rejects ISO-8601 `T`/`Z`. */
+export function toMysqlDateTime(isoString: string): string {
+  return isoString.replace("T", " ").replace(/Z$/, "");
 }
 
 export function toBool(value: unknown): boolean {

@@ -18,6 +18,7 @@ import {
 } from "@/lib/shipping";
 import { resolveCartPromo } from "@/lib/cart-promo";
 import { normalizeSearchSuggestions, resolveSearchUi } from "@/lib/search-ui";
+import { resolveSupportWidgetCopy } from "@/lib/support-fab/copy";
 import { revalidatePath } from "next/cache";
 import { sanitizePlainText } from "@/lib/server/safe-copy";
 
@@ -58,6 +59,20 @@ const patchSchema = z.object({
       suggestionsTitle: z.string().max(40).optional(),
       hint: z.string().max(160).optional(),
       suggestions: z.array(z.string().max(80)).max(16).optional(),
+    })
+    .optional(),
+  supportWidgetCopy: z
+    .object({
+      welcomeLineLive: z.string().max(160).optional(),
+      welcomeLineQueue: z.string().max(160).optional(),
+      welcomeLineAfterHours: z.string().max(160).optional(),
+      statusLive: z.string().max(80).optional(),
+      statusQueue: z.string().max(80).optional(),
+      statusAfterHours: z.string().max(80).optional(),
+      statusOffline: z.string().max(80).optional(),
+      liveGreeting: z.string().max(200).optional(),
+      offlineOperatorGreeting: z.string().max(200).optional(),
+      afterHoursGreeting: z.string().max(200).optional(),
     })
     .optional(),
 });
@@ -143,6 +158,7 @@ export async function GET(request: Request) {
       },
       cartPromo: resolveCartPromo(settings),
       searchUi: resolveSearchUi(settings),
+      supportWidgetCopy: resolveSupportWidgetCopy(settings),
     },
     missing,
     productionReady:
@@ -221,6 +237,21 @@ export async function PATCH(request: Request) {
           patch.searchUi.suggestions.map((s) => sanitizePlainText(s, 80)),
           [],
         );
+      }
+    }
+    if (patch.supportWidgetCopy) {
+      for (const [key, value] of Object.entries(patch.supportWidgetCopy)) {
+        if (typeof value !== "string") continue;
+        const max =
+          key === "liveGreeting" ||
+          key === "offlineOperatorGreeting" ||
+          key === "afterHoursGreeting"
+            ? 200
+            : key.startsWith("welcomeLine")
+              ? 160
+              : 80;
+        (patch.supportWidgetCopy as Record<string, string>)[key] =
+          sanitizePlainText(value, max);
       }
     }
 

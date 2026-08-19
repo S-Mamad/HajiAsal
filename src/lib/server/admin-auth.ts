@@ -28,6 +28,12 @@ const USERS_FILE = "admin-users.json";
 const SCRYPT_PREFIX = "scrypt$";
 const SCRYPT_KEYLEN = 64;
 
+function toMysqlDateTime(isoString: string): string {
+  // MySQL DATETIME(3) in strict mode rejects ISO-8601 with `T`/`Z`.
+  // Convert `YYYY-MM-DDTHH:mm:ss.sssZ` -> `YYYY-MM-DD HH:mm:ss.sss`.
+  return isoString.replace("T", " ").replace(/Z$/, "");
+}
+
 export interface AdminUser {
   id: string;
   fullName: string;
@@ -297,7 +303,8 @@ export async function createAdminUser(input: {
   password?: string;
   role: AdminRole;
 }): Promise<AdminUser> {
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
+  const nowMysql = toMysqlDateTime(nowIso);
   const phone = input.phone?.trim()
     ? normalizePhone(input.phone) ?? input.phone.trim()
     : null;
@@ -312,8 +319,8 @@ export async function createAdminUser(input: {
     role: input.role,
     status: "active",
     lastLoginAt: null,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: nowIso,
+    updatedAt: nowIso,
   };
 
   if (isMysqlConfigured()) {
@@ -329,8 +336,8 @@ export async function createAdminUser(input: {
           user.phone,
           user.passwordHash,
           user.role,
-          now,
-          now,
+          nowMysql,
+          nowMysql,
         ],
       );
       return user;
@@ -392,7 +399,7 @@ export async function updateAdminUser(
           next.passwordHash,
           next.role,
           next.status,
-          next.updatedAt,
+          toMysqlDateTime(next.updatedAt),
           id,
         ],
       );
@@ -442,12 +449,13 @@ export async function deleteAdminUser(id: string): Promise<boolean> {
 }
 
 export async function touchAdminLogin(userId: string): Promise<void> {
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
+  const nowMysql = toMysqlDateTime(nowIso);
   if (isMysqlConfigured()) {
     try {
       await mysqlExecute(
         "UPDATE admin_users SET last_login_at = ? WHERE id = ?",
-        [now, userId],
+        [nowMysql, userId],
       );
     } catch {
       /* ignore */
@@ -458,7 +466,7 @@ export async function touchAdminLogin(userId: string): Promise<void> {
     const users = await listUsersFs();
     const idx = users.findIndex((u) => u.id === userId);
     if (idx >= 0) {
-      users[idx] = { ...users[idx], lastLoginAt: now };
+      users[idx] = { ...users[idx], lastLoginAt: nowIso };
       await saveUsersFs(users);
     }
   }

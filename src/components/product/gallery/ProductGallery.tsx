@@ -74,10 +74,7 @@ export function ProductGallery({
               animate={{ opacity: 1 }}
               exit={reducedMotion ? undefined : { opacity: 0 }}
               transition={{ duration: reducedMotion ? 0 : 0.3 }}
-              className={cn(
-                "absolute inset-0",
-                catalogMediaClass(activeSrc, activeFit),
-              )}
+              className="absolute inset-0"
             >
               <ProductImage
                 src={activeSrc}

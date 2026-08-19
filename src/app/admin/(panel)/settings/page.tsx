@@ -15,6 +15,10 @@ import {
   DEFAULT_SEARCH_UI,
   parseSearchSuggestionLines,
 } from "@/lib/search-ui";
+import {
+  DEFAULT_SUPPORT_WIDGET_COPY,
+  type SupportWidgetCopy,
+} from "@/lib/support-fab/copy";
 
 interface EnvStatus {
   mysql: boolean;
@@ -86,6 +90,10 @@ export default function AdminSettingsPage() {
     DEFAULT_SEARCH_UI.suggestions.join("\n"),
   );
   const [savingSearchUi, setSavingSearchUi] = useState(false);
+  const [supportCopy, setSupportCopy] = useState<SupportWidgetCopy>(
+    DEFAULT_SUPPORT_WIDGET_COPY,
+  );
+  const [savingSupportCopy, setSavingSupportCopy] = useState(false);
   const [standardLabel, setStandardLabel] = useState("");
   const [standardEta, setStandardEta] = useState("");
   const [standardDescription, setStandardDescription] = useState("");
@@ -229,6 +237,46 @@ export default function AdminSettingsPage() {
             ? searchUi.suggestions.join("\n")
             : DEFAULT_SEARCH_UI.suggestions.join("\n"),
         );
+        const widgetCopy = data.settings.supportWidgetCopy ?? {};
+        setSupportCopy({
+          welcomeLineLive: String(
+            widgetCopy.welcomeLineLive ??
+              DEFAULT_SUPPORT_WIDGET_COPY.welcomeLineLive,
+          ),
+          welcomeLineQueue: String(
+            widgetCopy.welcomeLineQueue ??
+              DEFAULT_SUPPORT_WIDGET_COPY.welcomeLineQueue,
+          ),
+          welcomeLineAfterHours: String(
+            widgetCopy.welcomeLineAfterHours ??
+              DEFAULT_SUPPORT_WIDGET_COPY.welcomeLineAfterHours,
+          ),
+          statusLive: String(
+            widgetCopy.statusLive ?? DEFAULT_SUPPORT_WIDGET_COPY.statusLive,
+          ),
+          statusQueue: String(
+            widgetCopy.statusQueue ?? DEFAULT_SUPPORT_WIDGET_COPY.statusQueue,
+          ),
+          statusAfterHours: String(
+            widgetCopy.statusAfterHours ??
+              DEFAULT_SUPPORT_WIDGET_COPY.statusAfterHours,
+          ),
+          statusOffline: String(
+            widgetCopy.statusOffline ??
+              DEFAULT_SUPPORT_WIDGET_COPY.statusOffline,
+          ),
+          liveGreeting: String(
+            widgetCopy.liveGreeting ?? DEFAULT_SUPPORT_WIDGET_COPY.liveGreeting,
+          ),
+          offlineOperatorGreeting: String(
+            widgetCopy.offlineOperatorGreeting ??
+              DEFAULT_SUPPORT_WIDGET_COPY.offlineOperatorGreeting,
+          ),
+          afterHoursGreeting: String(
+            widgetCopy.afterHoursGreeting ??
+              DEFAULT_SUPPORT_WIDGET_COPY.afterHoursGreeting,
+          ),
+        });
         const methods = data.settings.shippingMethods ?? {};
         setStandardLabel(String(methods.standard?.label ?? ""));
         setStandardEta(String(methods.standard?.eta ?? ""));
@@ -384,6 +432,40 @@ export default function AdminSettingsPage() {
       toast.error(message);
     } finally {
       setSavingSearchUi(false);
+    }
+  };
+
+  const saveSupportCopy = async () => {
+    setSavingSupportCopy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          supportWidgetCopy: {
+            welcomeLineLive: supportCopy.welcomeLineLive.trim(),
+            welcomeLineQueue: supportCopy.welcomeLineQueue.trim(),
+            welcomeLineAfterHours: supportCopy.welcomeLineAfterHours.trim(),
+            statusLive: supportCopy.statusLive.trim(),
+            statusQueue: supportCopy.statusQueue.trim(),
+            statusAfterHours: supportCopy.statusAfterHours.trim(),
+            statusOffline: supportCopy.statusOffline.trim(),
+            liveGreeting: supportCopy.liveGreeting.trim(),
+            offlineOperatorGreeting: supportCopy.offlineOperatorGreeting.trim(),
+            afterHoursGreeting: supportCopy.afterHoursGreeting.trim(),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "خطا در ذخیره");
+      toast.success("متن‌های ویجت پشتیبانی ذخیره شد");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "خطای ناشناخته";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSavingSupportCopy(false);
     }
   };
 
@@ -778,6 +860,167 @@ export default function AdminSettingsPage() {
             disabled={savingSearchUi}
           >
             {savingSearchUi ? "در حال ذخیره..." : "ذخیره جستجو"}
+          </AdminButton>
+        </div>
+      </AdminAccordion>
+
+      <AdminAccordion
+        title="ویجت پشتیبانی"
+        description="متن خوش‌آمد، وضعیت و پیام فرم مهمان در چت شناور فروشگاه."
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm sm:col-span-2">
+              <span>متن خوش‌آمد — اپراتور آنلاین</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.welcomeLineLive}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    welcomeLineLive: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm sm:col-span-2">
+              <span>متن خوش‌آمد — صف / اپراتور آفلاین</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.welcomeLineQueue}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    welcomeLineQueue: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm sm:col-span-2">
+              <span>متن خوش‌آمد — خارج از ساعت پاسخگویی</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.welcomeLineAfterHours}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    welcomeLineAfterHours: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>برچسب وضعیت — آنلاین</span>
+              <AdminInput
+                value={supportCopy.statusLive}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    statusLive: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>برچسب وضعیت — صف انتظار</span>
+              <AdminInput
+                value={supportCopy.statusQueue}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    statusQueue: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>برچسب وضعیت — خارج از ساعت</span>
+              <AdminInput
+                value={supportCopy.statusAfterHours}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    statusAfterHours: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>برچسب وضعیت — قطع اینترنت</span>
+              <AdminInput
+                value={supportCopy.statusOffline}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    statusOffline: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+          </div>
+
+          <div className="space-y-3 border-t border-zinc-200 pt-4">
+            <p className="text-sm font-medium text-zinc-800">
+              پیام فرم ثبت‌نام مهمان
+            </p>
+            <label className="space-y-1 text-sm">
+              <span>آنلاین</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.liveGreeting}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    liveGreeting: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>اپراتور آفلاین</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.offlineOperatorGreeting}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    offlineOperatorGreeting: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>خارج از ساعت</span>
+              <AdminTextarea
+                rows={2}
+                value={supportCopy.afterHoursGreeting}
+                onChange={(e) =>
+                  setSupportCopy((prev) => ({
+                    ...prev,
+                    afterHoursGreeting: e.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </label>
+          </div>
+
+          <AdminButton
+            type="button"
+            className="w-full sm:w-auto"
+            onClick={() => void saveSupportCopy()}
+            disabled={savingSupportCopy}
+          >
+            {savingSupportCopy ? "در حال ذخیره..." : "ذخیره ویجت پشتیبانی"}
           </AdminButton>
         </div>
       </AdminAccordion>

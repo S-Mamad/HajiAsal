@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trackingCodesMatch } from "@/lib/tracking-code";
 import { getOrderById } from "@/lib/server/orders";
 import { getSessionFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/phone";
@@ -65,7 +66,7 @@ export async function GET(
     phoneParam &&
     trackingParam &&
     normalizePhone(order.customer.phone) === phoneParam &&
-    (order.trackingCode ?? "").toUpperCase() === trackingParam;
+    trackingCodesMatch(order.trackingCode, trackingParam);
 
   let audience: InvoiceAudience | null = null;
   let sellerItems = order.items;

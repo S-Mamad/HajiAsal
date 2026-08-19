@@ -5,6 +5,7 @@ export type DashboardPendingItem = {
   productId: string;
   title: string;
   image: string;
+  imageFit?: { scale: number; x: number; y: number };
   weightGrams: number;
 };
 
@@ -36,4 +37,14 @@ export function getNameInitials(fullName: string): string {
   const a = (parts[0] ?? "").charAt(0);
   const b = (parts[1] ?? "").charAt(0);
   return `${a} ${b}`.trim();
+}
+
+export function formatDefaultAddressSummary(
+  address: { city: string; address: string } | null | undefined,
+): string | null {
+  if (!address) return null;
+  const line = [address.city.trim(), address.address.trim()]
+    .filter(Boolean)
+    .join("، ");
+  return line.length > 0 ? line : null;
 }

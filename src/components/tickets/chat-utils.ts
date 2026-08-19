@@ -42,8 +42,11 @@ export function ticketStatusLabel(status: string): string {
   return TICKET_STATUS_LABELS[status] ?? status;
 }
 
-export function ticketStatusHint(status: string): string {
-  return TICKET_STATUS_HINTS[status] ?? "";
+export function ticketStatusHint(
+  status: string,
+  hints: Record<string, string> = TICKET_STATUS_HINTS,
+): string {
+  return hints[status] ?? TICKET_STATUS_HINTS[status] ?? "";
 }
 
 export function ticketPriorityLabel(priority: string): string {

@@ -47,10 +47,14 @@ describe("account home composition", () => {
         displayName="سید محمد محمدی"
         initials="س م"
         phone="09351925900"
+        addressSummary="تهران، خیابان ولیعصر"
       />,
     );
     const link = screen.getByRole("link");
     expect(link).toHaveTextContent("سید محمد محمدی");
+    expect(link).toHaveTextContent("09351925900");
+    expect(link).toHaveTextContent("تهران، خیابان ولیعصر");
     expect(link.className).not.toMatch(/border-border/);
+    expect(screen.queryByText("پروفایل")).not.toBeInTheDocument();
   });
 });

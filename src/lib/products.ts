@@ -5,6 +5,8 @@ import {
 } from "@/lib/search/product-ranking";
 import { normalizeSearchText } from "@/lib/search/text";
 import type { Product, ProductCategory, ProductFilters, SortOption } from "@/types";
+import { isProductOnSale } from "@/lib/product-eligibility";
+import { isProductPurchasable } from "@/lib/product-availability";
 
 const products = productsData as Product[];
 
@@ -22,7 +24,7 @@ export function getProductById(id: string): Product | undefined {
 
 export function getBestsellers(limit = 8): Product[] {
   return products
-    .filter((p) => p.isBestseller && p.inStock)
+    .filter((p) => p.isBestseller && isProductPurchasable(p))
     .sort((a, b) => b.reviewCount - a.reviewCount)
     .slice(0, limit);
 }
@@ -132,7 +134,15 @@ export function filterProducts(
   }
 
   if (filters.inStockOnly) {
-    result = result.filter((p) => p.inStock);
+    result = result.filter((p) => isProductPurchasable(p));
+  }
+
+  if (filters.onSaleOnly) {
+    result = result.filter((p) => isProductOnSale(p));
+  }
+
+  if (filters.bestsellerOnly) {
+    result = result.filter((p) => p.isBestseller);
   }
 
   if (filters.minPrice !== undefined) {

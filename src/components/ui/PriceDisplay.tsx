@@ -21,16 +21,19 @@ export function PriceDisplay({
 
   if (discountPrice && discountPrice < price) {
     return (
-      <div className={cn("flex items-baseline justify-start gap-2", className)}>
-        <span
-          className={cn("font-bold text-gold", sizeClasses[size])}
-        >
+      <div
+        className={cn(
+          "flex min-w-0 flex-wrap items-baseline justify-start gap-x-1.5 gap-y-0.5",
+          className,
+        )}
+      >
+        <span className={cn("shrink-0 font-bold text-gold", sizeClasses[size])}>
           {formatPrice(discountPrice)}
         </span>
         <span
           className={cn(
-            "text-dim line-through",
-            size === "lg" ? "text-sm" : "text-xs",
+            "min-w-0 truncate text-dim line-through",
+            size === "lg" ? "text-sm" : "text-[10px] sm:text-xs",
           )}
         >
           {formatPrice(price)}
@@ -42,7 +45,7 @@ export function PriceDisplay({
   return (
     <span
       className={cn(
-        "inline-block text-start font-bold text-gold",
+        "block min-w-0 truncate text-start font-bold text-gold",
         sizeClasses[size],
         className,
       )}

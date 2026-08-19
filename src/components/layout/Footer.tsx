@@ -6,35 +6,12 @@ import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { SocialFollowSection } from "@/components/social/SocialFollowSection";
 import { hajiasalPath } from "@/lib/paths";
+import { usePageCopy } from "@/hooks/usePageCopy";
+import type { PageCopyLink } from "@/lib/page-copy";
 
-const footerLinks = [
-  { label: "فروشگاه", href: hajiasalPath("/shop") },
-  { label: "درباره ما", href: hajiasalPath("/about") },
-  { label: "حساب کاربری", href: hajiasalPath("/account") },
-  { label: "نظرات مشتریان", href: hajiasalPath("/reviews") },
-  { label: "تماس", href: hajiasalPath("/contact") },
-  { label: "سوالات", href: hajiasalPath("/faq") },
-  { label: "پیگیری سفارش", href: hajiasalPath("/track-order") },
-  { label: "علاقه‌مندی‌ها", href: hajiasalPath("/wishlist") },
-  { label: "فروشنده شوید", href: hajiasalPath("/seller/apply") },
-];
-
-const legalLinks = [
-  { label: "ضمانت اصالت", href: hajiasalPath("/authenticity") },
-  { label: "ارسال و تحویل", href: hajiasalPath("/shipping") },
-  { label: "قوانین", href: hajiasalPath("/terms") },
-  { label: "حریم خصوصی", href: hajiasalPath("/privacy") },
-];
-
-const mobileQuickLinks = [
-  { label: "فروشگاه", href: hajiasalPath("/shop") },
-  { label: "پیگیری", href: hajiasalPath("/track-order") },
-  { label: "تماس", href: hajiasalPath("/contact") },
-  { label: "اصالت", href: hajiasalPath("/authenticity") },
-  { label: "ارسال", href: hajiasalPath("/shipping") },
-  { label: "سوالات", href: hajiasalPath("/faq") },
-  { label: "فروشنده شوید", href: hajiasalPath("/seller/apply") },
-];
+function pageLinkHref(link: PageCopyLink) {
+  return link.href.startsWith("http") ? link.href : hajiasalPath(link.href);
+}
 
 const ENAMAD_HREF =
   "https://trustseal.enamad.ir/?id=759178&Code=3HO7QSKRb8oSthAlzX6BLgc7k9e03wDp";
@@ -63,6 +40,7 @@ function EnamadSeal({
 
 export function Footer() {
   const siteData = useSiteSettings();
+  const copy = usePageCopy();
 
   return (
     <footer
@@ -82,10 +60,10 @@ export function Footer() {
           aria-label="لینک‌های فوتر"
           className="mt-5 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2"
         >
-          {mobileQuickLinks.map((link) => (
+          {copy.footer.mobileQuickLinks.map((link) => (
             <Link
-              key={link.href}
-              href={link.href}
+              key={`${link.href}-${link.label}`}
+              href={pageLinkHref(link)}
               className="text-[12px] text-secondary transition-colors active:text-gold"
             >
               {link.label}
@@ -137,13 +115,13 @@ export function Footer() {
 
           <div>
             <h4 className="mb-4 text-sm font-semibold text-primary">
-              دسترسی سریع
+              {copy.footer.quickLinksTitle}
             </h4>
             <ul className="flex flex-col gap-2.5">
-              {footerLinks.map((link) => (
-                <li key={link.href}>
+              {copy.footer.quickLinks.map((link) => (
+                <li key={`${link.href}-${link.label}`}>
                   <Link
-                    href={link.href}
+                    href={pageLinkHref(link)}
                     className="text-sm text-secondary transition-colors hover:text-gold"
                   >
                     {link.label}
@@ -155,13 +133,13 @@ export function Footer() {
 
           <div>
             <h4 className="mb-4 text-sm font-semibold text-primary">
-              اعتماد و قوانین
+              {copy.footer.legalLinksTitle}
             </h4>
             <ul className="flex flex-col gap-2.5">
-              {legalLinks.map((link) => (
-                <li key={link.href}>
+              {copy.footer.legalLinks.map((link) => (
+                <li key={`${link.href}-${link.label}`}>
                   <Link
-                    href={link.href}
+                    href={pageLinkHref(link)}
                     className="text-sm text-secondary transition-colors hover:text-gold"
                   >
                     {link.label}
@@ -172,7 +150,9 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="mb-4 text-sm font-semibold text-primary">تماس با ما</h4>
+            <h4 className="mb-4 text-sm font-semibold text-primary">
+              {copy.footer.contactTitle}
+            </h4>
             <ul className="flex flex-col gap-3 text-sm text-secondary">
               <li className="flex items-center gap-2">
                 <Phone size={16} weight="light" className="shrink-0 text-gold" />
@@ -205,10 +185,10 @@ export function Footer() {
 
         <div className="mt-10 flex items-center justify-between gap-3 border-t border-border pt-6 text-xs text-dim">
           <p>
-            © {new Date().getFullYear()} {siteData.brand.name}. تمامی حقوق محفوظ
-            است.
+            © {new Date().getFullYear()} {siteData.brand.name}.{" "}
+            {copy.footer.copyrightSuffix}
           </p>
-          <p>ارسال سراسری · ضمانت اصالت · پشتیبانی خرید</p>
+          <p>{copy.footer.bottomTagline}</p>
         </div>
       </div>
     </footer>

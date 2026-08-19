@@ -2,6 +2,14 @@
 
 import type { ProductSeo } from "@/types";
 import { hajiasalAbsoluteUrl } from "@/lib/paths";
+import { cn } from "@/lib/utils";
+import {
+  catalogImageFit,
+  imageFitForSrc,
+  productImageFitStyle,
+  resolveProductImageSrc,
+  type ProductImageFit,
+} from "@/lib/product-image";
 
 function PreviewCard({
   label,
@@ -18,17 +26,53 @@ function PreviewCard({
   );
 }
 
+function SocialPreviewImage({
+  src,
+  imageFit,
+  className,
+}: {
+  src: string;
+  imageFit?: ProductImageFit | null;
+  className?: string;
+}) {
+  const resolved = resolveProductImageSrc(src);
+  const cropStyle = productImageFitStyle(imageFit);
+  const objectFit = cropStyle ? "cover" : catalogImageFit(src, imageFit);
+
+  return (
+    <div
+      className={cn(
+        "product-media product-media--fitted relative overflow-hidden bg-stone-100",
+        className,
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={resolved}
+        alt=""
+        className="absolute inset-0 h-full w-full object-center"
+        style={{
+          objectFit,
+          ...cropStyle,
+        }}
+      />
+    </div>
+  );
+}
+
 export function SeoPreviewPanel({
   title,
   slug,
   shortDescription,
   images,
+  imageFits,
   seo,
 }: {
   title: string;
   slug: string;
   shortDescription: string;
   images: string[];
+  imageFits?: Record<string, ProductImageFit>;
   seo?: ProductSeo;
 }) {
   const url = seo?.canonical || hajiasalAbsoluteUrl(`/product/${slug || "slug"}`);
@@ -39,10 +83,14 @@ export function SeoPreviewPanel({
     "توضیح کوتاه محصول اینجا نمایش داده می‌شود.";
   const ogTitle = seo?.ogTitle || serpTitle;
   const ogDesc = seo?.ogDescription || serpDesc;
-  const ogImage = seo?.ogImage || images[0] || "";
+  const coverSrc = seo?.ogImage || images[0] || "";
+  const ogImage = resolveProductImageSrc(coverSrc);
+  const ogFit = imageFitForSrc(imageFits, coverSrc);
   const twTitle = seo?.twitterTitle || ogTitle;
   const twDesc = seo?.twitterDescription || ogDesc;
-  const twImage = seo?.twitterImage || ogImage;
+  const twSrc = seo?.twitterImage || coverSrc;
+  const twImage = resolveProductImageSrc(twSrc);
+  const twFit = imageFitForSrc(imageFits, twSrc);
   const host = (() => {
     try {
       return new URL(url).hostname;
@@ -62,8 +110,11 @@ export function SeoPreviewPanel({
       <PreviewCard label="Facebook / Open Graph">
         <div className="overflow-hidden rounded-md border border-stone-200 bg-stone-50">
           {ogImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ogImage} alt="" className="h-36 w-full object-cover" />
+            <SocialPreviewImage
+              src={coverSrc}
+              imageFit={ogFit}
+              className="h-36 w-full"
+            />
           ) : (
             <div className="flex h-36 items-center justify-center text-xs text-stone-400">
               بدون تصویر
@@ -80,8 +131,11 @@ export function SeoPreviewPanel({
       <PreviewCard label="Twitter / X">
         <div className="overflow-hidden rounded-2xl border border-stone-200">
           {twImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={twImage} alt="" className="h-40 w-full object-cover" />
+            <SocialPreviewImage
+              src={twSrc}
+              imageFit={twFit}
+              className="h-40 w-full"
+            />
           ) : null}
           <div className="space-y-1 p-3">
             <p className="text-sm font-semibold">{twTitle}</p>
@@ -94,8 +148,11 @@ export function SeoPreviewPanel({
       <PreviewCard label="LinkedIn">
         <div className="overflow-hidden rounded border border-stone-200">
           {ogImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ogImage} alt="" className="h-32 w-full object-cover" />
+            <SocialPreviewImage
+              src={coverSrc}
+              imageFit={ogFit}
+              className="h-32 w-full"
+            />
           ) : null}
           <div className="space-y-1 bg-stone-50 p-3">
             <p className="text-sm font-semibold text-stone-900">{ogTitle}</p>

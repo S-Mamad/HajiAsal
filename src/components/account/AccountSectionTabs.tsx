@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import { Icon } from "@/components/ui/Icon";
 import {
   ACCOUNT_NAV_LINKS,
@@ -36,11 +36,11 @@ export function AccountSectionTabs() {
   return (
     <nav
       aria-label="بخش‌های حساب کاربری"
-      className="account-section-tabs -mx-4 mb-5 border-b border-border/80 md:-mx-6 lg:hidden"
+      className="account-section-tabs -mx-4 mb-6 md:-mx-6 lg:hidden"
     >
       <div
         ref={scrollerRef}
-        className="flex gap-1 overflow-x-auto px-4 pb-px md:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-1.5 overflow-x-auto px-4 pb-2 md:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {ACCOUNT_NAV_LINKS.map((link) => {
           const active = isAccountNavActive(pathname, link.href, link.exact);
@@ -52,11 +52,11 @@ export function AccountSectionTabs() {
               aria-current={active ? "page" : undefined}
               scroll={false}
               className={cn(
-                "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-[13px] transition-colors",
+                "relative flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] transition-[color,background-color] duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold/40",
                 active
-                  ? "font-semibold text-gold"
-                  : "font-medium text-secondary hover:text-primary",
+                  ? "bg-gold-dim font-semibold text-gold shadow-[inset_0_0_0_1px_rgba(161,98,7,0.12)]"
+                  : "font-medium text-secondary hover:bg-surface-muted/70 hover:text-primary",
               )}
             >
               <Icon
@@ -66,18 +66,6 @@ export function AccountSectionTabs() {
                 className="shrink-0"
               />
               <span>{link.shortLabel}</span>
-              {active ? (
-                <motion.span
-                  layoutId={reduceMotion ? undefined : "account-section-tab"}
-                  aria-hidden
-                  className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gold"
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { type: "spring", stiffness: 480, damping: 36 }
-                  }
-                />
-              ) : null}
             </Link>
           );
         })}

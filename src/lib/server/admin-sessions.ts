@@ -11,6 +11,11 @@ import { isMysqlConfigured, mysqlExecute, mysqlQueryOne, toIso } from "./mysql";
 const SESSIONS_FILE = "admin-sessions.json";
 const SESSION_DAYS = 30;
 
+function toMysqlDateTime(isoString: string): string {
+  // MySQL DATETIME(3) strict mode rejects ISO-8601 `T`/`Z`.
+  return isoString.replace("T", " ").replace(/Z$/, "");
+}
+
 export interface AdminSession {
   id: string;
   tokenHash: string;
@@ -60,8 +65,8 @@ export async function createAdminSession(meta?: {
         [
           sessionId,
           tokenHash,
-          session.createdAt,
-          expiresAt.toISOString(),
+          toMysqlDateTime(session.createdAt),
+          toMysqlDateTime(expiresAt.toISOString()),
           meta?.ipAddress ?? null,
           meta?.userAgent ?? null,
           meta?.adminUserId ?? null,
@@ -87,8 +92,8 @@ export async function createAdminSession(meta?: {
             [
               sessionId,
               tokenHash,
-              session.createdAt,
-              expiresAt.toISOString(),
+              toMysqlDateTime(session.createdAt),
+              toMysqlDateTime(expiresAt.toISOString()),
               meta?.ipAddress ?? null,
               meta?.userAgent ?? null,
             ],
@@ -214,7 +219,7 @@ export async function revokeAdminSession(token: string): Promise<void> {
     try {
       await mysqlExecute(
         "UPDATE admin_sessions SET revoked_at = ? WHERE token_hash = ?",
-        [new Date().toISOString(), tokenHash],
+        [toMysqlDateTime(new Date().toISOString()), tokenHash],
       );
     } catch (error) {
       console.error(

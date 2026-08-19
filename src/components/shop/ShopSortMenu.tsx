@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { CaretDown, Check } from "@phosphor-icons/react";
+import { CaretDown, Check, SortAscending } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
+import { ShopFilterChip } from "@/components/shop/ShopFilterChip";
 import { SHOP_SORT_OPTIONS, shopSortLabel } from "@/lib/shop-catalog";
 import { cn } from "@/lib/utils";
 import type { SortOption } from "@/types";
@@ -10,9 +11,14 @@ import type { SortOption } from "@/types";
 interface ShopSortMenuProps {
   value: SortOption;
   onChange: (value: SortOption) => void;
+  variant?: "panel" | "chip";
 }
 
-export function ShopSortMenu({ value, onChange }: ShopSortMenuProps) {
+export function ShopSortMenu({
+  value,
+  onChange,
+  variant = "panel",
+}: ShopSortMenuProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -34,6 +40,63 @@ export function ShopSortMenu({ value, onChange }: ShopSortMenuProps) {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  const listbox = open ? (
+    <ul
+      id={listId}
+      role="listbox"
+      aria-label="مرتب‌سازی"
+      className={cn(
+        "z-[130] overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-[0_16px_40px_-20px_rgb(28_25_23/0.55)]",
+        variant === "chip"
+          ? "absolute end-0 top-[calc(100%+0.35rem)] min-w-[11rem]"
+          : "mt-1.5",
+      )}
+    >
+      {SHOP_SORT_OPTIONS.map((option) => {
+        const selected = option.value === value;
+        return (
+          <li key={option.value}>
+            <button
+              type="button"
+              role="option"
+              aria-selected={selected}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-start text-[13px] transition",
+                selected
+                  ? "bg-gold-dim font-medium text-gold"
+                  : "text-primary hover:bg-surface-muted",
+              )}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+              {selected ? (
+                <Icon icon={Check} size={14} weight="bold" className="text-gold" />
+              ) : null}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  ) : null;
+
+  if (variant === "chip") {
+    return (
+      <div ref={rootRef} className="relative shrink-0">
+        <ShopFilterChip
+          label="مرتب‌سازی"
+          icon={<SortAscending size={15} weight="regular" aria-hidden />}
+          active={open || value !== "popular"}
+          onClick={() => setOpen((v) => !v)}
+          ariaLabel={`مرتب‌سازی: ${shopSortLabel(value)}`}
+        />
+        {listbox}
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef}>
@@ -61,42 +124,7 @@ export function ShopSortMenu({ value, onChange }: ShopSortMenuProps) {
           )}
         />
       </button>
-      {open ? (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label="مرتب‌سازی"
-          className="mt-1.5 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-[0_12px_32px_-18px_rgb(28_25_23/0.45)]"
-        >
-          {SHOP_SORT_OPTIONS.map((option) => {
-            const selected = option.value === value;
-            return (
-              <li key={option.value}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-start text-[13px] transition",
-                    selected
-                      ? "bg-gold-dim font-medium text-gold"
-                      : "text-primary hover:bg-surface-muted",
-                  )}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  {option.label}
-                  {selected ? (
-                    <Icon icon={Check} size={14} weight="bold" className="text-gold" />
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {listbox}
     </div>
   );
 }

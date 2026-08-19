@@ -3,9 +3,12 @@
 import { Tag } from "@phosphor-icons/react";
 import { Reveal } from "@/components/ui/Reveal";
 import { Button } from "@/components/ui/Button";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { hajiasalPath } from "@/lib/paths";
 
 export function PromoBanner() {
+  const copy = usePageCopy();
+
   return (
     <section className="py-8 md:py-16">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
@@ -22,17 +25,21 @@ export function PromoBanner() {
               <div>
                 <span className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium tracking-wide text-gold">
                   <Tag size={14} weight="fill" />
-                  کد تخفیف: HAJI10
+                  {copy.home.promoBadge}
                 </span>
                 <h2 className="font-display text-xl text-primary sm:text-2xl md:text-3xl">
-                  ۱۰٪ تخفیف اولین خرید
+                  {copy.home.promoTitle}
                 </h2>
                 <p className="mt-2 text-sm text-secondary md:text-base">
-                  برای سفارش‌های بالای ۳۰۰ هزار تومان
+                  {copy.home.promoSubtitle}
                 </p>
               </div>
-              <Button href={hajiasalPath("/shop")} size="lg" className="w-full sm:w-auto">
-                خرید کنید
+              <Button
+                href={hajiasalPath(copy.home.promoCtaHref)}
+                size="lg"
+                className="w-full sm:w-auto"
+              >
+                {copy.home.promoCta}
               </Button>
             </div>
           </div>

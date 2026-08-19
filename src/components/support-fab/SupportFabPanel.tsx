@@ -1,25 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChatCircle, X } from "@phosphor-icons/react";
+import { ChatCircleDots, X } from "@phosphor-icons/react";
 import { SupportGuestIdentityForm } from "@/components/support-fab/SupportGuestIdentityForm";
 import { TicketChat } from "@/components/tickets/TicketChat";
 import { TicketComposer } from "@/components/tickets/TicketComposer";
 import type { ChatMessage } from "@/components/tickets/chat-utils";
 import { Icon } from "@/components/ui/Icon";
-import { AFTER_HOURS_GREETING, WIDGET_STATUS_AFTER_HOURS, WIDGET_STATUS_LIVE, WIDGET_STATUS_OFFLINE, WIDGET_STATUS_QUEUE } from "@/lib/support-fab/constants";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { ticketSubjectForContext } from "@/lib/support-fab/context";
-import { supportGreeting } from "@/lib/support-fab/hours";
+import {
+  resolveSupportWidgetCopy,
+  widgetGuestGreeting,
+  widgetStatusCopy,
+  widgetWelcomeLine,
+} from "@/lib/support-fab/copy";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { planPanelOpenSync } from "@/lib/support-fab/panel-sync";
 import { cn } from "@/lib/utils";
 import type { SupportFabPanelProps, SupportHandshake } from "./types";
-
-const QUICK_PROMPTS = [
-  { id: "order", label: "پیگیری سفارش", body: "سلام، می‌خواهم وضعیت سفارشم را پیگیری کنم." },
-  { id: "pay", label: "مشکل پرداخت", body: "سلام، در پرداخت سفارش به مشکل خوردم." },
-  { id: "stock", label: "موجودی محصول", body: "سلام، می‌خواستم از موجودی این محصول مطلع شوم." },
-  { id: "other", label: "سوال دیگر", body: "" },
-] as const;
 
 export default function SupportFabPanel({
   open,
@@ -56,13 +55,20 @@ export default function SupportFabPanel({
   const browserOnline =
     typeof navigator === "undefined" ? true : navigator.onLine;
 
+  const siteSettings = useSiteSettings();
+  const pageCopy = usePageCopy();
+  const widgetCopy = useMemo(
+    () => resolveSupportWidgetCopy(siteSettings),
+    [siteSettings],
+  );
+
   const greeting = useMemo(
     () =>
-      supportGreeting({
+      widgetGuestGreeting(widgetCopy, {
         withinHours,
         operatorOnline: Boolean(handshake?.operatorOnline),
       }),
-    [handshake?.operatorOnline, withinHours],
+    [handshake?.operatorOnline, widgetCopy, withinHours],
   );
 
   const refreshHandshake = useCallback(async () => {
@@ -327,7 +333,7 @@ export default function SupportFabPanel({
     const optimisticGreeting: ChatMessage = {
       id: `${optimisticId}_g`,
       senderType: "system",
-      body: withinHours ? greeting : AFTER_HOURS_GREETING,
+      body: greeting,
       createdAt: now,
       delivery: "sent",
     };
@@ -416,33 +422,34 @@ export default function SupportFabPanel({
     }
   };
 
-  const statusCopy = !browserOnline
-    ? WIDGET_STATUS_OFFLINE
-    : !withinHours
-      ? WIDGET_STATUS_AFTER_HOURS
-      : handshake?.operatorOnline
-        ? WIDGET_STATUS_LIVE
-        : WIDGET_STATUS_QUEUE;
+  const statusCopy = widgetStatusCopy(widgetCopy, {
+    withinHours,
+    operatorOnline: Boolean(handshake?.operatorOnline),
+    browserOnline,
+  });
 
-  const introCopy = handshake?.shippingOrderId
-    ? "درباره بسته‌تان بپرسید. اولین پیام، گفتگو را باز می‌کند."
-    : productOutOfStock
-      ? "اگر موجودی مدنظرتان است، همین‌جا بپرسید."
-      : "پیامتان را بنویسید؛ بدون فرم اضافه وصل می‌شوید.";
+  const welcomeLine = useMemo(
+    () =>
+      widgetWelcomeLine(widgetCopy, {
+        withinHours,
+        operatorOnline: Boolean(handshake?.operatorOnline),
+      }),
+    [handshake?.operatorOnline, widgetCopy, withinHours],
+  );
 
   const inThread = Boolean(ticketId && identified);
 
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col text-primary",
+        "support-fab-panel flex h-full min-h-0 flex-col text-primary",
         inThread ? "bg-transparent" : "ticket-chat-canvas",
       )}
     >
       {inThread ? (
         <TicketChat
           ticketId={ticket?.id ?? ticketId!}
-          subject={ticket?.subject ?? "پشتیبانی حاجی‌عسل"}
+          subject={ticket?.subject ?? pageCopy.support.panelTitle}
           status={ticket?.status ?? "open"}
           priority={ticket?.priority ?? "normal"}
           messages={messages}
@@ -500,7 +507,7 @@ export default function SupportFabPanel({
                 browserOnline ? "bg-gold-dim text-gold" : "bg-surface-muted text-dim",
               )}
             >
-              <Icon icon={ChatCircle} size={20} weight="regular" />
+              <Icon icon={ChatCircleDots} size={20} weight="fill" />
               {browserOnline && withinHours ? (
                 <span
                   className={cn(
@@ -513,7 +520,7 @@ export default function SupportFabPanel({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-semibold tracking-tight">
-                پشتیبانی حاجی‌عسل
+                {pageCopy.support.panelTitle}
               </p>
               <p className="mt-1 truncate text-[11px] text-secondary">
                 {statusCopy}
@@ -544,64 +551,79 @@ export default function SupportFabPanel({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-4">
-                <div className="mx-auto flex max-w-sm flex-col gap-3.5">
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-dim text-gold">
-                      <Icon icon={ChatCircle} size={16} weight="regular" />
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+                <div className="mx-auto flex max-w-sm flex-col gap-5">
+                  <div className="space-y-2 text-center">
+                    <p className="text-[15px] font-semibold tracking-tight text-primary">
+                      {handshake?.user?.fullName
+                        ? `سلام ${handshake.user.fullName}`
+                        : "سلام"}
+                    </p>
+                    <p className="text-[13px] leading-6 text-secondary">
+                      {welcomeLine}
+                    </p>
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full px-2.5 py-1 text-[11px]",
+                        !browserOnline
+                          ? "bg-stone-100 text-stone-600"
+                          : withinHours && handshake?.operatorOnline
+                            ? "bg-emerald-50 text-emerald-800"
+                            : "bg-gold-dim text-gold",
+                      )}
+                    >
+                      {statusCopy}
                     </span>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="rounded-2xl rounded-ss-md border border-border/60 bg-surface px-3 py-2.5 text-[13px] leading-6 text-primary shadow-[0_10px_24px_-18px_rgb(28_25_23/0.28)]">
-                        {withinHours ? greeting : AFTER_HOURS_GREETING}
-                      </div>
-                      <p className="px-0.5 text-[12px] leading-5 text-secondary">
-                        {handshake?.user?.fullName
-                          ? `سلام ${handshake.user.fullName}؛ ${introCopy}`
-                          : introCopy}
-                      </p>
-                      {handshake?.kind === "guest" && handshake.user ? (
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-center text-[11px] text-secondary/80">
+                      {pageCopy.support.quickPromptsSection}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {pageCopy.support.quickPrompts.map((prompt) => (
                         <button
+                          key={prompt.id}
                           type="button"
-                          className="px-0.5 text-[11px] text-gold underline-offset-2 hover:underline"
-                          onClick={() => setEditIdentity(true)}
+                          disabled={!browserOnline || creating}
+                          onClick={() => {
+                            if (!prompt.body) {
+                              const el =
+                                document.querySelector<HTMLTextAreaElement>(
+                                  ".support-fab-panel textarea",
+                                );
+                              el?.focus();
+                              return;
+                            }
+                            void createFromComposer({
+                              body: prompt.body,
+                              clientMessageId:
+                                typeof crypto !== "undefined" &&
+                                crypto.randomUUID
+                                  ? crypto.randomUUID()
+                                  : `c_${Date.now()}`,
+                            });
+                          }}
+                          className="rounded-xl border border-border/45 bg-surface/90 px-3 py-2.5 text-[12px] text-primary transition hover:border-gold/35 hover:bg-gold-dim/50 disabled:opacity-50"
                         >
-                          تغییر نام یا شماره ({handshake.user.phone})
+                          {prompt.label}
                         </button>
-                      ) : null}
+                      ))}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2 ps-10">
-                    {QUICK_PROMPTS.map((prompt) => (
-                      <button
-                        key={prompt.id}
-                        type="button"
-                        disabled={!browserOnline || creating}
-                        onClick={() => {
-                          if (!prompt.body) {
-                            const el = document.querySelector<HTMLTextAreaElement>(
-                              ".support-fab-panel textarea",
-                            );
-                            el?.focus();
-                            return;
-                          }
-                          void createFromComposer({
-                            body: prompt.body,
-                            clientMessageId:
-                              typeof crypto !== "undefined" && crypto.randomUUID
-                                ? crypto.randomUUID()
-                                : `c_${Date.now()}`,
-                          });
-                        }}
-                        className="rounded-xl border border-border/80 bg-surface/90 px-3 py-2 text-[12px] text-primary transition hover:border-gold/40 hover:bg-gold-dim disabled:opacity-50"
-                      >
-                        {prompt.label}
-                      </button>
-                    ))}
-                  </div>
+                  {handshake?.kind === "guest" && handshake.user ? (
+                    <button
+                      type="button"
+                      className="mx-auto block text-[11px] text-secondary underline-offset-2 hover:text-gold hover:underline"
+                      onClick={() => setEditIdentity(true)}
+                    >
+                      ویرایش نام یا شماره
+                    </button>
+                  ) : null}
 
                   {error ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-[13px] leading-6 text-rose-800">
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[12px] leading-6 text-rose-800">
                       {error}
                     </div>
                   ) : null}
@@ -613,7 +635,7 @@ export default function SupportFabPanel({
                 sending={creating}
                 disabled={!browserOnline}
                 compact
-                placeholder="پیام خود را بنویسید…"
+                placeholder={pageCopy.support.composerPlaceholder}
                 onSend={createFromComposer}
                 onUpload={upload}
               />

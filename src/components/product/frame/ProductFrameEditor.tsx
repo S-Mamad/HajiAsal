@@ -5,12 +5,11 @@ import { ArrowCounterClockwise, Minus, Plus } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { cn } from "@/lib/utils";
 import {
-  catalogImageFit,
-  catalogMediaClass,
   clampImageFit,
   DEFAULT_IMAGE_FIT,
   isCustomImageFit,
   productImageFitStyle,
+  resolveProductImageSrc,
   type ProductImageFit,
 } from "@/lib/product-image";
 
@@ -125,10 +124,7 @@ export function ProductFrameEditor({
     <div className={cn("space-y-2", className)}>
       <div
         ref={frameRef}
-        className={cn(
-          "gallery-frame relative aspect-square w-full max-w-[220px] cursor-grab overflow-hidden touch-none active:cursor-grabbing",
-          catalogMediaClass(src, fit),
-        )}
+        className="gallery-frame relative aspect-square w-full max-w-[220px] cursor-grab overflow-hidden touch-none active:cursor-grabbing product-media product-media--fitted"
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           event.preventDefault();
@@ -182,12 +178,12 @@ export function ProductFrameEditor({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={src}
+          src={resolveProductImageSrc(src)}
           alt=""
           draggable={false}
-          className="pointer-events-none select-none"
+          className="pointer-events-none absolute inset-0 h-full w-full select-none"
           style={{
-            objectFit: catalogImageFit(src, fit),
+            objectFit: "cover" as const,
             ...imgStyle,
           }}
         />

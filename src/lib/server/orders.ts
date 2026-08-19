@@ -1,4 +1,9 @@
 import { randomBytes } from "node:crypto";
+import {
+  generateSixDigitCode,
+  normalizeTrackingCode,
+  trackingCodesMatch,
+} from "@/lib/tracking-code";
 import type { RowDataPacket } from "mysql2/promise";
 import type { CartItem, CheckoutFormData } from "@/types";
 import { normalizePhone } from "@/lib/auth/phone";
@@ -75,8 +80,16 @@ function generateOrderId(): string {
   return `HA-${timestamp}-${random}`;
 }
 
-function generateTrackingCode(): string {
-  return `TRK-${randomBytes(6).toString("hex").toUpperCase()}`;
+async function generateUniqueTrackingCode(): Promise<string> {
+  const orders = await getAllOrders();
+  const used = new Set(
+    orders.map((o) => o.trackingCode).filter(Boolean) as string[],
+  );
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const code = generateSixDigitCode();
+    if (!used.has(code)) return code;
+  }
+  throw new Error("Could not generate unique tracking code");
 }
 
 function mapRowToOrder(row: Record<string, unknown>): StoredOrder {
@@ -138,7 +151,7 @@ export async function createOrder(input: {
     shippingMethod: input.shippingMethod,
     createdAt: now,
     updatedAt: now,
-    trackingCode: generateTrackingCode(),
+    trackingCode: await generateUniqueTrackingCode(),
     userId: input.userId,
   };
 
@@ -216,12 +229,21 @@ export async function getOrderById(orderId: string): Promise<StoredOrder | null>
 export async function getOrderByTracking(
   trackingCode: string,
 ): Promise<StoredOrder | null> {
+  const code = normalizeTrackingCode(trackingCode);
+  if (!code) return null;
+
   if (isMysqlConfigured()) {
     try {
-      const row = await mysqlQueryOne<RowDataPacket>(
+      let row = await mysqlQueryOne<RowDataPacket>(
         "SELECT * FROM orders WHERE tracking_code = ? LIMIT 1",
-        [trackingCode.toUpperCase()],
+        [code],
       );
+      if (!row && code.toUpperCase() !== code) {
+        row = await mysqlQueryOne<RowDataPacket>(
+          "SELECT * FROM orders WHERE tracking_code = ? LIMIT 1",
+          [code.toUpperCase()],
+        );
+      }
       if (row) return mapRowToOrder(row);
     } catch (error) {
       console.error(
@@ -234,15 +256,13 @@ export async function getOrderByTracking(
   if (canUseFilesystemPersistence()) {
     const orders = await readJsonFile<StoredOrder[]>(ORDERS_FILE, []);
     return (
-      orders.find(
-        (o) => o.trackingCode?.toUpperCase() === trackingCode.toUpperCase(),
-      ) ?? null
+      orders.find((o) => trackingCodesMatch(o.trackingCode, code)) ?? null
     );
   }
 
   return (
-    memoryGetOrders<StoredOrder>().find(
-      (o) => o.trackingCode?.toUpperCase() === trackingCode.toUpperCase(),
+    memoryGetOrders<StoredOrder>().find((o) =>
+      trackingCodesMatch(o.trackingCode, code),
     ) ?? null
   );
 }

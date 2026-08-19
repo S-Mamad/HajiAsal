@@ -150,4 +150,23 @@ describe("filterProducts sort", () => {
     );
     expect(filtered.map((p) => p.id)).toEqual(["sale"]);
   });
+
+  it("filters onSaleOnly using discountPrice below list min", () => {
+    const filtered = filterProducts({ onSaleOnly: true }, catalog);
+    expect(filtered.map((p) => p.id)).toEqual(["sale"]);
+  });
+
+  it("inStockOnly rejects inStock true with stockQty zero", () => {
+    const stocked = makeProduct({
+      id: "zero-stock",
+      title: "zero",
+      inStock: true,
+      stockQty: 0,
+    });
+    const filtered = filterProducts({ inStockOnly: true }, [
+      ...catalog,
+      stocked,
+    ]);
+    expect(filtered.some((p) => p.id === "zero-stock")).toBe(false);
+  });
 });

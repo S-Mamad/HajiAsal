@@ -256,15 +256,85 @@ export async function deleteArticle(id: string): Promise<boolean> {
 export interface BannerRecord {
   id: string;
   title: string;
+  subtitle?: string | null;
   imageUrl: string;
+  imageMobileUrl?: string | null;
   linkUrl?: string | null;
+  ctaText?: string | null;
+  ctaHref?: string | null;
   placement: string;
   sortOrder: number;
   startsAt?: string | null;
   endsAt?: string | null;
   isActive: boolean;
+  isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+function mapBannerRow(r: Record<string, unknown>): BannerRecord {
+  return {
+    id: String(r.id),
+    title: String(r.title),
+    subtitle: r.subtitle ? String(r.subtitle) : null,
+    imageUrl: String(r.image_url),
+    imageMobileUrl: r.image_mobile_url ? String(r.image_mobile_url) : null,
+    linkUrl: r.link_url ? String(r.link_url) : null,
+    ctaText: r.cta_text ? String(r.cta_text) : null,
+    ctaHref: r.cta_href ? String(r.cta_href) : null,
+    placement: String(r.placement ?? "home_slider"),
+    sortOrder: Number(r.sort_order ?? 0),
+    startsAt: r.starts_at ? toIso(r.starts_at) : null,
+    endsAt: r.ends_at ? toIso(r.ends_at) : null,
+    isActive: toBool(r.is_active),
+    isDefault: toBool(r.is_default),
+    createdAt: toIso(r.created_at),
+    updatedAt: toIso(r.updated_at),
+  };
+}
+
+export function isBannerScheduleActive(
+  banner: Pick<BannerRecord, "isActive" | "startsAt" | "endsAt">,
+  now = Date.now(),
+): boolean {
+  if (!banner.isActive) return false;
+  if (banner.startsAt) {
+    const start = Date.parse(banner.startsAt);
+    if (Number.isFinite(start) && now < start) return false;
+  }
+  if (banner.endsAt) {
+    const end = Date.parse(banner.endsAt);
+    if (Number.isFinite(end) && now > end) return false;
+  }
+  return true;
+}
+
+export async function getActiveHomeSliderSlides(): Promise<BannerRecord[]> {
+  const all = await listBanners();
+  const now = Date.now();
+  return all
+    .filter(
+      (b) => b.placement === "home_slider" && isBannerScheduleActive(b, now),
+    )
+    .sort((a, b) => {
+      if (Boolean(a.isDefault) !== Boolean(b.isDefault)) {
+        return a.isDefault ? -1 : 1;
+      }
+      return a.sortOrder - b.sortOrder;
+    });
+}
+
+async function clearOtherDefaultSlides(
+  placement: string,
+  exceptId: string,
+): Promise<void> {
+  const all = await listBanners();
+  const others = all.filter(
+    (b) => b.placement === placement && b.id !== exceptId && b.isDefault,
+  );
+  for (const banner of others) {
+    await upsertBanner({ ...banner, isDefault: false }, { skipDefaultClear: true });
+  }
 }
 
 export async function listBanners(): Promise<BannerRecord[]> {
@@ -273,19 +343,7 @@ export async function listBanners(): Promise<BannerRecord[]> {
       const rows = await mysqlQuery<RowDataPacket>(
         "SELECT * FROM banners ORDER BY sort_order ASC, created_at DESC",
       );
-      return rows.map((r) => ({
-        id: String(r.id),
-        title: String(r.title),
-        imageUrl: String(r.image_url),
-        linkUrl: r.link_url ? String(r.link_url) : null,
-        placement: String(r.placement ?? "home_slider"),
-        sortOrder: Number(r.sort_order ?? 0),
-        startsAt: r.starts_at ? toIso(r.starts_at) : null,
-        endsAt: r.ends_at ? toIso(r.ends_at) : null,
-        isActive: toBool(r.is_active),
-        createdAt: toIso(r.created_at),
-        updatedAt: toIso(r.updated_at),
-      }));
+      return rows.map((r) => mapBannerRow(r as Record<string, unknown>));
     } catch {
       return [];
     }
@@ -296,53 +354,71 @@ export async function listBanners(): Promise<BannerRecord[]> {
 
 export async function upsertBanner(
   input: Partial<BannerRecord> & { title: string; imageUrl: string },
+  options?: { skipDefaultClear?: boolean },
 ): Promise<BannerRecord> {
   const now = new Date().toISOString();
   const record: BannerRecord = {
     id: input.id ?? `ban_${randomUUID().slice(0, 8)}`,
     title: input.title,
+    subtitle: input.subtitle ?? null,
     imageUrl: input.imageUrl,
+    imageMobileUrl: input.imageMobileUrl ?? null,
     linkUrl: input.linkUrl ?? null,
+    ctaText: input.ctaText ?? null,
+    ctaHref: input.ctaHref ?? input.linkUrl ?? null,
     placement: input.placement ?? "home_slider",
     sortOrder: input.sortOrder ?? 0,
     startsAt: input.startsAt ?? null,
     endsAt: input.endsAt ?? null,
     isActive: input.isActive ?? true,
+    isDefault: input.isDefault ?? false,
     createdAt: input.createdAt ?? now,
     updatedAt: now,
   };
   if (isMysqlConfigured()) {
     await mysqlExecute(
       `INSERT INTO banners
-        (id, title, image_url, link_url, placement, sort_order, starts_at, ends_at, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, title, subtitle, image_url, image_mobile_url, link_url, cta_text, cta_href,
+         placement, sort_order, starts_at, ends_at, is_active, is_default, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
-         title=VALUES(title), image_url=VALUES(image_url), link_url=VALUES(link_url),
-         placement=VALUES(placement), sort_order=VALUES(sort_order), starts_at=VALUES(starts_at),
-         ends_at=VALUES(ends_at), is_active=VALUES(is_active), updated_at=VALUES(updated_at)`,
+         title=VALUES(title), subtitle=VALUES(subtitle),
+         image_url=VALUES(image_url), image_mobile_url=VALUES(image_mobile_url),
+         link_url=VALUES(link_url), cta_text=VALUES(cta_text), cta_href=VALUES(cta_href),
+         placement=VALUES(placement), sort_order=VALUES(sort_order),
+         starts_at=VALUES(starts_at), ends_at=VALUES(ends_at),
+         is_active=VALUES(is_active), is_default=VALUES(is_default), updated_at=VALUES(updated_at)`,
       [
         record.id,
         record.title,
+        record.subtitle,
         record.imageUrl,
+        record.imageMobileUrl,
         record.linkUrl,
+        record.ctaText,
+        record.ctaHref,
         record.placement,
         record.sortOrder,
         record.startsAt,
         record.endsAt,
         record.isActive ? 1 : 0,
+        record.isDefault ? 1 : 0,
         record.createdAt,
         record.updatedAt,
       ],
     );
-    return record;
-  }
-  if (canUseFilesystemPersistence()) {
+  } else if (canUseFilesystemPersistence()) {
     const list = await fsList<BannerRecord>("banners.json");
     const idx = list.findIndex((b) => b.id === record.id);
     if (idx >= 0) list[idx] = record;
     else list.push(record);
     await fsSave("banners.json", list);
   }
+
+  if (record.isDefault && !options?.skipDefaultClear) {
+    await clearOtherDefaultSlides(record.placement, record.id);
+  }
+
   return record;
 }
 
@@ -540,6 +616,73 @@ export async function createMedia(
     await fsSave("media-assets.json", list);
   }
   return record;
+}
+
+export async function getMediaById(id: string): Promise<MediaRecord | null> {
+  const items = await listMedia();
+  return items.find((item) => item.id === id) ?? null;
+}
+
+export async function updateMedia(
+  id: string,
+  patch: Partial<
+    Pick<
+      MediaRecord,
+      "originalName" | "mimeType" | "sizeBytes" | "url" | "altText" | "folder"
+    >
+  >,
+): Promise<MediaRecord | null> {
+  if (isMysqlConfigured()) {
+    try {
+      const sets: string[] = [];
+      const params: unknown[] = [];
+      if (patch.originalName !== undefined) {
+        sets.push("original_name = ?");
+        params.push(patch.originalName);
+      }
+      if (patch.mimeType !== undefined) {
+        sets.push("mime_type = ?");
+        params.push(patch.mimeType);
+      }
+      if (patch.sizeBytes !== undefined) {
+        sets.push("size_bytes = ?");
+        params.push(patch.sizeBytes);
+      }
+      if (patch.url !== undefined) {
+        sets.push("url = ?");
+        params.push(patch.url);
+      }
+      if (patch.altText !== undefined) {
+        sets.push("alt_text = ?");
+        params.push(patch.altText);
+      }
+      if (patch.folder !== undefined) {
+        sets.push("folder = ?");
+        params.push(patch.folder);
+      }
+      if (!sets.length) return getMediaById(id);
+      params.push(id);
+      await mysqlExecute(
+        `UPDATE media_assets SET ${sets.join(", ")} WHERE id = ?`,
+        params,
+      );
+      return getMediaById(id);
+    } catch (error) {
+      console.error(
+        "[admin-platform] updateMedia mysql failed, falling back:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  if (canUseFilesystemPersistence()) {
+    const list = await fsList<MediaRecord>("media-assets.json");
+    const index = list.findIndex((item) => item.id === id);
+    if (index < 0) return null;
+    list[index] = { ...list[index]!, ...patch };
+    await fsSave("media-assets.json", list);
+    return list[index]!;
+  }
+  return null;
 }
 
 export async function deleteMedia(id: string): Promise<boolean> {

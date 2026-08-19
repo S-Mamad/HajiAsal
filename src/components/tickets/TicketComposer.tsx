@@ -101,19 +101,19 @@ export function TicketComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const labelId = useId();
+  const fileInputId = useId();
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(
+    null,
+  );
   const isStore = variant === "storefront";
   const bottomPad = omitBottomSafeArea
     ? compact
       ? "px-3 pb-2.5 pt-2"
-      : "px-3 pb-3 pt-2 sm:px-4"
+      : "px-3.5 pb-3.5 pt-2.5 sm:px-4"
     : compact
       ? "px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-2"
-      : "px-3 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pt-2 sm:px-4";
-
-  const fieldChrome = isStore
-    ? "rounded-[1.375rem] border border-border bg-surface-elevated"
-    : "rounded-[1.375rem] border border-stone-200 bg-white";
+      : "px-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] pt-2.5 sm:px-4";
 
   const draftKey =
     ticketId && roleKey ? draftStorageKey(ticketId, roleKey) : null;
@@ -146,11 +146,37 @@ export function TicketComposer({
 
   const locked = disabled || sending || closed || uploading;
 
+  const clearAttachment = useCallback(() => {
+    setAttachmentUrl(null);
+    setAttachmentName(null);
+    setAttachmentMime(null);
+    setAttachmentPreviewUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      setAttachmentPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
+
   const resize = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
+    const minH = 32;
+    const lineH = 20;
+    const maxH = compact ? 96 : 140;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, compact ? 96 : 140)}px`;
+    const next = Math.min(Math.max(el.scrollHeight, minH), maxH);
+    el.style.height = `${next}px`;
+    const pad = next <= minH ? (minH - lineH) / 2 : 4;
+    el.style.paddingTop = `${pad}px`;
+    el.style.paddingBottom = `${pad}px`;
   }, [compact]);
 
   useEffect(() => {
@@ -195,12 +221,26 @@ export function TicketComposer({
     }
     setUploading(true);
     setUploadError("");
+    setAttachmentUrl(null);
+    setAttachmentName(file.name);
+    setAttachmentMime(file.type);
+    setAttachmentPreviewUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null;
+    });
     try {
       const res = await onUpload(file);
       setAttachmentUrl(res.url);
       setAttachmentName(res.name ?? file.name);
       setAttachmentMime(res.mimeType ?? file.type);
+      setAttachmentPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
     } catch (err) {
+      clearAttachment();
       setUploadError(err instanceof Error ? err.message : "آپلود ناموفق");
     } finally {
       setUploading(false);
@@ -240,9 +280,7 @@ export function TicketComposer({
     const prevName = attachmentName;
     const prevMime = attachmentMime;
     setText("");
-    setAttachmentUrl(null);
-    setAttachmentName(null);
-    setAttachmentMime(null);
+    clearAttachment();
     setUploadError("");
     setSlashOpen(false);
     onClearReply?.();
@@ -312,7 +350,9 @@ export function TicketComposer({
         className={cn(
           "relative z-[1] text-center text-sm",
           compact ? "px-3 py-3" : "px-4 py-4",
-          isStore ? "border-t border-border bg-surface text-secondary" : "bg-white text-stone-500",
+          isStore
+            ? "border-t border-border/60 bg-surface text-secondary"
+            : "bg-white text-stone-500",
         )}
         style={
           keyboardOffset > 0
@@ -328,19 +368,16 @@ export function TicketComposer({
   return (
     <div
       className={cn(
-        "relative z-[1] border-t",
+        "ticket-composer-dock relative z-[1]",
         bottomPad,
-        isStore
-          ? "border-border bg-surface"
-          : "border-stone-200 bg-white",
-        dragOver && "ring-2 ring-inset ring-gold/50",
+        dragOver && "ring-2 ring-inset ring-gold/40",
       )}
       style={
         keyboardOffset > 0
           ? {
               paddingBottom: omitBottomSafeArea
-                ? `calc(${compact ? "0.5rem" : "0.75rem"} + ${keyboardOffset}px)`
-                : `calc(max(${compact ? "0.5rem" : "0.65rem"}, env(safe-area-inset-bottom, 0px)) + ${keyboardOffset}px)`,
+                ? `calc(${compact ? "0.5rem" : "0.875rem"} + ${keyboardOffset}px)`
+                : `calc(max(${compact ? "0.5rem" : "0.75rem"}, env(safe-area-inset-bottom, 0px)) + ${keyboardOffset}px)`,
             }
           : undefined
       }
@@ -354,7 +391,7 @@ export function TicketComposer({
       {slashOpen && slashMatches.length > 0 ? (
         <div
           className={cn(
-            "absolute inset-x-2.5 bottom-full z-20 mb-1 overflow-hidden rounded-2xl py-1 shadow-[0_16px_40px_-18px_rgb(28_25_23/0.4)]",
+            "absolute inset-x-3 bottom-full z-20 mb-2 overflow-hidden rounded-2xl border border-border/50 py-1 shadow-[0_18px_40px_-20px_rgb(28_25_23/0.35)]",
             isStore ? "bg-surface" : "bg-white",
           )}
           role="listbox"
@@ -365,13 +402,13 @@ export function TicketComposer({
               key={item.shortcut}
               type="button"
               role="option"
-              className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-right hover:bg-stone-50"
+              className="flex w-full flex-col gap-0.5 px-3.5 py-2.5 text-right transition hover:bg-surface-muted/80"
               onClick={() => applyCanned(item)}
             >
-              <span className="text-xs font-medium text-zinc-900">
+              <span className="text-xs font-medium text-primary">
                 {item.shortcut} · {item.title}
               </span>
-              <span className="truncate text-[11px] font-light text-stone-500">
+              <span className="truncate text-[11px] font-light text-secondary">
                 {item.body.slice(0, 80)}
               </span>
             </button>
@@ -379,95 +416,141 @@ export function TicketComposer({
         </div>
       ) : null}
 
+      {uploadError ? (
+        <p className="mb-2 px-1 text-xs text-rose-600">{uploadError}</p>
+      ) : null}
+
       {replyTo ? (
-        <div
-          className={cn(
-            "mb-2 flex h-9 items-center gap-2 px-3 text-[12px]",
-            "rounded-xl",
-            isStore ? "bg-surface-muted text-primary" : "bg-stone-100 text-stone-700",
-          )}
-        >
+        <div className="mb-1.5 flex h-7 items-center gap-2 rounded-lg bg-surface-muted/50 px-2.5 text-[11px] text-secondary">
           <span className="min-w-0 flex-1 truncate">
             پاسخ به: {replyTo.body.slice(0, 80) || "پیام"}
           </span>
           <button
             type="button"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-muted"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-white/80"
             onClick={onClearReply}
             aria-label="لغو پاسخ"
           >
-            <Icon icon={X} size={14} />
+            <Icon icon={X} size={12} />
           </button>
         </div>
       ) : null}
 
-      {attachmentUrl ? (
-        <div
-          className={cn(
-            "mb-2 flex h-9 items-center gap-2 px-3 text-[12px]",
-            "rounded-xl",
-            isStore
-              ? "bg-surface-muted text-primary"
-              : "bg-stone-100 text-stone-700",
-          )}
-        >
-          <Icon icon={Paperclip} size={14} className="shrink-0 opacity-70" />
-          <span className="min-w-0 flex-1 truncate">
-            {attachmentName ?? "پیوست"}
-          </span>
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-muted"
-            onClick={() => {
-              setAttachmentUrl(null);
-              setAttachmentName(null);
-              setAttachmentMime(null);
-            }}
-            aria-label="حذف پیوست"
-          >
-            <Icon icon={X} size={14} />
-          </button>
-        </div>
-      ) : null}
-      {uploadError ? (
-        <p className="mb-2 px-1 text-xs text-rose-600">{uploadError}</p>
-      ) : null}
-
-      {/* Native RTL: attach at start, send at end, all h-11. */}
-      <div className="flex items-end gap-1.5">
-        {onUpload ? (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-              className="hidden"
-              onChange={(e) => void onFile(e)}
+      {uploading || attachmentUrl || attachmentName ? (
+        <div className="mb-1.5 flex h-7 items-center gap-2 rounded-lg bg-surface-muted/50 px-2 text-[11px] text-secondary">
+          {attachmentPreviewUrl ||
+          (attachmentMime?.startsWith("image/") && attachmentUrl) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={attachmentPreviewUrl ?? attachmentUrl ?? ""}
+              alt=""
+              className="h-5 w-5 shrink-0 rounded object-cover"
             />
+          ) : (
+            <Icon icon={Paperclip} size={12} className="shrink-0 opacity-70" />
+          )}
+          <span className="min-w-0 flex-1 truncate">
+            {uploading ? "در حال آپلود…" : (attachmentName ?? "پیوست")}
+          </span>
+          {uploading ? (
+            <Icon
+              icon={SpinnerGap}
+              size={12}
+              className="shrink-0 animate-spin opacity-70"
+            />
+          ) : (
             <button
               type="button"
-              disabled={locked}
-              onClick={() => fileRef.current?.click()}
-              className={cn(
-                "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition",
-                "active:scale-[0.96]",
-                isStore
-                  ? "text-secondary hover:bg-surface-muted hover:text-primary"
-                  : "text-stone-500 hover:bg-stone-100 hover:text-stone-800",
-                locked && "pointer-events-none opacity-40",
-                shake && "motion-safe:animate-pulse ring-1 ring-rose-400",
-              )}
-              aria-label="پیوست فایل"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-white/80"
+              onClick={clearAttachment}
+              aria-label="حذف پیوست"
             >
-              <Icon
-                icon={uploading ? SpinnerGap : Paperclip}
-                size={20}
-                weight="regular"
-                className={uploading ? "animate-spin" : undefined}
-              />
+              <Icon icon={X} size={12} />
             </button>
-          </>
-        ) : null}
+          )}
+        </div>
+      ) : null}
+
+      {/*
+        RTL: ارسال راست · متن · سنجاق چپ — یک کپسول مینیمال هم‌خوان با canvas
+      */}
+      <div
+        className={cn(
+          "ticket-composer-bar flex items-center gap-1 rounded-[1.125rem] border px-1 py-0.5",
+          "bg-surface/88 backdrop-blur-sm transition-shadow duration-200",
+          "focus-within:ring-1 focus-within:ring-gold/30",
+          isStore ? "border-border/35" : "border-stone-200/80",
+          "dark:bg-surface/90 dark:border-white/8",
+        )}
+      >
+        <button
+          type="button"
+          disabled={!canSend}
+          onClick={() => void submit()}
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition duration-150",
+            "active:scale-95",
+            canSend
+              ? isStore
+                ? "bg-gold text-ink-on-gold hover:bg-gold-bright"
+                : "bg-zinc-900 text-white hover:bg-zinc-800"
+              : "text-secondary/45",
+            !canSend && "pointer-events-none",
+          )}
+          aria-label="ارسال پیام"
+        >
+          <Icon
+            icon={sending ? SpinnerGap : PaperPlaneTilt}
+            size={16}
+            weight={canSend ? "fill" : "regular"}
+            className={cn(sending && "animate-spin")}
+          />
+        </button>
+
+        <div className="relative flex min-h-8 min-w-0 flex-1 items-center">
+          <label htmlFor={labelId} className="sr-only">
+            متن پیام
+          </label>
+          <textarea
+            id={labelId}
+            ref={textareaRef}
+            rows={1}
+            value={text}
+            disabled={locked}
+            onChange={(e) => {
+              setText(e.target.value.slice(0, MAX_CHARS));
+              if (onTyping) {
+                if (typingTimer.current) clearTimeout(typingTimer.current);
+                typingTimer.current = setTimeout(() => onTyping(), 250);
+              }
+            }}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            placeholder={
+              internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
+            }
+            className={cn(
+              "max-h-20 w-full min-h-8 resize-none border-0 bg-transparent px-2 py-0 text-start",
+              "text-[13.5px] leading-5 outline-none focus:outline-none focus:ring-0",
+              isStore
+                ? "text-primary placeholder:text-secondary/55"
+                : "text-zinc-900 placeholder:text-stone-400",
+              locked && "opacity-60",
+            )}
+          />
+          {text.length > MAX_CHARS - 200 ? (
+            <span
+              className={cn(
+                "pointer-events-none absolute bottom-1.5 start-2 text-[10px] tabular-nums",
+                text.length > MAX_CHARS - 100
+                  ? "text-rose-500"
+                  : "text-stone-400",
+              )}
+            >
+              {text.length}/{MAX_CHARS}
+            </span>
+          ) : null}
+        </div>
 
         {allowInternal ? (
           <button
@@ -475,97 +558,47 @@ export function TicketComposer({
             title="یادداشت داخلی"
             onClick={() => setInternal((v) => !v)}
             className={cn(
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-[0.96]",
-              internal
-                ? "bg-amber-100 text-amber-900"
-                : "text-stone-500 hover:bg-stone-100",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-secondary/70 transition",
+              "hover:bg-surface-muted/80 hover:text-primary active:scale-95",
+              internal && "bg-amber-100/90 text-amber-900",
             )}
           >
-            <Icon icon={NoteBlank} size={18} />
+            <Icon icon={NoteBlank} size={16} />
           </button>
         ) : null}
 
-        <div
-          className={cn(
-            "flex min-h-11 min-w-0 flex-1 items-end px-3.5",
-            fieldChrome,
-            "focus-within:border-gold/45",
-          )}
-        >
-          <div className="relative min-w-0 flex-1">
-            <label htmlFor={labelId} className="sr-only">
-              متن پیام
-            </label>
-            <textarea
-              id={labelId}
-              ref={textareaRef}
-              rows={1}
-              value={text}
+        {onUpload ? (
+          <>
+            <input
+              id={fileInputId}
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              className="sr-only"
               disabled={locked}
-              onChange={(e) => {
-                setText(e.target.value.slice(0, MAX_CHARS));
-                if (onTyping) {
-                  if (typingTimer.current) clearTimeout(typingTimer.current);
-                  typingTimer.current = setTimeout(() => onTyping(), 250);
-                }
-              }}
-              onKeyDown={onKeyDown}
-              onPaste={onPaste}
-              placeholder={
-                internal ? "یادداشت داخلی (فقط اپراتورها)…" : placeholder
-              }
-              className={cn(
-                "max-h-24 w-full resize-none bg-transparent py-2.5 text-start outline-none",
-                "min-h-11 text-[15px] leading-6",
-                isStore
-                  ? "text-primary placeholder:text-secondary/45"
-                  : "text-zinc-900 placeholder:text-stone-400",
-                locked && "opacity-60",
-              )}
+              aria-label="پیوست فایل"
+              onChange={(e) => void onFile(e)}
             />
-            {text.length > MAX_CHARS - 200 ? (
-              <span
-                className={cn(
-                  "pointer-events-none absolute bottom-2.5 start-0 text-[10px] tabular-nums",
-                  text.length > MAX_CHARS - 100
-                    ? "text-rose-500"
-                    : "text-stone-400",
-                )}
-              >
-                {text.length}/{MAX_CHARS}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          disabled={!canSend}
-          onClick={() => void submit()}
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition duration-150",
-            "active:scale-[0.94]",
-            canSend
-              ? isStore
-                ? "bg-gold text-ink-on-gold"
-                : "bg-zinc-900 text-white"
-              : isStore
-                ? "text-secondary/35"
-                : "text-stone-300",
-          )}
-          aria-label="ارسال پیام"
-        >
-          <Icon
-            icon={sending ? SpinnerGap : PaperPlaneTilt}
-            size={18}
-            weight={canSend ? "fill" : "regular"}
-            className={cn(
-              sending && "animate-spin",
-              !sending && "-scale-x-100",
-            )}
-          />
-        </button>
+            <label
+              htmlFor={fileInputId}
+              className={cn(
+                "flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-secondary/70 transition",
+                "hover:bg-surface-muted/80 hover:text-primary active:scale-95",
+                locked && "pointer-events-none opacity-40",
+                shake && "motion-safe:animate-pulse ring-1 ring-rose-400",
+              )}
+            >
+              <Icon
+                icon={uploading ? SpinnerGap : Paperclip}
+                size={17}
+                weight="regular"
+                className={uploading ? "animate-spin" : undefined}
+              />
+            </label>
+          </>
+        ) : null}
       </div>
+
       {!isStore ? (
         <p className="mt-1.5 hidden px-1 text-[11px] font-light text-stone-400 sm:block">
           Enter ارسال · Shift+Enter خط جدید · Paste/Drop برای فایل

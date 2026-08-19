@@ -68,4 +68,8 @@ hajiasal-host-upload.tar.gz
 _host_env_patch.env
 otp-diag-*.txt
 _docker_retry.sh
+_tar_parts/
+
+# runtime uploads (symlink on host; never commit user media)
+public/uploads/
 

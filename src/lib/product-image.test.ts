@@ -10,6 +10,9 @@ import {
   parseImageFits,
   pruneImageFits,
   resolveProductImageSrc,
+  shouldUnoptimizeProductImage,
+  isUploadedProductImage,
+  isExternalProductImage,
   writeImageFit,
 } from "./product-image";
 
@@ -33,6 +36,31 @@ describe("resolveProductImageSrc", () => {
     expect(resolveProductImageSrc("")).toBe(
       "/images/hajiasal/placeholder.svg",
     );
+  });
+});
+
+describe("upload and optimizer helpers", () => {
+  it("detects uploaded and external assets", () => {
+    expect(isUploadedProductImage("/uploads/admin/products/a.png")).toBe(true);
+    expect(isUploadedProductImage("/images/hajiasal/products/p001.svg")).toBe(
+      false,
+    );
+    expect(isExternalProductImage("https://cdn.example.com/jar.webp")).toBe(
+      true,
+    );
+  });
+
+  it("skips optimizer for uploads, svg, and external urls", () => {
+    expect(shouldUnoptimizeProductImage("/uploads/seller/x.webp")).toBe(true);
+    expect(shouldUnoptimizeProductImage("/images/products/p001.jpg")).toBe(
+      true,
+    );
+    expect(shouldUnoptimizeProductImage("https://cdn.example.com/x.jpg")).toBe(
+      true,
+    );
+    expect(
+      shouldUnoptimizeProductImage("/images/hajiasal/brand/logo.png"),
+    ).toBe(false);
   });
 });
 

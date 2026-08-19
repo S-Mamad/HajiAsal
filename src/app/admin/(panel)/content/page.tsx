@@ -17,6 +17,9 @@ import type {
   TrustPageContent,
 } from "@/types";
 import { hajiasalPath } from "@/lib/paths";
+import { PageCopyEditor } from "@/components/admin/PageCopyEditor";
+import { MediaImageField } from "@/components/admin/MediaImageField";
+import { resolvePageCopy, type PageCopySettings } from "@/lib/page-copy";
 
 const SOCIAL_FIELDS: Array<{ key: keyof SocialLinks; label: string }> = [
   { key: "instagram", label: "اینستاگرام" },
@@ -40,6 +43,7 @@ export default function AdminContentPage() {
   const router = useRouter();
   const toast = useAdminToast();
   const [settings, setSettings] = useState<SiteConfig | null>(null);
+  const [pageCopy, setPageCopy] = useState<PageCopySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +60,7 @@ export default function AdminContentPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در بارگذاری");
       setSettings(data.settings);
+      setPageCopy(resolvePageCopy(data.settings));
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطای ناشناخته");
     } finally {
@@ -68,7 +73,7 @@ export default function AdminContentPage() {
   }, [loadContent]);
 
   const save = async () => {
-    if (!settings) return;
+    if (!settings || !pageCopy) return;
     setSaving(true);
     setError("");
     try {
@@ -87,11 +92,15 @@ export default function AdminContentPage() {
           trustItems: settings.trustItems,
           milestones: settings.milestones,
           trustPages: settings.trustPages,
+          pageCopy: pageCopy ?? undefined,
+          homeSlider: settings.homeSlider,
+          homeSections: settings.homeSections,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "خطا در ذخیره");
       setSettings(data.settings);
+      setPageCopy(resolvePageCopy(data.settings));
       toast.success("متن‌ها ذخیره شد");
     } catch (err) {
       const message = err instanceof Error ? err.message : "خطا";
@@ -188,6 +197,237 @@ export default function AdminContentPage() {
             </div>
           </AdminAccordion>
 
+          <AdminAccordion
+            title="بخش‌های صفحه اصلی"
+            description="اسلایدر، پیشنهادات شگفت‌انگیز و بنر فروشندگی"
+          >
+            <div className="space-y-6">
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
+                <p className="text-sm font-medium text-zinc-800">تنظیمات اسلایدر</p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={settings.homeSlider?.autoplay !== false}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSlider: {
+                          ...settings.homeSlider,
+                          autoplay: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  پخش خودکار
+                </label>
+                <FormField label="فاصله تغییر اسلاید (میلی‌ثانیه)">
+                  <AdminInput
+                    dir="ltr"
+                    type="number"
+                    value={String(settings.homeSlider?.intervalMs ?? 6000)}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSlider: {
+                          ...settings.homeSlider,
+                          intervalMs: Number(e.target.value) || 6000,
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <p className="text-xs text-zinc-500">
+                  اسلایدها از منوی «بنرها» با محل «اسلایدر صفحه اصلی» مدیریت می‌شوند.
+                </p>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={settings.homeSections?.amazingDeals?.enabled !== false}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          amazingDeals: {
+                            ...settings.homeSections?.amazingDeals,
+                            enabled: e.target.checked,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  پیشنهادات شگفت‌انگیز
+                </label>
+                <FormField label="عنوان">
+                  <AdminInput
+                    value={settings.homeSections?.amazingDeals?.title ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          amazingDeals: {
+                            ...settings.homeSections?.amazingDeals,
+                            title: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="زیرعنوان">
+                  <AdminInput
+                    value={settings.homeSections?.amazingDeals?.subtitle ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          amazingDeals: {
+                            ...settings.homeSections?.amazingDeals,
+                            subtitle: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="تعداد محصولات">
+                  <AdminInput
+                    dir="ltr"
+                    type="number"
+                    value={String(settings.homeSections?.amazingDeals?.limit ?? 8)}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          amazingDeals: {
+                            ...settings.homeSections?.amazingDeals,
+                            limit: Number(e.target.value) || 8,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-zinc-200 p-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={settings.homeSections?.sellerBanner?.enabled !== false}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            enabled: e.target.checked,
+                          },
+                        },
+                      })
+                    }
+                  />
+                  بنر «فروشنده حاجی عسل شوید»
+                </label>
+                <FormField label="عنوان">
+                  <AdminInput
+                    value={settings.homeSections?.sellerBanner?.title ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            title: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="توضیحات">
+                  <AdminTextarea
+                    rows={3}
+                    value={settings.homeSections?.sellerBanner?.description ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            description: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="تصویر (URL)">
+                  <AdminInput
+                    dir="ltr"
+                    value={settings.homeSections?.sellerBanner?.image ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            image: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="متن دکمه">
+                  <AdminInput
+                    value={settings.homeSections?.sellerBanner?.ctaText ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            ctaText: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+                <FormField label="لینک دکمه">
+                  <AdminInput
+                    dir="ltr"
+                    value={settings.homeSections?.sellerBanner?.ctaHref ?? ""}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        homeSections: {
+                          ...settings.homeSections,
+                          sellerBanner: {
+                            ...settings.homeSections?.sellerBanner,
+                            ctaHref: e.target.value,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </FormField>
+              </div>
+            </div>
+          </AdminAccordion>
+
           <AdminAccordion title="برند" description="نام، شعار و توضیح کوتاه">
             <div className="space-y-3">
               <FormField label="نام برند">
@@ -262,6 +502,17 @@ export default function AdminContentPage() {
 
           <AdminAccordion title="داستان برند" description="بخش درباره ما در صفحه اصلی">
             <div className="space-y-3">
+              <MediaImageField
+                label="تصویر بخش «چرا حاجی عسل؟»"
+                hint="از کتابخانه رسانه انتخاب کنید یا URL بگذارید"
+                value={settings.brandStory.image ?? ""}
+                onChange={(image) =>
+                  setSettings({
+                    ...settings,
+                    brandStory: { ...settings.brandStory, image },
+                  })
+                }
+              />
               <FormField label="عنوان">
                 <AdminInput
                   value={settings.brandStory.title}
@@ -501,6 +752,10 @@ export default function AdminContentPage() {
               ))}
             </div>
           </AdminAccordion>
+
+          {pageCopy ? (
+            <PageCopyEditor value={pageCopy} onChange={setPageCopy} />
+          ) : null}
 
           <div className="sticky bottom-4 z-10 flex justify-end">
             <AdminButton type="button" onClick={() => void save()} disabled={saving}>

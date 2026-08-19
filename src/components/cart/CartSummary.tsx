@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPrice } from "@/lib/utils";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { useCartStore } from "@/store/cart";
 
 interface CartSummaryProps {
@@ -21,6 +22,7 @@ export function CartSummary({
   feeAmount = 0,
   payableOverride,
 }: CartSummaryProps) {
+  const copy = usePageCopy();
   // Payable only — OOS lines must not inflate checkout totals.
   const subtotal = useCartStore((s) => s.getPayableSubtotal());
   const storeShipping = useCartStore((s) => s.getShippingCost());
@@ -35,24 +37,24 @@ export function CartSummary({
   return (
     <div className="flex flex-col gap-2 text-sm">
       <div className="flex justify-between text-secondary">
-        <span>جمع جزء</span>
+        <span>{copy.cart.subtotalLabel}</span>
         <span className="tabular-nums">{formatPrice(subtotal)}</span>
       </div>
       {showShipping && subtotal > 0 ? (
         <div className="flex justify-between text-secondary">
-          <span>هزینه ارسال</span>
+          <span>{copy.cart.shippingLabel}</span>
           <span className="tabular-nums">
-            {shipping === 0 ? "بدون هزینه" : formatPrice(shipping)}
+            {shipping === 0 ? copy.cart.freeShippingLabel : formatPrice(shipping)}
           </span>
         </div>
       ) : subtotal > 0 ? (
         <p className="text-xs text-secondary">
-          هزینه ارسال بعد از ادامه خرید محاسبه می‌شود.
+          {copy.cart.shippingLaterHint}
         </p>
       ) : null}
       {discount > 0 ? (
         <div className="flex justify-between text-gold">
-          <span>تخفیف</span>
+          <span>{copy.cart.discountLabel}</span>
           <span className="tabular-nums">-{formatPrice(discount)}</span>
         </div>
       ) : null}
@@ -63,7 +65,7 @@ export function CartSummary({
         </div>
       ) : null}
       <div className="flex justify-between border-t border-border pt-2 text-base font-bold text-primary">
-        <span>مبلغ قابل پرداخت</span>
+        <span>{copy.cart.totalLabel}</span>
         <span className="text-gold tabular-nums">{formatPrice(total)}</span>
       </div>
     </div>

@@ -7,9 +7,12 @@ import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   createMedia,
   deleteMedia,
+  getMediaById,
   listMedia,
+  updateMedia,
 } from "@/lib/server/admin-platform-store";
 import { logAdminAction } from "@/lib/server/audit-log";
+import { syncSiteMediaToLibrary } from "@/lib/server/media-sync";
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -26,7 +29,15 @@ function extForMime(mime: string): string {
   if (mime === "image/webp") return ".webp";
   if (mime === "image/gif") return ".gif";
   if (mime === "application/pdf") return ".pdf";
+  if (mime === "image/svg+xml") return ".svg";
   return ".jpg";
+}
+
+function localPublicPathFromUrl(url: string): string | null {
+  const clean = url.split("?")[0]?.trim();
+  if (!clean?.startsWith("/") || clean.startsWith("//")) return null;
+  if (clean.includes("..")) return null;
+  return path.join(process.cwd(), "public", clean.replace(/^\//, ""));
 }
 
 const urlSchema = z.object({
@@ -42,6 +53,14 @@ const urlSchema = z.object({
 export async function GET(request: Request) {
   const gate = await gateAdmin(request, "media.view");
   if (!gate.ok) return gate.response;
+  try {
+    await syncSiteMediaToLibrary();
+  } catch (error) {
+    console.warn(
+      "[media] sync failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
   return NextResponse.json({ items: await listMedia() });
 }
 
@@ -188,4 +207,115 @@ export async function DELETE(request: Request) {
     adminUserId: gate.ctx.user?.id,
   });
   return NextResponse.json({ success: true });
+}
+
+const patchSchema = z.object({
+  id: z.string().min(1),
+  originalName: z.string().min(1).optional(),
+  altText: z.string().nullable().optional(),
+});
+
+export async function PATCH(request: Request) {
+  const gate = await gateAdmin(request, "media.manage");
+  if (!gate.ok) return gate.response;
+
+  const contentType = request.headers.get("content-type") ?? "";
+
+  try {
+    if (contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const id = String(form.get("id") ?? "").trim();
+      if (!id) {
+        return NextResponse.json({ error: "شناسه الزامی است" }, { status: 400 });
+      }
+      const existing = await getMediaById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "یافت نشد" }, { status: 404 });
+      }
+
+      const file = form.get("file");
+      if (!(file instanceof File)) {
+        return NextResponse.json({ error: "فایل لازم است" }, { status: 400 });
+      }
+      if (!ALLOWED_MIME.has(file.type) || file.type === "application/pdf") {
+        return NextResponse.json(
+          { error: "فقط تصویر JPEG/PNG/WebP/GIF" },
+          { status: 400 },
+        );
+      }
+      if (file.size > MAX_BYTES) {
+        return NextResponse.json(
+          { error: "حداکثر حجم ۵ مگابایت" },
+          { status: 400 },
+        );
+      }
+
+      const localPath = localPublicPathFromUrl(existing.url);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      let nextUrl = existing.url;
+
+      if (localPath) {
+        await mkdir(path.dirname(localPath), { recursive: true });
+        await writeFile(localPath, buffer);
+      } else {
+        const folderRaw =
+          String(form.get("folder") ?? existing.folder ?? "library").trim() ||
+          "library";
+        const folder = folderRaw.replace(/[^\w\-آ-ی]+/gi, "_").slice(0, 64);
+        const filename = `${randomUUID()}${extForMime(file.type)}`;
+        const dir = path.join(process.cwd(), "public", "uploads", "admin", folder);
+        await mkdir(dir, { recursive: true });
+        await writeFile(path.join(dir, filename), buffer);
+        nextUrl = `/uploads/admin/${folder}/${filename}`;
+      }
+
+      const item = await updateMedia(id, {
+        originalName: file.name || existing.originalName,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        url: nextUrl,
+      });
+      if (!item) {
+        return NextResponse.json({ error: "یافت نشد" }, { status: 404 });
+      }
+
+      await logAdminAction({
+        action: "media.replace",
+        entityType: "media",
+        entityId: id,
+        adminUserId: gate.ctx.user?.id,
+      });
+
+      return NextResponse.json({ item });
+    }
+
+    const parsed = patchSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "اطلاعات نامعتبر است" }, { status: 400 });
+    }
+
+    const item = await updateMedia(parsed.data.id, {
+      originalName: parsed.data.originalName,
+      altText: parsed.data.altText,
+    });
+    if (!item) {
+      return NextResponse.json({ error: "یافت نشد" }, { status: 404 });
+    }
+
+    await logAdminAction({
+      action: "media.update",
+      entityType: "media",
+      entityId: parsed.data.id,
+      adminUserId: gate.ctx.user?.id,
+    });
+
+    return NextResponse.json({ item });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "خطا در ویرایش رسانه",
+      },
+      { status: 503 },
+    );
+  }
 }

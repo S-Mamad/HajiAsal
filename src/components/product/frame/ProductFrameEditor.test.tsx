@@ -101,4 +101,19 @@ describe("ProductFrameEditor", () => {
     fireEvent.pointerUp(frame, { pointerId: 1 });
     expect(calls.at(-1)?.x).toBeGreaterThan(0);
   });
+
+  it("always renders the img as fitted cover to match production", () => {
+    render(
+      <ProductFrameEditor
+        src="/uploads/jar.webp"
+        value={DEFAULT_IMAGE_FIT}
+        onChange={() => undefined}
+      />,
+    );
+    const img = document.querySelector(".gallery-frame img") as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.style.objectFit).toBe("cover");
+    const frame = document.querySelector(".gallery-frame") as HTMLElement;
+    expect(frame.classList.contains("product-media--fitted")).toBe(true);
+  });
 });

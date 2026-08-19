@@ -13,6 +13,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { SocialFollowSection } from "@/components/social/SocialFollowSection";
 import { SupportMessengerButtons } from "@/components/social/SupportMessengerButtons";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { phoneSchema } from "@/lib/auth/validations/auth";
 import { formatPhoneInput } from "@/lib/auth/phone-mask";
 
@@ -28,6 +29,7 @@ type FormData = z.infer<typeof schema>;
 
 function ContactPageInner() {
   const siteData = useSiteSettings();
+  const copy = usePageCopy();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
@@ -90,20 +92,20 @@ function ContactPageInner() {
   const contactCards = [
     {
       icon: Phone,
-      label: "موبایل",
+      label: copy.contact.phoneLabel,
       value: siteData.footer.phone,
       href: `tel:${siteData.footer.phone.replace(/\s/g, "")}`,
       dir: "ltr" as const,
     },
     {
       icon: Envelope,
-      label: "ایمیل",
+      label: copy.contact.emailLabel,
       value: siteData.footer.email,
       href: `mailto:${siteData.footer.email}`,
     },
     {
       icon: MapPin,
-      label: "آدرس",
+      label: copy.contact.addressLabel,
       value: siteData.footer.address,
     },
   ];
@@ -112,8 +114,8 @@ function ContactPageInner() {
     <div className="mx-auto max-w-5xl px-4 py-14 md:px-8 md:py-24">
       <Reveal>
         <SectionHeading
-          title="تماس با ما"
-          subtitle="سؤال، پیشنهاد یا درخواست مشاوره. پاسخگوی شما هستیم"
+          title={copy.contact.title}
+          subtitle={copy.contact.subtitle}
           className="mb-10 md:mb-14"
         />
       </Reveal>

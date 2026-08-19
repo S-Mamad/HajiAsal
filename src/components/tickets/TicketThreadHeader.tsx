@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ChatCircle,
+  ChatCircleDots,
   DotsThreeVertical,
   SpeakerHigh,
   SpeakerSlash,
@@ -13,6 +13,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SupportPresenceDot } from "@/components/support-fab/SupportPresenceDot";
 import { cn } from "@/lib/utils";
 import { TicketStatusBadge } from "./TicketStatusBadge";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { ticketStatusHint, type TicketChatVariant } from "./chat-utils";
 
 type Props = {
@@ -47,8 +48,12 @@ export function TicketThreadHeader({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
-  const hint = ticketStatusHint(status);
+  const pageCopy = usePageCopy();
   const isStore = variant === "storefront";
+  const hint = ticketStatusHint(
+    status,
+    isStore ? pageCopy.tickets.statusHints : undefined,
+  );
   const messenger = Boolean(compact && isStore);
   const closed = status === "closed" || status === "resolved";
   const subtitle = [partyLabel, hint || ticketStatusHint("open")]
@@ -144,7 +149,11 @@ export function TicketThreadHeader({
           )}
           aria-hidden
         >
-          <Icon icon={ChatCircle} size={messenger ? 18 : 20} weight="regular" />
+          <Icon
+            icon={ChatCircleDots}
+            size={messenger ? 18 : 20}
+            weight="fill"
+          />
           <SupportPresenceDot live={!closed} />
         </div>
 

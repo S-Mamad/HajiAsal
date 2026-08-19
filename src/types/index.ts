@@ -145,6 +145,10 @@ export interface CategoryItem {
   label: string;
   description: string;
   image: string;
+  /** نمایش در صفحه اصلی؛ پیش‌فرض true */
+  showOnHome?: boolean;
+  /** عنوان جایگزین در صفحه اصلی */
+  homeLabel?: string;
 }
 
 export interface TeamMember {
@@ -209,6 +213,29 @@ export interface SiteConfig {
     /** اختیاری؛ نسخه عمودی برای موبایل */
     imageMobile?: string;
   };
+  /** تنظیمات اسلایدر صفحه اصلی (autoplay و …) */
+  homeSlider?: {
+    autoplay?: boolean;
+    intervalMs?: number;
+  };
+  /** بخش‌های قابل کنترل صفحه اصلی */
+  homeSections?: {
+    amazingDeals?: {
+      enabled?: boolean;
+      title?: string;
+      subtitle?: string;
+      limit?: number;
+      sort?: "discount-desc" | "popular" | "newest";
+    };
+    sellerBanner?: {
+      enabled?: boolean;
+      title?: string;
+      description?: string;
+      image?: string;
+      ctaText?: string;
+      ctaHref?: string;
+    };
+  };
   couponHAJI10: {
     minOrder: number;
     percent: number;
@@ -241,6 +268,51 @@ export interface SiteConfig {
     hint?: string;
     suggestions?: string[];
   };
+  /** متن‌های ویجت پشتیبانی شناور (FAB) */
+  supportWidgetCopy?: {
+    welcomeLineLive?: string;
+    welcomeLineQueue?: string;
+    welcomeLineAfterHours?: string;
+    statusLive?: string;
+    statusQueue?: string;
+    statusAfterHours?: string;
+    statusOffline?: string;
+    liveGreeting?: string;
+    offlineOperatorGreeting?: string;
+    afterHoursGreeting?: string;
+  };
+  /** متن‌های ثابت صفحات فروشگاه (فوتر، سبد، تماس، …) */
+  pageCopy?: {
+    home?: Partial<import("@/lib/page-copy").PageCopySettings["home"]>;
+    faq?: Partial<import("@/lib/page-copy").PageCopySettings["faq"]>;
+    contact?: Partial<import("@/lib/page-copy").PageCopySettings["contact"]>;
+    footer?: Partial<
+      Omit<
+        import("@/lib/page-copy").PageCopySettings["footer"],
+        "quickLinks" | "legalLinks" | "mobileQuickLinks"
+      >
+    > & {
+      quickLinks?: import("@/lib/page-copy").PageCopyLink[];
+      legalLinks?: import("@/lib/page-copy").PageCopyLink[];
+      mobileQuickLinks?: import("@/lib/page-copy").PageCopyLink[];
+    };
+    cart?: Partial<import("@/lib/page-copy").PageCopySettings["cart"]>;
+    auth?: Partial<import("@/lib/page-copy").PageCopySettings["auth"]>;
+    social?: Partial<import("@/lib/page-copy").PageCopySettings["social"]>;
+    support?: Partial<
+      Omit<
+        import("@/lib/page-copy").PageCopySettings["support"],
+        "quickPrompts"
+      >
+    > & {
+      quickPrompts?: import("@/lib/page-copy").PageCopyQuickPrompt[];
+    };
+    tickets?: {
+      statusHints?: Partial<
+        import("@/lib/page-copy").PageCopySettings["tickets"]["statusHints"]
+      >;
+    };
+  };
   shippingMethods?: {
     standard?: { label?: string; description?: string; eta?: string };
     express?: { label?: string; description?: string; eta?: string };
@@ -258,6 +330,7 @@ export interface SiteConfig {
   }>;
   brandStory: {
     title: string;
+    image?: string;
     paragraphs: string[];
   };
   aboutPage: {
@@ -287,6 +360,8 @@ export type SortOption =
   | "price-desc"
   | "newest";
 
+export type AmazingDealsSort = "discount-desc" | "popular" | "newest";
+
 export interface ProductFilters {
   category?: ProductCategory | null;
   minPrice?: number;
@@ -295,6 +370,8 @@ export interface ProductFilters {
   weightGrams?: number;
   sort?: SortOption;
   inStockOnly?: boolean;
+  onSaleOnly?: boolean;
+  bestsellerOnly?: boolean;
 }
 
 export interface CheckoutFormData {

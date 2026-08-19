@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ProfileHero } from "@/components/account/ProfileHero";
 import { PendingPaymentAlert } from "@/components/account/PendingPaymentAlert";
 import { OrdersStatusMatrix } from "@/components/account/OrdersStatusMatrix";
@@ -12,12 +11,12 @@ import type {
   DashboardPendingOrder,
 } from "@/components/account/dashboard-types";
 import { isPendingOrderExpired } from "@/components/account/OrderExpiryPill";
-import { hajiasalPath } from "@/lib/paths";
 
 export interface AccountDashboardClientProps {
   displayName: string;
   initials: string;
   phone: string;
+  addressSummary?: string | null;
   pendingOrders: DashboardPendingOrder[];
   counts: DashboardOrderCounts;
   hasAnyOrders: boolean;
@@ -27,6 +26,7 @@ export function AccountDashboardClient({
   displayName,
   initials,
   phone,
+  addressSummary = null,
   pendingOrders,
   counts,
   hasAnyOrders,
@@ -41,11 +41,12 @@ export function AccountDashboardClient({
 
   return (
     <>
-      <div className="account-dashboard flex flex-col gap-5">
+      <div className="account-dashboard flex flex-col gap-6">
         <ProfileHero
           displayName={displayName}
           initials={initials}
           phone={phone}
+          addressSummary={addressSummary}
         />
 
         {pendingCount > 0 ? (
@@ -56,23 +57,11 @@ export function AccountDashboardClient({
           />
         ) : null}
 
-        <div>
-          <OrdersStatusMatrix
-            counts={counts}
-            onPendingPress={pendingCount > 0 ? openSheet : undefined}
-          />
-          {!hasAnyOrders ? (
-            <p className="mt-2.5 px-1 text-[13px] leading-6 text-secondary">
-              هنوز سفارشی ثبت نشده.{" "}
-              <Link
-                href={hajiasalPath("/shop")}
-                className="font-medium text-gold hover:text-primary"
-              >
-                رفتن به فروشگاه
-              </Link>
-            </p>
-          ) : null}
-        </div>
+        <OrdersStatusMatrix
+          counts={counts}
+          onPendingPress={pendingCount > 0 ? openSheet : undefined}
+          showEmptyHint={!hasAnyOrders}
+        />
 
         <AccountQuickLinks />
       </div>

@@ -7,8 +7,7 @@ import { Minus, Plus, Trash, Warning } from "@phosphor-icons/react";
 import { useCartStore } from "@/store/cart";
 import { hajiasalPath } from "@/lib/paths";
 import { PriceText } from "@/components/ui/PriceText";
-import { ProductImage } from "@/components/ui/ProductImage";
-import { catalogImageFit, catalogMediaClass } from "@/lib/product-image";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import { maxPurchasableQty } from "@/lib/product-availability";
 import type { CartItem } from "@/types";
 
@@ -88,18 +87,18 @@ function CartLine({ item }: { item: CartItem }) {
       >
         <Link
           href={hajiasalPath(`/product/${item.slug}`)}
-          className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl ${catalogMediaClass(item.image, item.imageFit)} sm:h-20 sm:w-20`}
+          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl sm:h-20 sm:w-20"
           onClick={(e) => {
             if (Math.abs(x.get() - startX.current) > 8) e.preventDefault();
           }}
         >
-          <ProductImage
+          <FramedProductImage
             src={item.image}
             alt={item.title}
-            fill
-            fit={catalogImageFit(item.image, item.imageFit)}
             imageFit={item.imageFit}
             sizes="80px"
+            aspectClassName="relative h-full w-full overflow-hidden"
+            className="h-full w-full"
           />
         </Link>
         <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">

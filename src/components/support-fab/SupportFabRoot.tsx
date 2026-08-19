@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ChatCircle, X } from "@phosphor-icons/react";
+import { ChatCircleDots, SpinnerGap } from "@phosphor-icons/react";
 import { Icon } from "@/components/ui/Icon";
 import { SupportPresenceDot } from "@/components/support-fab/SupportPresenceDot";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ const SupportFabPanel = dynamic(() => import("./SupportFabPanel"), {
   ssr: false,
   loading: () => (
     <div className="flex h-full items-center justify-center text-gold">
-      <Icon icon={X} size={22} weight="bold" />
+      <Icon icon={SpinnerGap} size={22} className="animate-spin" />
     </div>
   ),
 });
@@ -407,18 +407,23 @@ function SupportFabEngine({ pathname }: { pathname: string }) {
               exit={reduceMotion ? undefined : { scale: 0.85, opacity: 0 }}
               whileTap={!reduceMotion ? { scale: FAB_PRESS_SCALE } : undefined}
               transition={reduceMotion ? { duration: 0.2 } : spring}
-              className="support-fab-btn relative flex min-h-[56px] min-w-[56px] cursor-pointer items-center justify-center rounded-full touch-manipulation"
+              className={cn(
+                "support-fab-btn relative flex min-h-[56px] min-w-[56px] cursor-pointer items-center justify-center rounded-full touch-manipulation",
+                !online && "support-fab-btn--offline",
+                online && !withinHours && "support-fab-btn--moon",
+              )}
               style={{
                 width: closedWidth,
                 height: closedWidth,
               }}
             >
-              <Icon icon={ChatCircle} size={22} weight="regular" />
-              {online && withinHours ? (
-                <SupportPresenceDot live />
-              ) : (
-                <SupportPresenceDot live={false} />
-              )}
+              <Icon
+                icon={ChatCircleDots}
+                size={26}
+                weight="fill"
+                className="support-fab-chat-icon"
+              />
+              <SupportPresenceDot live={online && withinHours} />
               {unread > 0 && !open ? (
                 <span
                   className="support-fab-badge absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-surface"

@@ -13,9 +13,11 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useCartStore } from "@/store/cart";
 import { hajiasalPath } from "@/lib/paths";
 import { formatPersianNumber, formatPrice } from "@/lib/utils";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { useRegisterStickyBottomBar } from "@/hooks/useRegisterStickyBottomBar";
 
 export default function CartPage() {
+  const copy = usePageCopy();
   const itemCount = useCartStore((s) => s.getItemCount());
   const hasHydrated = useCartStore((s) => s._hasHydrated);
   const payableSubtotal = useCartStore((s) => s.getPayableSubtotal());
@@ -112,7 +114,7 @@ export default function CartPage() {
     return (
       <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col overflow-y-auto overscroll-y-contain px-4 py-8 sm:px-6 md:px-8 md:py-14">
         <h1 className="mb-6 text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-3xl">
-          سبد خرید
+          {copy.cart.title}
         </h1>
         <CartSkeleton />
       </div>
@@ -126,7 +128,7 @@ export default function CartPage() {
         <header className="mb-6 flex shrink-0 items-end justify-between gap-3 sm:mb-8">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-primary sm:text-2xl md:text-3xl">
-              سبد خرید
+              {copy.cart.title}
             </h1>
             {itemCount > 0 ? (
               <p className="mt-1 text-sm text-secondary">
@@ -141,7 +143,7 @@ export default function CartPage() {
           {canCheckout ? (
             <span className="hidden items-center gap-1.5 rounded-full bg-gold-dim px-3 py-1 text-xs font-medium text-gold sm:inline-flex">
               <ShoppingBag size={14} weight="fill" />
-              آماده پرداخت
+              {copy.cart.readyToPay}
             </span>
           ) : null}
         </header>
@@ -161,7 +163,7 @@ export default function CartPage() {
 
             <aside className="hidden rounded-2xl border border-border bg-surface p-5 sm:sticky sm:top-24 sm:block">
               <h2 className="mb-4 text-sm font-semibold text-primary">
-                خلاصه سفارش
+                {copy.cart.summaryTitle}
               </h2>
               <CartSummary />
               <div className="mt-5 flex flex-col gap-2.5">
@@ -180,17 +182,17 @@ export default function CartPage() {
                     }}
                     className="w-full rounded-xl border border-border bg-surface-muted px-4 py-3 text-sm font-medium text-secondary transition hover:border-gold/30 hover:text-primary"
                   >
-                    حذف کالاهای ناموجود
+                    {copy.cart.removeUnavailable}
                   </button>
                 ) : null}
                 <div id="cart-checkout-cta">
                   {canCheckout ? (
                     <Button href={checkoutHref} className="w-full">
-                      ادامه فرآیند خرید
+                      {copy.cart.checkoutCta}
                     </Button>
                   ) : (
                     <Button href={hajiasalPath("/shop")} className="w-full">
-                      انتخاب کالای موجود
+                      {copy.cart.selectAvailable}
                     </Button>
                   )}
                 </div>
@@ -199,7 +201,7 @@ export default function CartPage() {
                   variant="outline"
                   className="w-full"
                 >
-                  ادامه خرید
+                  {copy.cart.continueShopping}
                 </Button>
               </div>
             </aside>
@@ -207,15 +209,15 @@ export default function CartPage() {
         ) : (
           <EmptyState
             className="my-auto"
-            title="سبد خرید خالی است"
-            description="هنوز چیزی انتخاب نکرده‌اید. از پرفروش‌ترین‌ها شروع کنید یا به فروشگاه برگردید."
+            title={copy.cart.emptyTitle}
+            description={copy.cart.emptyDescription}
             action={
               <>
                 <Button href={`${hajiasalPath("/shop")}?sort=popular`}>
-                  مشاهده پرفروش‌ترین‌ها
+                  {copy.cart.emptyCtaPopular}
                 </Button>
                 <Button href={hajiasalPath("/")} variant="outline">
-                  بازگشت به صفحه اصلی
+                  {copy.cart.emptyCtaHome}
                 </Button>
               </>
             }
@@ -236,14 +238,16 @@ export default function CartPage() {
                 className="min-w-0 flex-1 text-start"
                 onClick={() => setBreakdownOpen(true)}
               >
-                <p className="text-[11px] text-secondary">مبلغ قابل پرداخت</p>
+                <p className="text-[11px] text-secondary">
+                  {copy.cart.stickyPayableLabel}
+                </p>
                 <p className="truncate text-sm font-bold text-gold tabular-nums">
                   {formatPrice(cartTotal)}
                 </p>
               </button>
               {canCheckout ? (
                 <Button href={checkoutHref} size="sm" className="max-w-[55%] shrink-0 px-3">
-                  ادامه خرید
+                  {copy.cart.stickyCheckout}
                 </Button>
               ) : hasUnavailable && payableItemCount > 0 ? (
                 <Button
@@ -260,7 +264,7 @@ export default function CartPage() {
                     }
                   }}
                 >
-                  حذف ناموجودها
+                  {copy.cart.stickyRemoveUnavailable}
                 </Button>
               ) : (
                 <Button
@@ -268,7 +272,7 @@ export default function CartPage() {
                   size="sm"
                   className="max-w-[55%] shrink-0 px-3"
                 >
-                  کالای موجود
+                  {copy.cart.stickySelectAvailable}
                 </Button>
               )}
             </div>
@@ -277,7 +281,7 @@ export default function CartPage() {
           <BottomSheet
             open={breakdownOpen}
             onClose={() => setBreakdownOpen(false)}
-            title="جزئیات مبلغ"
+            title={copy.cart.breakdownSheetTitle}
           >
             <CartSummary />
           </BottomSheet>

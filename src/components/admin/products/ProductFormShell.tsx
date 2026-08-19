@@ -27,7 +27,7 @@ import { RevisionsDrawer } from "./RevisionsDrawer";
 import { DynamicFieldRenderer } from "./DynamicFieldRenderer";
 import { useAdminAuth, Can } from "@/components/admin/auth/AdminAuthProvider";
 import { productImageFitSchema } from "@/lib/server/product-schemas";
-import { pruneImageFits } from "@/lib/product-image";
+import { pruneImageFits, type ProductImageFit } from "@/lib/product-image";
 
 const formSchema = z.object({
   title: z.string().min(1, "عنوان الزامی است"),
@@ -618,6 +618,12 @@ export function ProductFormShell({
               slug={values.slug}
               shortDescription={values.shortDescription}
               images={values.images}
+              imageFits={
+                pruneImageFits(
+                  values.imageFits as Record<string, ProductImageFit> | undefined,
+                  values.images,
+                ) ?? {}
+              }
               seo={values.seo}
             />
           </div>

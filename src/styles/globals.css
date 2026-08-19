@@ -99,6 +99,10 @@
 
 html {
   scroll-behavior: smooth;
+  --mobile-dock-h: 4rem;
+  --mobile-dock-clearance: calc(
+    var(--mobile-dock-h) + env(safe-area-inset-bottom, 0px)
+  );
   /* Fixed mobile dock must not steal the last lines of content from scroll/anchors.
      --scroll-pad-bottom-chrome is set by StoreChrome when dock is hidden (account/checkout). */
   scroll-padding-bottom: calc(
@@ -215,6 +219,11 @@ html {
 .product-media {
   position: relative;
   overflow: hidden;
+}
+
+/* Do not break absolutely positioned slide layers inside the gallery frame. */
+.product-media.absolute {
+  position: absolute;
 }
 
 .product-media img {
@@ -413,9 +422,8 @@ html.commerce-focus-lock body {
 /* Ticket chat: soft ambient canvas (mobile-first messaging) */
 .ticket-chat-canvas {
   background-color: var(--surface-muted);
-  background-image:
-    radial-gradient(ellipse 120% 80% at 100% 0%, var(--gold-dim), transparent 55%),
-    radial-gradient(ellipse 90% 60% at 0% 100%, color-mix(in srgb, var(--gold) 6%, transparent), transparent 50%);
+  /* Minimal messenger-like surface: keep it flat, no decorative gradients. */
+  background-image: none;
 }
 
 .ticket-chat-canvas::before {
@@ -423,8 +431,9 @@ html.commerce-focus-lock body {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  opacity: 0.35;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23a16207' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  /* Hide decorative dots/pattern for a cleaner composer look. */
+  opacity: 0;
+  background-image: none;
 }
 
 .hajiasal-root[data-theme="dark"] .ticket-chat-canvas {
@@ -434,6 +443,40 @@ html.commerce-focus-lock body {
 .hajiasal-root[data-theme="dark"] .ticket-chat-canvas::before {
   opacity: 0.22;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4a056' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Ticket composer — RTL chat input bar */
+.ticket-composer-dock {
+  position: relative;
+  background: transparent;
+}
+
+.ticket-composer-bar {
+  border-color: rgb(28 25 23 / 0.22);
+  box-shadow: 0 1px 0 rgb(28 25 23 / 0.04);
+}
+
+.hajiasal-root[data-theme="dark"] .ticket-composer-bar {
+  border-color: rgb(255 255 255 / 0.18);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.2);
+}
+
+.ticket-composer-chip {
+  display: flex;
+  height: 2.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid rgb(28 25 23 / 0.08);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.hajiasal-root[data-theme="dark"] .ticket-composer-chip {
+  border-color: rgb(255 255 255 / 0.1);
+  background: color-mix(in srgb, var(--surface-elevated) 82%, transparent);
 }
 
 @keyframes ticket-msg-in {
@@ -776,35 +819,78 @@ html.commerce-focus-lock body {
 }
 
 .support-fab-btn {
-  background: var(--surface);
+  background:
+    radial-gradient(
+      120% 120% at 30% 20%,
+      color-mix(in srgb, var(--surface) 88%, #fff 12%),
+      var(--surface)
+    );
   color: var(--gold);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, var(--border));
   box-shadow:
-    0 10px 28px rgba(28, 25, 23, 0.1),
-    0 2px 6px rgba(28, 25, 23, 0.06);
+    0 1px 0 rgb(255 255 255 / 0.75) inset,
+    0 10px 28px -10px rgb(28 25 23 / 0.22),
+    0 4px 12px -6px var(--gold-glow);
+  transition:
+    transform 160ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
 }
+
+.support-fab-btn:hover {
+  border-color: color-mix(in srgb, var(--gold) 40%, var(--border));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.85) inset,
+    0 14px 32px -10px rgb(28 25 23 / 0.26),
+    0 6px 16px -6px var(--gold-glow);
+}
+
+.support-fab-btn:active {
+  transform: scale(0.96);
+}
+
 .hajiasal-root[data-theme="dark"] .support-fab-btn {
-  background: color-mix(in srgb, var(--surface-elevated) 92%, var(--gold) 8%);
+  background:
+    radial-gradient(
+      120% 120% at 30% 18%,
+      color-mix(in srgb, var(--surface-elevated) 82%, var(--gold) 18%),
+      var(--surface-elevated)
+    );
   color: var(--gold-bright);
   border: 1px solid rgb(255 255 255 / 0.1);
-  box-shadow: none;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.06) inset,
+    0 12px 28px -12px rgb(0 0 0 / 0.55);
 }
+
+.support-fab-chat-icon {
+  display: block;
+}
+
 .support-fab-btn--offline {
   color: var(--text-dim);
   background: var(--surface-muted);
+  border-color: var(--border);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.5) inset,
+    0 8px 20px -12px rgb(28 25 23 / 0.16);
 }
+
 .support-fab-btn--moon {
   color: var(--gold);
   background: var(--surface-elevated);
 }
+
 .hajiasal-root[data-theme="dark"] .support-fab-btn--offline {
   background: var(--surface-muted);
   color: var(--text-dim);
 }
+
 .hajiasal-root[data-theme="dark"] .support-fab-btn--moon {
   background: var(--surface-elevated);
   color: var(--gold-bright);
 }
+
 .support-fab-panel {
   display: flex;
   flex-direction: column;
@@ -814,13 +900,16 @@ html.commerce-focus-lock body {
     0 24px 60px -24px rgba(28, 25, 23, 0.28),
     0 8px 24px -12px rgba(28, 25, 23, 0.12);
 }
+
 .hajiasal-root[data-theme="dark"] .support-fab-panel {
   box-shadow: none;
   border-color: rgb(255 255 255 / 0.1);
 }
+
 .support-fab-badge {
   animation: support-fab-pulse 1.8s ease-out infinite;
 }
+
 @keyframes support-fab-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.55);
@@ -830,6 +919,69 @@ html.commerce-focus-lock body {
   }
   100% {
     box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+}
+
+/* Presence pip — shared by FAB, ticket headers, list rows */
+.support-presence-dot {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 2px;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--surface);
+  background: #d6d3d1;
+}
+
+.support-presence-dot--live {
+  background: #10b981;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 1px rgb(16 185 129 / 0.35);
+}
+
+.support-presence-dot--live::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #34d399;
+  animation: support-presence-ping 1.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.hajiasal-root[data-theme="dark"] .support-presence-dot {
+  box-shadow: 0 0 0 2px var(--surface-elevated);
+}
+
+.hajiasal-root[data-theme="dark"] .support-presence-dot--live {
+  background: #34d399;
+  box-shadow:
+    0 0 0 2px var(--surface-elevated),
+    0 0 0 1px rgb(52 211 153 / 0.4);
+}
+
+@keyframes support-presence-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  75%,
+  100% {
+    transform: scale(2.35);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-fab-badge,
+  .support-presence-dot--live::after {
+    animation: none;
+  }
+
+  .support-fab-btn {
+    transition: none;
   }
 }
 

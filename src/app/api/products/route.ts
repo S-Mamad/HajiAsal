@@ -3,9 +3,12 @@ import {
   filterProductsAsync,
   getAllCategories,
   getAllProductsAsync,
+  getBestsellersAsync,
   searchProductsAsync,
 } from "@/lib/server/products";
 import { getDisplayPrice } from "@/lib/products";
+import { isProductOnSale } from "@/lib/product-eligibility";
+import { isProductPurchasable } from "@/lib/product-availability";
 import { parseSortOption } from "@/lib/shop-catalog";
 import type { Product, ProductCategory } from "@/types";
 
@@ -23,6 +26,8 @@ export async function GET(request: Request) {
     ? Number(searchParams.get("maxPrice"))
     : undefined;
   const inStockOnly = searchParams.get("inStock") === "1";
+  const onSaleOnly = searchParams.get("onSale") === "1";
+  const bestsellerOnly = searchParams.get("bestseller") === "1";
   const idsRaw = searchParams.get("ids")?.trim() ?? "";
   const search =
     searchParams.get("search")?.trim() ||
@@ -41,7 +46,7 @@ export async function GET(request: Request) {
       .map((id) => byId.get(id))
       .filter((p): p is Product => Boolean(p));
     if (inStockOnly) {
-      picked = picked.filter((p) => p.inStock !== false);
+      picked = picked.filter((p) => isProductPurchasable(p));
     }
     const prices = catalog.map((p) => getDisplayPrice(p)).filter((n) => n > 0);
     return NextResponse.json({
@@ -70,12 +75,36 @@ export async function GET(request: Request) {
     Math.max(1, Number(limitRaw) || DEFAULT_LIMIT),
   );
 
+  if (bestsellerOnly) {
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(limitRaw) || DEFAULT_LIMIT),
+    );
+    const products = await getBestsellersAsync(limit);
+    const filtered = onSaleOnly
+      ? products.filter((p) => isProductOnSale(p))
+      : products;
+    return NextResponse.json({
+      products: filtered,
+      meta: {
+        total: filtered.length,
+        page: 1,
+        limit: filtered.length,
+        hasMore: false,
+        priceRange: { min: 0, max: 0 },
+        categories: getAllCategories(),
+        query: null,
+      },
+    });
+  }
+
   let products = await filterProductsAsync({
     category: category ?? undefined,
     sort,
     minPrice,
     maxPrice,
     inStockOnly,
+    onSaleOnly,
   });
 
   if (search) {

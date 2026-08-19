@@ -16,6 +16,25 @@ export function resolveProductImageSrc(src: string): string {
   return src;
 }
 
+/** User-uploaded assets served from `/public/uploads` (admin, seller, tickets, …). */
+export function isUploadedProductImage(src: string): boolean {
+  return /^\/uploads\//i.test(resolveProductImageSrc(src));
+}
+
+export function isExternalProductImage(src: string): boolean {
+  return /^https?:\/\//i.test(src.trim());
+}
+
+/** Bypass Next/Image optimizer for SVG, runtime uploads, and arbitrary external URLs. */
+export function shouldUnoptimizeProductImage(src: string): boolean {
+  const resolved = resolveProductImageSrc(src);
+  return (
+    /\.svg(?:$|\?)/i.test(resolved) ||
+    isUploadedProductImage(resolved) ||
+    isExternalProductImage(resolved)
+  );
+}
+
 /** Designed 800×800 illustrations already include the studio canvas. */
 export function isCatalogIllustration(src: string): boolean {
   return /\.svg(?:$|\?)/i.test(resolveProductImageSrc(src));

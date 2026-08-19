@@ -25,6 +25,62 @@ interface BottomSheetProps {
   overlayClassName?: string;
   /** Extra classes on the scrollable body */
   bodyClassName?: string;
+  /** Shorter sheet for simple pickers (filters, sort, …) */
+  compact?: boolean;
+}
+
+function SheetHeader({
+  title,
+  titleId,
+  compact,
+  onClose,
+}: {
+  title?: string;
+  titleId: string;
+  compact: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-2",
+        compact && "px-3.5 pb-1.5 pt-1.5",
+      )}
+    >
+      {title ? (
+        <h2
+          id={titleId}
+          className={cn(
+            "font-semibold text-primary",
+            compact ? "text-[15px]" : "text-base",
+          )}
+        >
+          {title}
+        </h2>
+      ) : (
+        <span />
+      )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex h-9 w-9 items-center justify-center rounded-xl text-secondary hover:bg-surface-muted hover:text-primary"
+        aria-label="بستن"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  );
+}
+
+function SheetHandle({ compact }: { compact: boolean }) {
+  return (
+    <div
+      className={cn("flex shrink-0 justify-center sm:hidden", compact ? "pt-1.5" : "pt-2")}
+      aria-hidden
+    >
+      <span className="h-1 w-10 rounded-full bg-border-bright" />
+    </div>
+  );
 }
 
 export function BottomSheet({
@@ -40,6 +96,7 @@ export function BottomSheet({
   hideHeader = false,
   overlayClassName,
   bodyClassName,
+  compact = false,
 }: BottomSheetProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -93,96 +150,142 @@ export function BottomSheet({
     return () => window.clearTimeout(t);
   }, [open]);
 
+  const bodyPadding = !flush && (compact ? "px-3.5 pb-2.5" : "px-4 pb-4");
+
+  const dockPad = aboveDock
+    ? "max-sm:pb-[var(--mobile-dock-clearance,4rem)]"
+    : "pb-[max(0.5rem,env(safe-area-inset-bottom))]";
+
+  const compactPanel = (
+    <motion.div
+      ref={panelRef}
+      role="dialog"
+      aria-modal
+      aria-labelledby={title ? titleId : undefined}
+      initial={{ y: "100%" }}
+      animate={{ y: 0 }}
+      exit={{ y: "100%" }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+      className={cn(
+        "relative z-10 w-full max-h-[min(72dvh,28rem)] overflow-y-auto overscroll-contain rounded-t-2xl border border-border bg-surface shadow-2xl sm:max-w-lg sm:rounded-2xl",
+        className,
+      )}
+    >
+      {showHandle ? <SheetHandle compact /> : null}
+      {hideHeader && title ? (
+        <h2 id={titleId} className="sr-only">
+          {title}
+        </h2>
+      ) : null}
+      {!hideHeader ? (
+        <SheetHeader title={title} titleId={titleId} compact onClose={onClose} />
+      ) : null}
+      <div className={cn("shrink-0", bodyPadding, bodyClassName)}>{children}</div>
+      {footer ? (
+        <div className="shrink-0 border-t border-border px-3.5 py-2.5">{footer}</div>
+      ) : null}
+    </motion.div>
+  );
+
+  const fullPanel = (
+    <motion.div
+      ref={panelRef}
+      role="dialog"
+      aria-modal
+      aria-labelledby={title ? titleId : undefined}
+      initial={{ y: "100%", opacity: 0.9 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: "100%", opacity: 0.9 }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+      className={cn(
+        "relative z-10 flex w-full max-h-[min(92dvh,720px)] flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:max-w-lg sm:rounded-2xl",
+        className,
+      )}
+    >
+      {showHandle ? <SheetHandle compact={false} /> : null}
+      {hideHeader && title ? (
+        <h2 id={titleId} className="sr-only">
+          {title}
+        </h2>
+      ) : null}
+      {!hideHeader ? (
+        <SheetHeader
+          title={title}
+          titleId={titleId}
+          compact={false}
+          onClose={onClose}
+        />
+      ) : null}
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+          bodyPadding,
+          bodyClassName,
+        )}
+      >
+        {children}
+      </div>
+      {footer ? (
+        <div
+          className={cn(
+            "shrink-0 border-t border-border px-4 py-3",
+            aboveDock
+              ? "pb-3"
+              : "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+          )}
+        >
+          {footer}
+        </div>
+      ) : null}
+    </motion.div>
+  );
+
   const sheet = (
     <AnimatePresence>
       {open ? (
-        <div
-          className={cn(
-            "fixed inset-0 z-[130] flex items-end justify-center sm:items-center",
-            aboveDock && "pb-[var(--mobile-dock-clearance)] sm:pb-0",
-          )}
-        >
-          <motion.button
-            type="button"
-            aria-label="بستن"
+        compact ? (
+          <div
             className={cn(
-              "absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-[1px]",
-              overlayClassName,
-            )}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal
-            aria-labelledby={title ? titleId : undefined}
-            initial={{ y: "100%", opacity: 0.9 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0.9 }}
-            transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-            className={cn(
-              "relative z-10 flex max-h-[min(92dvh,720px)] w-full flex-col rounded-t-2xl border border-border bg-surface shadow-2xl sm:max-w-lg sm:rounded-2xl",
-              className,
+              "fixed inset-0 z-[130] flex items-end justify-center sm:items-center",
+              dockPad,
             )}
           >
-            {showHandle ? (
-              <div className="flex justify-center pt-2 sm:hidden" aria-hidden>
-                <span className="h-1 w-10 rounded-full bg-border-bright" />
-              </div>
-            ) : null}
-            {hideHeader && title ? (
-              <h2 id={titleId} className="sr-only">
-                {title}
-              </h2>
-            ) : null}
-            {!hideHeader ? (
-              <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-2">
-                {title ? (
-                  <h2
-                    id={titleId}
-                    className="text-base font-semibold text-primary"
-                  >
-                    {title}
-                  </h2>
-                ) : (
-                  <span />
-                )}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-secondary hover:bg-surface-muted hover:text-primary"
-                  aria-label="بستن"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            ) : null}
-            <div
+            <motion.button
+              type="button"
+              aria-label="بستن"
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto overscroll-contain",
-                !flush && "px-4 pb-4",
-                bodyClassName,
+                "absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-[1px]",
+                overlayClassName,
               )}
-            >
-              {children}
-            </div>
-            {footer ? (
-              <div
-                className={cn(
-                  "shrink-0 border-t border-border px-4 py-3",
-                  aboveDock
-                    ? "pb-3"
-                    : "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
-                )}
-              >
-                {footer}
-              </div>
-            ) : null}
-          </motion.div>
-        </div>
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+            />
+            {compactPanel}
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "fixed inset-0 z-[130] flex items-end justify-center sm:items-center",
+              aboveDock && "max-sm:pb-[var(--mobile-dock-clearance,4rem)] sm:pb-0",
+            )}
+          >
+            <motion.button
+              type="button"
+              aria-label="بستن"
+              className={cn(
+                "absolute inset-0 bg-[var(--overlay-scrim)] backdrop-blur-[1px]",
+                overlayClassName,
+              )}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+            />
+            {fullPanel}
+          </div>
+        )
       ) : null}
     </AnimatePresence>
   );

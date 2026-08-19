@@ -387,13 +387,29 @@ export const useCartStore = create<CartStore>()(
         };
       },
       onRehydrateStorage: () => (_state, error) => {
-        useCartStore.setState({ _hasHydrated: true });
         if (error) {
           console.warn("[cart] persist rehydrate failed", error);
         }
+        // Defer until `useCartStore` finishes initializing (sync rehydrate runs inside create()).
+        queueMicrotask(() => {
+          useCartStore.setState({ _hasHydrated: true });
+        });
       },
     },
   ),
 );
+
+if (typeof window !== "undefined") {
+  const unsub = useCartStore.persist.onFinishHydration(() => {
+    useCartStore.setState({ _hasHydrated: true });
+    unsub();
+  });
+  // Fallback: if storage is unavailable, persist skips hydration silently.
+  setTimeout(() => {
+    if (!useCartStore.getState()._hasHydrated) {
+      useCartStore.setState({ _hasHydrated: true });
+    }
+  }, 150);
+}
 
 export type { WeightOption, CartRevalidatePatch };

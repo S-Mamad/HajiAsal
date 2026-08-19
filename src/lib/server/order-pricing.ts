@@ -1,5 +1,6 @@
 import type { CartItem } from "@/types";
 import { getEffectiveWeightPrice } from "@/lib/products";
+import { imageFitForSrc } from "@/lib/product-image";
 import { shippingCostForMethod } from "@/lib/shipping";
 import { getHeldQtyForProduct } from "./cart-holds";
 import { getProductByIdAsync } from "./products-store";
@@ -101,11 +102,14 @@ export async function rebuildOrderItems(
 
     const unitPrice = getEffectiveWeightPrice(product, weight);
 
+    const coverImage = product.images[0] ?? "";
+
     items.push({
       productId: product.id,
       slug: product.slug,
       title: product.title,
-      image: product.images[0] ?? "",
+      image: coverImage,
+      imageFit: imageFitForSrc(product.imageFits, coverImage),
       weight: {
         label: weight.label,
         grams: weight.grams,

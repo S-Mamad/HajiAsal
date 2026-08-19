@@ -57,6 +57,11 @@ export const SELLER_COOKIE = "hajiasal_seller_session";
 const SESSIONS_FILE = "seller-sessions.json";
 const SESSION_DAYS = 30;
 
+function toMysqlDateTime(isoString: string): string {
+  // MySQL DATETIME(3) strict mode rejects ISO-8601 `T`/`Z`.
+  return isoString.replace("T", " ").replace(/Z$/, "");
+}
+
 /** Known leaked SHA-256 hashes (e.g. documented seller123) — always reject. */
 const COMPROMISED_PASSWORD_HASHES = new Set([
   "2a76110d06bcc4fd437337b984131cfa82db9f792e3e2340acef9f3066b264e0",
@@ -429,7 +434,13 @@ export async function createSellerSession(
     try {
       await mysqlExecute(
         "INSERT INTO seller_sessions (id, seller_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-        [session.id, sellerId, session.tokenHash, session.createdAt, session.expiresAt],
+        [
+          session.id,
+          sellerId,
+          session.tokenHash,
+          toMysqlDateTime(session.createdAt),
+          toMysqlDateTime(session.expiresAt),
+        ],
       );
       return { token };
     } catch (error) {
@@ -496,7 +507,7 @@ export async function revokeSellerSession(token: string): Promise<void> {
     try {
       await mysqlExecute(
         "UPDATE seller_sessions SET revoked_at = ? WHERE token_hash = ?",
-        [new Date().toISOString(), tokenHash],
+        [toMysqlDateTime(new Date().toISOString()), tokenHash],
       );
     } catch (error) {
       console.error(

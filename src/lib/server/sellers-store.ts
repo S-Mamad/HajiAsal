@@ -13,6 +13,11 @@ import {
   mysqlQueryOne,
 } from "./mysql";
 
+function toMysqlDateTime(isoString: string): string {
+  // MySQL DATETIME(3) strict mode rejects ISO-8601 `T`/`Z`.
+  return isoString.replace("T", " ").replace(/Z$/, "");
+}
+
 type SellerRow = RowDataPacket & Record<string, unknown>;
 
 export type SellerStatus = "pending" | "active" | "suspended" | "rejected";
@@ -221,7 +226,7 @@ function sellerToRow(seller: Seller) {
     joined_at: seller.joinedAt,
     reviewed_at: seller.reviewedAt ?? null,
     review_note: seller.reviewNote ?? null,
-    updated_at: new Date().toISOString(),
+    updated_at: toMysqlDateTime(new Date().toISOString()),
   };
 }
 
@@ -427,7 +432,8 @@ export async function createSellerAsync(
   }
 
   const all = await getAllSellersAsync();
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
+  const nowMysql = toMysqlDateTime(nowIso);
   const status = input.status ?? "active";
   const password =
     input.password?.trim() || randomBytes(32).toString("hex");
@@ -442,16 +448,20 @@ export async function createSellerAsync(
     isDemo: input.isDemo ?? false,
     notes: input.notes?.trim() || undefined,
     commissionPercent: input.commissionPercent ?? 10,
-    joinedAt: now.split("T")[0]!,
-    reviewedAt: status === "active" || status === "rejected" ? now : undefined,
-    createdAt: now,
-    updatedAt: now,
+    joinedAt: nowIso.split("T")[0]!,
+    reviewedAt:
+      status === "active" || status === "rejected" ? nowIso : undefined,
+    createdAt: nowIso,
+    updatedAt: nowIso,
   };
 
   if (isMysqlConfigured()) {
     try {
       const row = sellerToRow(seller);
-      await mysqlExecute(SELLER_INSERT_SQL, sellerInsertParams(row, now));
+      await mysqlExecute(
+        SELLER_INSERT_SQL,
+        sellerInsertParams(row, nowMysql),
+      );
       const saved = await mysqlQueryOne<SellerRow>(
         "SELECT * FROM sellers WHERE id = ? LIMIT 1",
         [seller.id],
@@ -487,7 +497,8 @@ export async function updateSellerAsync(
     }
   }
 
-  const now = new Date().toISOString();
+  const nowIso = new Date().toISOString();
+  const nowMysql = toMysqlDateTime(nowIso);
   const statusChanged =
     input.status !== undefined && input.status !== existing.status;
 
@@ -517,8 +528,8 @@ export async function updateSellerAsync(
         : input.reviewNote !== undefined
           ? input.reviewNote.trim() || undefined
           : existing.reviewNote,
-    reviewedAt: statusChanged ? now : existing.reviewedAt,
-    updatedAt: now,
+    reviewedAt: statusChanged ? nowIso : existing.reviewedAt,
+    updatedAt: nowIso,
     logo:
       input.logo === null
         ? undefined
@@ -607,7 +618,7 @@ export async function updateSellerAsync(
               merged.notificationPrefs
                 ? JSON.stringify(merged.notificationPrefs)
                 : null,
-              now,
+              nowMysql,
               id,
             ],
           );

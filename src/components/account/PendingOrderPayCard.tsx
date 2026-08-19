@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ProductImage } from "@/components/ui/ProductImage";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import { PayButton } from "@/components/account/PayButton";
 import {
   OrderExpiryPill,
@@ -74,12 +74,13 @@ export function PendingOrderPayCard({
                 className="relative h-9 w-9 overflow-hidden rounded-full border-2 border-surface bg-surface-muted ring-1 ring-border"
                 title={item.title}
               >
-                <ProductImage
+                <FramedProductImage
                   src={item.image}
                   alt={item.title}
-                  fill
+                  imageFit={item.imageFit}
                   sizes="36px"
-                  className="object-cover"
+                  aspectClassName="relative h-full w-full overflow-hidden"
+                  className="h-full w-full rounded-full"
                 />
               </div>
             ))}

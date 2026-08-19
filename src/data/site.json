@@ -39,6 +39,27 @@
     "image": "/images/hajiasal/hero-studio.webp",
     "imageMobile": "/images/hajiasal/hero-mobile.webp"
   },
+  "homeSlider": {
+    "autoplay": true,
+    "intervalMs": 6000
+  },
+  "homeSections": {
+    "amazingDeals": {
+      "enabled": true,
+      "title": "پیشنهادات شگفت‌انگیز",
+      "subtitle": "تخفیف‌های ویژه روی محصولات موجود",
+      "limit": 8,
+      "sort": "discount-desc"
+    },
+    "sellerBanner": {
+      "enabled": true,
+      "title": "فروشنده حاجی عسل شوید",
+      "description": "محصولات خود را در کنار محصولات باکیفیت حاجی عسل عرضه کنید و به جمع فروشندگان ما بپیوندید.",
+      "image": "/images/hajiasal/hero-studio.webp",
+      "ctaText": "ثبت درخواست فروشندگی",
+      "ctaHref": "/seller/apply"
+    }
+  },
   "couponHAJI10": {
     "minOrder": 300000,
     "percent": 10
@@ -81,6 +102,7 @@
   ],
   "brandStory": {
     "title": "چرا حاجی عسل؟",
+    "image": "/images/hajiasal/hero-studio.webp",
     "paragraphs": [
       "حاجی عسل فعالیت خود را از سال ۱۴۰۰ با فروش حضوری عسل طبیعی آغاز کرد. همان‌طور که از نام این برند پیداست، نقطه شروع ما عسل بوده و همچنان نیز اصالت و کیفیت عسل، مهم‌ترین ارزش ماست.",
       "در طول این سال‌ها با انتخاب بهترین محصولات طبیعی و جلب اعتماد مشتریان، مسیر رشد خود را ادامه دادیم. از اوایل سال ۱۴۰۵ نیز با حمایت، اعتماد و همراهی شما عزیزان، فعالیت آنلاین حاجی عسل آغاز شد تا بتوانیم محصولات خود را در سراسر کشور در دسترس علاقه‌مندان به محصولات طبیعی قرار دهیم.",
@@ -269,6 +291,8 @@
       "عسل گون"
     ]
   },
+  "supportWidgetCopy": {},
+  "pageCopy": {},
   "shippingMethods": {
     "standard": {
       "label": "پست پیشتاز",

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { ProductImage } from "@/components/ui/ProductImage";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -20,11 +21,14 @@ interface AuthLayoutProps {
 
 export function AuthLayout({
   children,
-  title = "ورود یا ثبت‌نام",
-  subtitle = "با شماره موبایل، سریع و امن",
+  title,
+  subtitle,
   contentAlign = "center",
 }: AuthLayoutProps) {
   const siteData = useSiteSettings();
+  const copy = usePageCopy();
+  const resolvedTitle = title ?? copy.auth.title;
+  const resolvedSubtitle = subtitle ?? copy.auth.subtitle;
   const reduced = useReducedMotion();
 
   return (
@@ -92,9 +96,11 @@ export function AuthLayout({
             transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
           >
             <h1 className="font-display text-3xl font-bold leading-tight tracking-tight text-primary md:text-[2.15rem]">
-              {title}
+              {resolvedTitle}
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted">{subtitle}</p>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              {resolvedSubtitle}
+            </p>
           </motion.div>
 
           <motion.div

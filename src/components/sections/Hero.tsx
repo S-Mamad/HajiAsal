@@ -3,46 +3,44 @@
 import { getImageProps } from "next/image";
 import { motion, useReducedMotion } from "motion/react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { usePageCopy } from "@/hooks/usePageCopy";
 import { Button } from "@/components/ui/Button";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { hajiasalPath } from "@/lib/paths";
 import { ArrowLeft } from "@phosphor-icons/react";
-import site from "@/data/site.json";
-
-const HERO_DESKTOP =
-  site.hero.image || "/images/hajiasal/hero-studio.webp";
-const HERO_MOBILE =
-  site.hero.imageMobile || "/images/hajiasal/hero-mobile.webp";
-
-const common = {
-  alt: "شیشه عسل طلایی حاجی عسل با شهد روان و موم طبیعی",
-  sizes: "100vw",
-} as const;
-
-const {
-  props: { srcSet: desktopSrcSet },
-} = getImageProps({
-  ...common,
-  src: HERO_DESKTOP,
-  width: 2400,
-  height: 1350,
-  quality: 82,
-});
-
-const {
-  props: { srcSet: mobileSrcSet, ...mobileImg },
-} = getImageProps({
-  ...common,
-  src: HERO_MOBILE,
-  width: 1200,
-  height: 1600,
-  quality: 82,
-  priority: true,
-});
 
 export function Hero() {
   const reduced = useReducedMotion();
   const siteData = useSiteSettings();
+  const copy = usePageCopy();
+
+  const heroDesktop =
+    siteData.hero.image || "/images/hajiasal/hero-studio.webp";
+  const heroMobile =
+    siteData.hero.imageMobile || "/images/hajiasal/hero-mobile.webp";
+
+  const {
+    props: { srcSet: desktopSrcSet },
+  } = getImageProps({
+    alt: copy.home.heroImageAlt,
+    sizes: "100vw",
+    src: heroDesktop,
+    width: 2400,
+    height: 1350,
+    quality: 82,
+  });
+
+  const {
+    props: { srcSet: mobileSrcSet, ...mobileImg },
+  } = getImageProps({
+    alt: copy.home.heroImageAlt,
+    sizes: "100vw",
+    src: heroMobile,
+    width: 1200,
+    height: 1600,
+    quality: 82,
+    priority: true,
+  });
 
   return (
     <section className="relative -mt-16 flex h-[100svh] max-h-[100svh] flex-col overflow-hidden bg-void sm:-mt-[4.75rem] md:h-auto md:min-h-[100svh] md:max-h-none">
@@ -53,7 +51,7 @@ export function Hero() {
           <img
             {...mobileImg}
             srcSet={mobileSrcSet}
-            alt={common.alt}
+            alt={copy.home.heroImageAlt}
             className="absolute inset-0 h-full w-full object-cover object-[center_32%] md:object-[32%_42%]"
           />
         </picture>
@@ -94,12 +92,12 @@ export function Hero() {
               <ArrowLeft size={18} weight="bold" className="shrink-0" />
             </Button>
             <Button
-              href={hajiasalPath("/reviews")}
+              href={hajiasalPath(copy.home.heroSecondaryCtaHref)}
               variant="outline"
               size="lg"
               className="w-full whitespace-nowrap border-border-bright bg-surface px-5 text-primary hover:border-gold/50 sm:w-auto sm:px-8"
             >
-              نظرات مشتریان
+              {copy.home.heroSecondaryCtaLabel}
             </Button>
           </div>
         </motion.div>

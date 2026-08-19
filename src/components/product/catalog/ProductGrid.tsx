@@ -6,12 +6,15 @@ import type { ProductGridProps } from "../types";
 
 export function ProductGrid({ products, className }: ProductGridProps) {
   return (
-    <div className={cn("pb-32", className)}>
-      <div className="grid grid-cols-2 items-stretch gap-4 md:grid-cols-3 md:gap-5 lg:gap-6">
+    <div className={cn("w-full min-w-0", className)}>
+      <ul className="m-0 grid w-full min-w-0 list-none grid-cols-2 gap-x-2.5 gap-y-3 p-0 sm:gap-x-3 sm:gap-y-4 md:grid-cols-3 md:gap-x-5 md:gap-y-5 lg:gap-6">
         {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+          <li key={product.id} className="min-w-0">
+            <ProductCard product={product} />
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
+

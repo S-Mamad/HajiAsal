@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react";
-import { ProductImage } from "@/components/ui/ProductImage";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import { PriceText } from "@/components/ui/PriceText";
 import { useCartStore } from "@/store/cart";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { hajiasalPath } from "@/lib/paths";
-import { catalogImageFit, catalogMediaClass, imageFitForSrc } from "@/lib/product-image";
+import { imageFitForSrc } from "@/lib/product-image";
 import { getEffectiveWeightPrice } from "@/lib/products";
 import { pickImpulseProducts, resolveCartPromo } from "@/lib/cart-promo";
 import type { Product } from "@/types";
@@ -98,13 +98,11 @@ export function CartImpulseBuys() {
             >
               <Link
                 href={hajiasalPath(`/product/${product.slug}`)}
-                className={`relative mb-2 block aspect-square overflow-hidden rounded-xl ${catalogMediaClass(coverSrc, coverFit)}`}
+                className="relative mb-2 block overflow-hidden rounded-xl"
               >
-                <ProductImage
+                <FramedProductImage
                   src={coverSrc}
                   alt={product.title}
-                  fill
-                  fit={catalogImageFit(coverSrc, coverFit)}
                   imageFit={coverFit}
                   sizes="144px"
                 />

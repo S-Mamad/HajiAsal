@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import productsData from "@/data/products.json";
 import type {
+  AmazingDealsSort,
   Product,
   ProductApprovalStatus,
   ProductCategory,
@@ -11,6 +12,11 @@ import type {
   ProductStatus,
   WeightOption,
 } from "@/types";
+import {
+  getDiscountPercent,
+  isProductOnSale,
+  isSellableCatalogProduct,
+} from "@/lib/product-eligibility";
 import {
   filterProducts as filterProductsSync,
   getAllProducts as getAllProductsSync,
@@ -675,9 +681,47 @@ export async function filterProductsAsync(
 export async function getBestsellersAsync(limit = 8): Promise<Product[]> {
   const catalog = await getAllProductsAsync();
   return catalog
-    .filter((p) => !p.deletedAt && p.isBestseller && p.inStock)
+    .filter((p) => p.isBestseller && isSellableCatalogProduct(p))
     .sort((a, b) => b.reviewCount - a.reviewCount)
     .slice(0, limit);
+}
+
+function productRecencyTs(product: Product): number {
+  const raw = product.publishedAt ?? product.createdAt;
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function sortAmazingDeals(
+  items: Product[],
+  sort: AmazingDealsSort,
+): Product[] {
+  const sorted = [...items];
+  switch (sort) {
+    case "popular":
+      return sorted.sort((a, b) => b.reviewCount - a.reviewCount);
+    case "newest":
+      return sorted.sort(
+        (a, b) => productRecencyTs(b) - productRecencyTs(a),
+      );
+    case "discount-desc":
+    default:
+      return sorted.sort(
+        (a, b) => getDiscountPercent(b) - getDiscountPercent(a),
+      );
+  }
+}
+
+export async function getAmazingDealsAsync(options: {
+  limit: number;
+  sort: AmazingDealsSort;
+}): Promise<Product[]> {
+  const catalog = await getAllProductsAsync();
+  const deals = catalog.filter(
+    (p) => isSellableCatalogProduct(p) && isProductOnSale(p),
+  );
+  return sortAmazingDeals(deals, options.sort).slice(0, options.limit);
 }
 
 export async function getRelatedProductsAsync(

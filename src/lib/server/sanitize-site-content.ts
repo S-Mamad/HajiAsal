@@ -103,6 +103,9 @@ export function sanitizeSiteContentPatch(
     if (story.title !== undefined) {
       next.title = sanitizePlainText(story.title, 80);
     }
+    if (story.image !== undefined) {
+      next.image = sanitizeSitePath(story.image);
+    }
     if (Array.isArray(story.paragraphs)) {
       next.paragraphs = story.paragraphs
         .map((p) => sanitizeMultiline(p, 1200))
@@ -216,5 +219,229 @@ export function sanitizeSiteContentPatch(
     out.trustPages = next;
   }
 
+  if (input.pageCopy && typeof input.pageCopy === "object") {
+    out.pageCopy = sanitizePageCopyPatch(input.pageCopy as Record<string, unknown>);
+  }
+
   return out as Partial<SiteConfig>;
+}
+
+function sanitizePageCopyLink(raw: unknown) {
+  const row = (raw ?? {}) as Record<string, unknown>;
+  const label = sanitizePlainText(row.label, 40);
+  const href = sanitizeCtaHref(row.href);
+  if (!label || !href) return null;
+  return { label, href };
+}
+
+function sanitizePageCopyPatch(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+
+  const textFields = (
+    source: Record<string, unknown> | undefined,
+    specs: Array<[string, number]>,
+  ) => {
+    if (!source) return undefined;
+    const next: Record<string, unknown> = {};
+    for (const [key, max] of specs) {
+      if (source[key] === undefined) continue;
+      next[key] = sanitizePlainText(source[key], max);
+    }
+    return Object.keys(next).length ? next : undefined;
+  };
+
+  const home = textFields(input.home as Record<string, unknown>, [
+    ["heroImageAlt", 120],
+    ["heroSecondaryCtaLabel", 40],
+    ["heroSecondaryCtaHref", 120],
+    ["promoBadge", 60],
+    ["promoTitle", 80],
+    ["promoSubtitle", 120],
+    ["promoCta", 40],
+    ["promoCtaHref", 120],
+    ["bestsellersTitle", 60],
+    ["bestsellersSubtitle", 120],
+    ["categoriesTitle", 60],
+    ["categoriesSubtitle", 120],
+    ["testimonialsEyebrow", 40],
+    ["testimonialsTitle", 60],
+    ["brandStoryCta", 24],
+    ["brandStoryImageAlt", 120],
+  ]);
+  if (home) out.home = home;
+
+  const faq = textFields(input.faq as Record<string, unknown>, [
+    ["title", 60],
+    ["subtitle", 160],
+  ]);
+  if (faq) out.faq = faq;
+
+  const contact = textFields(input.contact as Record<string, unknown>, [
+    ["title", 60],
+    ["subtitle", 160],
+    ["phoneLabel", 24],
+    ["emailLabel", 24],
+    ["addressLabel", 24],
+  ]);
+  if (contact) out.contact = contact;
+
+  const footerRaw = input.footer as Record<string, unknown> | undefined;
+  if (footerRaw) {
+    const footer = textFields(footerRaw, [
+      ["quickLinksTitle", 40],
+      ["legalLinksTitle", 40],
+      ["contactTitle", 40],
+      ["bottomTagline", 120],
+      ["copyrightSuffix", 80],
+    ]) ?? {};
+    for (const key of ["quickLinks", "legalLinks", "mobileQuickLinks"] as const) {
+      if (!Array.isArray(footerRaw[key])) continue;
+      footer[key] = footerRaw[key]
+        .map((item) => sanitizePageCopyLink(item))
+        .filter(Boolean)
+        .slice(0, key === "quickLinks" ? 16 : key === "legalLinks" ? 8 : 12);
+    }
+    if (Object.keys(footer).length) out.footer = footer;
+  }
+
+  const cart = textFields(input.cart as Record<string, unknown>, [
+    ["title", 40],
+    ["emptyTitle", 60],
+    ["emptyDescription", 200],
+    ["emptyCtaPopular", 40],
+    ["emptyCtaHome", 40],
+    ["summaryTitle", 40],
+    ["removeUnavailable", 40],
+    ["checkoutCta", 40],
+    ["selectAvailable", 40],
+    ["continueShopping", 40],
+    ["readyToPay", 32],
+    ["stickyPayableLabel", 40],
+    ["stickyCheckout", 32],
+    ["stickyRemoveUnavailable", 32],
+    ["stickySelectAvailable", 32],
+    ["breakdownSheetTitle", 40],
+    ["subtotalLabel", 24],
+    ["shippingLabel", 24],
+    ["freeShippingLabel", 24],
+    ["shippingLaterHint", 120],
+    ["discountLabel", 24],
+    ["totalLabel", 40],
+  ]);
+  if (cart) out.cart = cart;
+
+  const auth = textFields(input.auth as Record<string, unknown>, [
+    ["title", 60],
+    ["subtitle", 120],
+  ]);
+  if (auth) out.auth = auth;
+
+  const social = textFields(input.social as Record<string, unknown>, [
+    ["heading", 120],
+    ["handle", 40],
+  ]);
+  if (social) out.social = social;
+
+  const supportRaw = input.support as Record<string, unknown> | undefined;
+  if (supportRaw) {
+    const support = textFields(supportRaw, [
+      ["panelTitle", 60],
+      ["composerPlaceholder", 80],
+      ["quickPromptsSection", 40],
+    ]) ?? {};
+    if (Array.isArray(supportRaw.quickPrompts)) {
+      support.quickPrompts = supportRaw.quickPrompts
+        .slice(0, 8)
+        .map((item) => {
+          const row = (item ?? {}) as Record<string, unknown>;
+          const id = sanitizePlainText(row.id, 32).replace(/[^a-z0-9-_]/gi, "");
+          const label = sanitizePlainText(row.label, 40);
+          const body =
+            typeof row.body === "string" ? sanitizeMultiline(row.body, 400) : "";
+          if (!id || !label) return null;
+          return { id, label, body };
+        })
+        .filter(Boolean);
+    }
+    if (Object.keys(support).length) out.support = support;
+  }
+
+  const ticketsRaw = input.tickets as Record<string, unknown> | undefined;
+  if (ticketsRaw?.statusHints && typeof ticketsRaw.statusHints === "object") {
+    const hints = textFields(ticketsRaw.statusHints as Record<string, unknown>, [
+      ["open", 80],
+      ["waiting", 80],
+      ["pending", 80],
+      ["answered", 80],
+      ["resolved", 80],
+      ["closed", 80],
+    ]);
+    if (hints) out.tickets = { statusHints: hints };
+  }
+
+  if (input.homeSlider && typeof input.homeSlider === "object") {
+    const slider = input.homeSlider as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    if (slider.autoplay !== undefined) next.autoplay = Boolean(slider.autoplay);
+    if (slider.intervalMs !== undefined) {
+      const ms = Number(slider.intervalMs);
+      if (Number.isFinite(ms)) {
+        next.intervalMs = Math.min(30000, Math.max(2000, ms));
+      }
+    }
+    if (Object.keys(next).length) out.homeSlider = next;
+  }
+
+  if (input.homeSections && typeof input.homeSections === "object") {
+    const sections = input.homeSections as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+
+    if (sections.amazingDeals && typeof sections.amazingDeals === "object") {
+      const deals = sections.amazingDeals as Record<string, unknown>;
+      const dealsNext: Record<string, unknown> = {};
+      if (deals.enabled !== undefined) dealsNext.enabled = Boolean(deals.enabled);
+      if (deals.title !== undefined) {
+        dealsNext.title = sanitizePlainText(deals.title, 80);
+      }
+      if (deals.subtitle !== undefined) {
+        dealsNext.subtitle = sanitizePlainText(deals.subtitle, 160);
+      }
+      if (deals.limit !== undefined) {
+        const limit = Number(deals.limit);
+        if (Number.isFinite(limit)) {
+          dealsNext.limit = Math.min(24, Math.max(1, limit));
+        }
+      }
+      if (deals.sort === "popular" || deals.sort === "newest" || deals.sort === "discount-desc") {
+        dealsNext.sort = deals.sort;
+      }
+      if (Object.keys(dealsNext).length) next.amazingDeals = dealsNext;
+    }
+
+    if (sections.sellerBanner && typeof sections.sellerBanner === "object") {
+      const seller = sections.sellerBanner as Record<string, unknown>;
+      const sellerNext: Record<string, unknown> = {};
+      if (seller.enabled !== undefined) sellerNext.enabled = Boolean(seller.enabled);
+      if (seller.title !== undefined) {
+        sellerNext.title = sanitizePlainText(seller.title, 80);
+      }
+      if (seller.description !== undefined) {
+        sellerNext.description = sanitizeMultiline(seller.description, 400);
+      }
+      if (seller.image !== undefined) {
+        sellerNext.image = sanitizeSitePath(seller.image);
+      }
+      if (seller.ctaText !== undefined) {
+        sellerNext.ctaText = sanitizePlainText(seller.ctaText, 40);
+      }
+      if (seller.ctaHref !== undefined) {
+        sellerNext.ctaHref = sanitizeCtaHref(seller.ctaHref) || "/seller/apply";
+      }
+      if (Object.keys(sellerNext).length) next.sellerBanner = sellerNext;
+    }
+
+    if (Object.keys(next).length) out.homeSections = next;
+  }
+
+  return out;
 }

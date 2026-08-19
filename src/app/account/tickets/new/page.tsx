@@ -3,15 +3,16 @@
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, ChatCircle } from "@phosphor-icons/react";
+import { ArrowRight, ChatCircleDots } from "@phosphor-icons/react";
 import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { Icon } from "@/components/ui/Icon";
 import { SupportPresenceDot } from "@/components/support-fab/SupportPresenceDot";
-import {
-  AFTER_HOURS_GREETING,
-  LIVE_GREETING,
-} from "@/lib/support-fab/constants";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { isWithinSupportHours } from "@/lib/support-fab/hours";
+import {
+  resolveSupportWidgetCopy,
+  widgetGuestGreeting,
+} from "@/lib/support-fab/copy";
 import { hajiasalPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +41,16 @@ function TicketNewInner() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const siteSettings = useSiteSettings();
+  const widgetCopy = useMemo(
+    () => resolveSupportWidgetCopy(siteSettings),
+    [siteSettings],
+  );
   const withinHours = useMemo(() => isWithinSupportHours(), []);
-  const greeting = withinHours ? LIVE_GREETING : AFTER_HOURS_GREETING;
+  const greeting = widgetGuestGreeting(widgetCopy, {
+    withinHours,
+    operatorOnline: true,
+  });
   const introCopy = orderId
     ? `درباره سفارش ${orderId} بنویسید؛ اولین پیام گفتگو را باز می‌کند.`
     : "پیامتان را بنویسید؛ بدون فرم موضوع مستقیم به پشتیبانی وصل می‌شوید.";
@@ -129,7 +138,7 @@ function TicketNewInner() {
           <Icon icon={ArrowRight} size={18} />
         </Link>
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-dim text-gold">
-          <Icon icon={ChatCircle} size={18} weight="regular" />
+          <Icon icon={ChatCircleDots} size={18} weight="fill" />
           <SupportPresenceDot live={withinHours} />
         </span>
         <div className="min-w-0 flex-1">
@@ -146,7 +155,7 @@ function TicketNewInner() {
         <div className="mx-auto flex max-w-lg flex-col gap-3.5">
           <div className="flex items-start gap-2.5">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-dim text-gold">
-              <Icon icon={ChatCircle} size={16} weight="regular" />
+              <Icon icon={ChatCircleDots} size={16} weight="fill" />
             </span>
             <div className="min-w-0 flex-1 space-y-2">
               <div className="rounded-2xl rounded-ss-md border border-border bg-surface px-3.5 py-2.5 text-[15px] leading-[1.5] text-primary shadow-[0_10px_24px_-18px_rgb(28_25_23/0.2)]">

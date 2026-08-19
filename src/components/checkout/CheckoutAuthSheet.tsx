@@ -17,8 +17,7 @@ export function CheckoutAuthSheet({
   return (
     <BottomSheet open={open} onClose={onClose} title="ورود با شماره موبایل">
       <p className="mb-4 text-sm text-secondary">
-        فقط شماره موبایل کافی است. کد یک‌بارمصرف پیامکی را وارد کنید تا ادامه
-        دهید.
+        نام کامل را بعداً هم می‌توانید تکمیل کنید.
       </p>
       <PhoneLoginForm
         allowIncompleteProfile

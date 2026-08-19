@@ -10,7 +10,7 @@ import {
 import type { StoredOrder } from "@/lib/server/orders";
 import { AccountSurface } from "@/components/account/AccountSurface";
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge";
-import { ProductImage } from "@/components/ui/ProductImage";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import {
   formatPrice,
   formatPersianNumber,
@@ -59,12 +59,12 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
                 className="relative h-11 w-11 overflow-hidden rounded-xl border-2 border-surface bg-surface-muted ring-1 ring-border"
                 title={item.title}
               >
-                <ProductImage
+                <FramedProductImage
                   src={item.image}
                   alt={item.title}
-                  fill
+                  imageFit={item.imageFit}
                   sizes="44px"
-                  className="object-cover"
+                  aspectClassName="relative h-full w-full overflow-hidden"
                 />
               </div>
             ))}
@@ -159,14 +159,15 @@ export function AccountOrderCard({ order }: { order: StoredOrder }) {
                 >
                   <Link
                     href={hajiasalPath(`/product/${item.slug}`)}
-                    className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface-muted"
+                    className="block h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-surface-muted"
                   >
-                    <ProductImage
+                    <FramedProductImage
                       src={item.image}
                       alt={item.title}
-                      fill
+                      imageFit={item.imageFit}
                       sizes="56px"
-                      className="object-cover"
+                      aspectClassName="relative h-full w-full overflow-hidden"
+                      className="h-full w-full"
                     />
                   </Link>
                   <div className="min-w-0 flex-1">

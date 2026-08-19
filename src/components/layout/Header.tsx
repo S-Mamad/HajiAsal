@@ -31,6 +31,7 @@ import { hajiasalPath } from "@/lib/paths";
 export function Header() {
   const siteData = useSiteSettings();
   const pathname = usePathname();
+  const isShopPage = pathname === hajiasalPath("/shop");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -107,14 +108,16 @@ export function Header() {
 
           {/* Mobile: search + wishlist + menu (cart lives in MobileDock) */}
           <div className="flex shrink-0 items-center gap-0.5 lg:hidden">
-            <button
-              type="button"
-              onClick={openSearch}
-              className={iconBtn}
-              aria-label="جستجو"
-            >
-              <Icon icon={MagnifyingGlass} size={18} />
-            </button>
+            {!isShopPage ? (
+              <button
+                type="button"
+                onClick={openSearch}
+                className={iconBtn}
+                aria-label="جستجو"
+              >
+                <Icon icon={MagnifyingGlass} size={18} />
+              </button>
+            ) : null}
             <Link
               href={hajiasalPath("/wishlist")}
               className={cn("relative", iconBtn)}
@@ -138,14 +141,16 @@ export function Header() {
           {/* Desktop actions */}
           <div className="hidden shrink-0 items-center gap-0.5 lg:flex">
             <ThemeToggle className="h-10 w-10 rounded-full hover:bg-gold-dim" />
-            <button
-              type="button"
-              onClick={openSearch}
-              className={iconBtn}
-              aria-label="جستجو"
-            >
-              <Icon icon={MagnifyingGlass} size={18} />
-            </button>
+            {!isShopPage ? (
+              <button
+                type="button"
+                onClick={openSearch}
+                className={iconBtn}
+                aria-label="جستجو"
+              >
+                <Icon icon={MagnifyingGlass} size={18} />
+              </button>
+            ) : null}
             <Link
               href={hajiasalPath("/wishlist")}
               className={cn("relative", iconBtn)}

@@ -1,5 +1,5 @@
 import type { RowDataPacket } from "mysql2/promise";
-import { isMysqlUsable, mysqlExecute, mysqlQueryOne, newId } from "./mysql";
+import { isMysqlUsable, mysqlExecute, mysqlQueryOne, newId, toMysqlDateTime } from "./mysql";
 
 const hits = new Map<string, number[]>();
 
@@ -75,7 +75,7 @@ async function mysqlPeek(
 ): Promise<{ ok: boolean; retryAfterSec: number } | null> {
   if (!(await ensureRateLimitTable())) return null;
   try {
-    const since = new Date(Date.now() - windowMs).toISOString();
+    const since = toMysqlDateTime(new Date(Date.now() - windowMs).toISOString());
     const row = await mysqlQueryOne<RowDataPacket>(
       `SELECT COUNT(*) AS count,
               MIN(hit_at) AS oldest
@@ -127,10 +127,10 @@ export async function recordRateLimitHitAsync(
 ): Promise<void> {
   if (await ensureRateLimitTable()) {
     try {
-      const since = new Date(Date.now() - windowMs).toISOString();
+      const since = toMysqlDateTime(new Date(Date.now() - windowMs).toISOString());
       await mysqlExecute(
         `INSERT INTO rate_limit_hits (id, bucket_key, hit_at) VALUES (?, ?, ?)`,
-        [newId(), key, new Date().toISOString()],
+        [newId(), key, toMysqlDateTime(new Date().toISOString())],
       );
       void mysqlExecute(
         `DELETE FROM rate_limit_hits WHERE hit_at < ? LIMIT 500`,

@@ -7,6 +7,7 @@ import {
   mysqlQueryOne,
   newId,
   toIso,
+  toMysqlDateTime,
 } from "@/lib/server/mysql";
 import { normalizeOtpDigits } from "@/lib/auth/otp-digits";
 
@@ -202,7 +203,7 @@ export async function createOtpChallenge(
   await clearPreviousChallenges(phone);
 
   const codeHash = hashCode(phone, code);
-  const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  const expiresAt = toMysqlDateTime(new Date(Date.now() + OTP_TTL_MS).toISOString());
   // Memory first so same-process verify never waits on MySQL.
   storeMemoryChallenge(phone, codeHash);
 
@@ -252,9 +253,9 @@ export async function verifyOtpChallenge(
 
   const codeHash = hashCode(phone, normalized);
   // Allow verify until expires_at + grace (same as memory path).
-  const graceCutoffIso = new Date(
-    Date.now() - OTP_VERIFY_GRACE_MS,
-  ).toISOString();
+  const graceCutoffIso = toMysqlDateTime(
+    new Date(Date.now() - OTP_VERIFY_GRACE_MS).toISOString(),
+  );
 
   // Atomic MySQL consume first — closes multi-instance replay (TOCTOU).
   if (isMysqlUsable()) {

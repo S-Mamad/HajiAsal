@@ -5,14 +5,13 @@ type Props = {
   className?: string;
 };
 
-/** 8px presence pip. Live = emerald, otherwise muted. */
+/** Shared presence pip — styles live in globals.css (.support-presence-dot). */
 export function SupportPresenceDot({ live = true, className }: Props) {
   return (
     <span
       className={cn(
-        "pointer-events-none absolute end-[3px] bottom-[3px] h-2 w-2 rounded-full",
-        "ring-[2px] ring-surface",
-        live ? "bg-emerald-500" : "bg-stone-300",
+        "support-presence-dot",
+        live ? "support-presence-dot--live" : "support-presence-dot--idle",
         className,
       )}
       aria-hidden

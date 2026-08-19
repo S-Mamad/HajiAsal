@@ -5,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { ShopSortMenu } from "./ShopSortMenu";
 import { ShopInStockToggle } from "./ShopInStockToggle";
 import { ShopLoadMoreButton } from "./ShopLoadMoreButton";
+import { ShopFilterBar } from "./ShopFilterBar";
 
 afterEach(() => {
   cleanup();
@@ -17,6 +18,75 @@ describe("ShopSortMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "مرتب‌سازی" }));
     fireEvent.click(screen.getByRole("option", { name: "ارزان‌ترین" }));
     expect(onChange).toHaveBeenCalledWith("price-asc");
+  });
+});
+
+describe("ShopFilterBar", () => {
+  it("opens dedicated sheets per filter trigger", () => {
+    const updateParams = vi.fn();
+    const onOpenSheet = vi.fn();
+    render(
+      <ShopFilterBar
+        sort="popular"
+        category={null}
+        inStockOnly={false}
+        maxPriceParam={null}
+        categories={[{ id: "mountain", label: "عسل کوهستان" }]}
+        onOpenSheet={onOpenSheet}
+        updateParams={updateParams}
+      />,
+    );
+
+    expect(screen.getByRole("toolbar", { name: "فیلترهای فروشگاه" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "مرتب‌سازی" }));
+    expect(onOpenSheet).toHaveBeenCalledWith("sort");
+
+    fireEvent.click(screen.getByRole("button", { name: "انتخاب دسته‌بندی" }));
+    expect(onOpenSheet).toHaveBeenCalledWith("category");
+
+    fireEvent.click(screen.getByRole("button", { name: "محدوده قیمت" }));
+    expect(onOpenSheet).toHaveBeenCalledWith("price");
+  });
+
+  it("toggles in-stock filter immediately without opening a sheet", () => {
+    const updateParams = vi.fn();
+    const onOpenSheet = vi.fn();
+    render(
+      <ShopFilterBar
+        sort="popular"
+        category={null}
+        inStockOnly={false}
+        maxPriceParam={null}
+        categories={[]}
+        onOpenSheet={onOpenSheet}
+        updateParams={updateParams}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "فقط موجود" }));
+    expect(updateParams).toHaveBeenCalledWith({ inStock: "1" });
+    expect(onOpenSheet).not.toHaveBeenCalled();
+  });
+
+  it("clears active filters from chips", () => {
+    const updateParams = vi.fn();
+    render(
+      <ShopFilterBar
+        sort="price-asc"
+        category="mountain"
+        inStockOnly
+        maxPriceParam="250000"
+        categories={[{ id: "mountain", label: "عسل کوهستان" }]}
+        onOpenSheet={vi.fn()}
+        updateParams={updateParams}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "حذف ارزان‌ترین" }));
+    expect(updateParams).toHaveBeenCalledWith({ sort: null });
+
+    fireEvent.click(screen.getByRole("button", { name: "حذف عسل کوهستان" }));
+    expect(updateParams).toHaveBeenCalledWith({ category: null });
   });
 });
 

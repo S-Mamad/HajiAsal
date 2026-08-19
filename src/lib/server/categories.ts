@@ -10,6 +10,8 @@ export interface CategoryRecord {
   description?: string;
   image?: string;
   sortOrder: number;
+  showOnHome?: boolean;
+  homeLabel?: string;
 }
 
 const siteCategories = (categoriesData as SiteConfig).categories;
@@ -22,6 +24,8 @@ function mapRow(row: Record<string, unknown>): CategoryRecord {
     description: (row.description as string) ?? undefined,
     image: (row.image as string) ?? undefined,
     sortOrder: Number(row.sort_order ?? 0),
+    showOnHome: row.show_on_home === undefined ? true : Boolean(row.show_on_home),
+    homeLabel: row.home_label ? String(row.home_label) : undefined,
   };
 }
 
@@ -47,7 +51,16 @@ export async function getAllCategoriesAsync(): Promise<CategoryRecord[]> {
     description: c.description,
     image: c.image,
     sortOrder: i,
+    showOnHome: c.showOnHome !== false,
+    homeLabel: c.homeLabel,
   }));
+}
+
+export async function getHomeCategoriesAsync(): Promise<CategoryRecord[]> {
+  const all = await getAllCategoriesAsync();
+  return all
+    .filter((c) => c.showOnHome !== false)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function upsertCategoryAsync(
@@ -57,11 +70,13 @@ export async function upsertCategoryAsync(
 
   try {
     await mysqlExecute(
-      `INSERT INTO categories (id, slug, name, description, image, sort_order, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO categories (id, slug, name, description, image, sort_order, show_on_home, home_label, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          slug = VALUES(slug), name = VALUES(name), description = VALUES(description),
-         image = VALUES(image), sort_order = VALUES(sort_order), updated_at = VALUES(updated_at)`,
+         image = VALUES(image), sort_order = VALUES(sort_order),
+         show_on_home = VALUES(show_on_home), home_label = VALUES(home_label),
+         updated_at = VALUES(updated_at)`,
       [
         category.id,
         category.slug,
@@ -69,6 +84,8 @@ export async function upsertCategoryAsync(
         category.description ?? null,
         category.image ?? null,
         category.sortOrder,
+        category.showOnHome !== false ? 1 : 0,
+        category.homeLabel ?? null,
         new Date().toISOString(),
       ],
     );

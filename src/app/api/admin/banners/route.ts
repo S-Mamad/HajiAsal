@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { gateAdmin } from "@/lib/server/admin-gate";
 import {
   deleteBanner,
@@ -11,13 +12,18 @@ import { logAdminAction } from "@/lib/server/audit-log";
 const schema = z.object({
   id: z.string().optional(),
   title: z.string().min(1),
+  subtitle: z.string().nullable().optional(),
   imageUrl: z.string().min(1),
+  imageMobileUrl: z.string().nullable().optional(),
   linkUrl: z.string().nullable().optional(),
+  ctaText: z.string().nullable().optional(),
+  ctaHref: z.string().nullable().optional(),
   placement: z.string().optional(),
   sortOrder: z.number().optional(),
   startsAt: z.string().nullable().optional(),
   endsAt: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -40,6 +46,7 @@ export async function POST(request: Request) {
     entityId: item.id,
     adminUserId: gate.ctx.user?.id,
   });
+  revalidatePath("/");
   return NextResponse.json({ item });
 }
 
@@ -56,5 +63,6 @@ export async function DELETE(request: Request) {
     entityId: id,
     adminUserId: gate.ctx.user?.id,
   });
+  revalidatePath("/");
   return NextResponse.json({ success: true });
 }

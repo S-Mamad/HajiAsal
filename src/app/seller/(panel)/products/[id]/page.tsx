@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminButton } from "@/components/admin/ui/AdminButton";
+import { FramedProductImage } from "@/components/product/media/FramedProductImage";
 import { hajiasalPath } from "@/lib/paths";
+import { imageFitForSrc } from "@/lib/product-image";
 import type { Product, ProductApprovalStatus } from "@/types";
 
 const APPROVAL_LABELS: Record<ProductApprovalStatus, string> = {
@@ -108,11 +110,13 @@ export default function SellerProductViewPage() {
       {error ? <p className="text-sm text-rose-700">{error}</p> : null}
       <div className="rounded-xl border border-stone-200 bg-white p-4">
         {product.images?.[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <FramedProductImage
             src={product.images[0]}
-            alt=""
-            className="mb-3 h-40 w-40 rounded-lg object-cover"
+            alt={product.title}
+            imageFit={imageFitForSrc(product.imageFits, product.images[0])}
+            sizes="160px"
+            className="mb-3 h-40 w-40 rounded-lg"
+            aspectClassName="relative h-full w-full overflow-hidden"
           />
         ) : null}
         <h3 className="text-xl font-semibold">{product.title}</h3>

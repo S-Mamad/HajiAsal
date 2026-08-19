@@ -1,13 +1,13 @@
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { findProfileById } from "@/lib/server/profiles";
+import { findProfileById, getAddressesByUserId } from "@/lib/server/profiles";
 import { getOrdersByUserId } from "@/lib/server/orders";
 import { AccountDashboardClient } from "@/components/account/AccountDashboardClient";
 import {
   getNameInitials,
+  formatDefaultAddressSummary,
   type DashboardOrderCounts,
   type DashboardPendingOrder,
 } from "@/components/account/dashboard-types";
-
 export default async function AccountPage() {
   const session = await getSessionFromCookies();
   const profile = session ? await findProfileById(session.userId) : null;
@@ -15,7 +15,10 @@ export default async function AccountPage() {
 
   const displayName = profile?.fullName?.trim() || "مشتری عزیز";
   const phone = profile?.phone ?? "";
-
+  const addresses = session ? await getAddressesByUserId(session.userId) : [];
+  const defaultAddress =
+    addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+  const addressSummary = formatDefaultAddressSummary(defaultAddress);
   const pendingOrders: DashboardPendingOrder[] = orders
     .filter((o) => o.status === "pending_payment")
     .map((o) => ({
@@ -26,6 +29,7 @@ export default async function AccountPage() {
         productId: item.productId,
         title: item.title,
         image: item.image,
+        imageFit: item.imageFit,
         weightGrams: item.weight.grams,
       })),
     }));
@@ -47,8 +51,8 @@ export default async function AccountPage() {
       displayName={displayName}
       initials={getNameInitials(displayName)}
       phone={phone}
-      pendingOrders={pendingOrders}
-      counts={counts}
+      addressSummary={addressSummary}
+      pendingOrders={pendingOrders}      counts={counts}
       hasAnyOrders={orders.length > 0}
     />
   );

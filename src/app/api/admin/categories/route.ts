@@ -18,6 +18,8 @@ const categorySchema = z.object({
   description: z.string().max(240).optional(),
   image: z.string().max(400).optional(),
   sortOrder: z.number().default(0),
+  showOnHome: z.boolean().optional(),
+  homeLabel: z.string().max(80).optional(),
 });
 
 export async function GET(request: Request) {
